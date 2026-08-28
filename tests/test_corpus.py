@@ -29,7 +29,7 @@ TF_GREEK_IDS = ["g-alpha", "g-nouns", "g-verbs", "g-1john", "g-app", "g-mark"]
 class TestTextualFlow(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        sidecar = load_sidecar(os.path.join(TF_ROOT, "learning", "course.yaml"))
         cls.manifest, cls.issues = compile_course(TF_ROOT, sidecar)
 
     def test_compiles_without_errors(self):
@@ -101,7 +101,7 @@ class TestHubParity(unittest.TestCase):
         import re
         from curricle.hubrender import render_hub
 
-        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        sidecar = load_sidecar(os.path.join(TF_ROOT, "learning", "course.yaml"))
         manifest, _ = compile_course(TF_ROOT, sidecar)
         gen = render_hub(manifest)
 
@@ -129,7 +129,7 @@ class TestCurriculumViewParity(unittest.TestCase):
         import json
         import re
         from curricle.currender import render_curriculum
-        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        sidecar = load_sidecar(os.path.join(TF_ROOT, "learning", "course.yaml"))
         manifest, _ = compile_course(TF_ROOT, sidecar)
         cls.gen = render_curriculum(manifest)
         cls.payload = json.loads(
@@ -175,7 +175,7 @@ class TestResourcesViewParity(unittest.TestCase):
         import json
         import re
         from curricle.resrender import render_resources
-        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        sidecar = load_sidecar(os.path.join(TF_ROOT, "learning", "course.yaml"))
         manifest, _ = compile_course(TF_ROOT, sidecar)
         cls.gen = render_resources(manifest)
         cls.tiers = json.loads(

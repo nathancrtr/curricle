@@ -9,6 +9,7 @@ the manifest YAML only when compilation is clean of errors.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 import yaml
@@ -22,7 +23,8 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     c = sub.add_parser("compile", help="compile curriculum.md + sidecar to a manifest")
     c.add_argument("course_root", help="path to the course repo root")
-    c.add_argument("--sidecar", required=True, help="path to course.yaml")
+    c.add_argument("--sidecar", help="path to course.yaml "
+                                     "(default: <course_root>/learning/course.yaml)")
     c.add_argument("--out", help="write manifest YAML here (default: stdout summary only)")
     c.add_argument("--quiet", action="store_true", help="suppress warnings")
     for name, helptext in (("hub", "render the course hub page from the manifest"),
@@ -30,12 +32,15 @@ def main(argv: list[str] | None = None) -> int:
                            ("resources", "render the resources view from the manifest")):
         h = sub.add_parser(name, help=helptext)
         h.add_argument("course_root", help="path to the course repo root")
-        h.add_argument("--sidecar", required=True, help="path to course.yaml")
+        h.add_argument("--sidecar", help="path to course.yaml "
+                                         "(default: <course_root>/learning/course.yaml)")
         h.add_argument("--out", required=True, help="write the HTML here")
         h.add_argument("--quiet", action="store_true", help="suppress warnings")
     args = parser.parse_args(argv)
 
-    sidecar = load_sidecar(args.sidecar)
+    sidecar_path = args.sidecar or os.path.join(
+        args.course_root, "learning", "course.yaml")
+    sidecar = load_sidecar(sidecar_path)
     manifest, issues = compile_course(args.course_root, sidecar)
 
     shown = [i for i in issues if not (args.quiet and i.level == "warning")]

@@ -15,10 +15,25 @@ material registry), into a validated manifest.
 
 ```bash
 source .venv/bin/activate
-python -m curricle compile ~/repos/textual-flow \
-    --sidecar courses/textual-flow.course.yaml \
-    --out build/textual-flow.manifest.yaml
-python -m unittest discover tests        # includes integration vs. the real courses
+python -m curricle compile ~/repos/textual-flow --out build/textual-flow.manifest.yaml
+python -m curricle hub ~/repos/textual-flow --out .../index.html          # static pages
+python -m unittest discover tests   # incl. integration vs. the real courses and a
+                                    # throwaway Postgres cluster (never a real DB)
+
+# The progress service (Phase 1): Postgres event ledger + web app
+export CURRICLE_DATABASE_URL="postgresql+psycopg:///curricle"
+alembic upgrade head
+python -m curricle tenant create nathan
+python -m curricle serve --course ~/repos/textual-flow \
+    --course ~/repos/rhyme-schemer --tenant nathan --port 8765
+# then: http://localhost:8765/ — same three pages, state server-side
+
+# One-time import of browser localStorage state (run the JS below in the
+# static page's console, paste the copied JSON):
+#   copy(JSON.stringify({progress: localStorage.getItem("tf-progress"),
+#     curriculum_notes: localStorage.getItem("tf-curriculum-notes"),
+#     resources: localStorage.getItem("tf-resources")}))
+python -m curricle import-progress ~/repos/textual-flow --tenant nathan --json '<paste>'
 ```
 
 ## Layout
@@ -32,8 +47,16 @@ python -m unittest discover tests        # includes integration vs. the real cou
 - `curricle/compiler.py` — merge + validate + refuse. House rules the corpus kept
   by discipline are errors or warnings here (dangling refs, unregistered files,
   bare URLs in prose, vanished ids).
-- `courses/` — the sidecars for the existing courses.
-- `build/` — compiled manifests, committed for inspection.
+- `curricle/db.py` — tables, tenancy invariants (T1–T5) satisfied by
+  construction: classification asserted at import, `TenantScope` as the only
+  path to scoped rows, purge/export derived from the classification.
+- `curricle/progress.py` — the event ledger's pure fold and append-time
+  validation against the manifest.
+- `curricle/webapp.py` — FastAPI app serving the three views in server mode
+  (state folded from Postgres, writes POSTed as events).
+- `migrations/` — Alembic; the schema changes by migration only.
+- `build/` — compiled manifests, committed for inspection. Sidecars live in
+  the course repos (`<course>/learning/course.yaml`).
 
 ## Invariants (enforced, not aspirational)
 

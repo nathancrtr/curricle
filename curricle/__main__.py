@@ -36,7 +36,34 @@ def main(argv: list[str] | None = None) -> int:
                                          "(default: <course_root>/learning/course.yaml)")
         h.add_argument("--out", required=True, help="write the HTML here")
         h.add_argument("--quiet", action="store_true", help="suppress warnings")
+    t = sub.add_parser("tenant", help="manage tenants")
+    tsub = t.add_subparsers(dest="tenant_command", required=True)
+    tc = tsub.add_parser("create", help="provision a tenant")
+    tc.add_argument("slug")
+
+    s = sub.add_parser("serve", help="run the web app over the progress service")
+    s.add_argument("--course", action="append", required=True, dest="courses",
+                   help="course repo root (repeatable)")
+    s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
+    s.add_argument("--port", type=int, default=8765)
+
+    imp = sub.add_parser("import-progress",
+                         help="import browser localStorage state as ledger events")
+    imp.add_argument("course_root", help="path to the course repo root")
+    imp.add_argument("--tenant", required=True)
+    imp.add_argument("--json", required=True,
+                     help="JSON: {progress:{}, curriculum_notes:{}, "
+                          "resources:{inhand:{},notes:{}}} — values may also be "
+                          "the raw localStorage strings")
+
     args = parser.parse_args(argv)
+
+    if args.command == "tenant":
+        return _tenant(args)
+    if args.command == "serve":
+        return _serve(args)
+    if args.command == "import-progress":
+        return _import_progress(args)
 
     sidecar_path = args.sidecar or os.path.join(
         args.course_root, "learning", "course.yaml")
@@ -78,6 +105,72 @@ def main(argv: list[str] | None = None) -> int:
             yaml.safe_dump(manifest.to_dict(), f, sort_keys=False,
                            allow_unicode=True, width=100)
         print(f"wrote {args.out}")
+    return 0
+
+
+def _tenant(args) -> int:
+    from . import db
+    engine = db.make_engine()
+    with engine.begin() as conn:
+        tenant_id = db.create_tenant(conn, args.slug)
+    print(f"tenant {args.slug!r} created (id {tenant_id})")
+    return 0
+
+
+def _serve(args) -> int:
+    import uvicorn
+    from .webapp import create_app
+    app = create_app(args.courses, tenant_slug=args.tenant)
+    print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
+    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    return 0
+
+
+def _import_progress(args) -> int:
+    import json
+
+    from . import db, progress
+    from .compiler import compile_course
+
+    sidecar_path = os.path.join(args.course_root, "learning", "course.yaml")
+    manifest, issues = compile_course(args.course_root, load_sidecar(sidecar_path))
+    if manifest is None:
+        for i in issues:
+            print(i, file=sys.stderr)
+        return 1
+
+    blob = json.loads(args.json)
+    def maybe_parse(v):
+        return json.loads(v) if isinstance(v, str) else (v or {})
+    prog = maybe_parse(blob.get("progress"))
+    notes = maybe_parse(blob.get("curriculum_notes"))
+    res = maybe_parse(blob.get("resources"))
+
+    engine = db.make_engine()
+    imported, skipped = 0, []
+    with engine.begin() as conn:
+        scope = db.for_tenant(db.tenant_id_for(conn, args.tenant))
+        def emit(kind, subject, payload):
+            nonlocal imported
+            try:
+                progress.append_event(conn, scope, manifest, kind, subject, payload)
+                imported += 1
+            except progress.InvalidEvent as exc:
+                skipped.append(str(exc))
+        for sid, done in prog.items():
+            emit("mark", sid, {"done": bool(done)})
+        for sid, text in notes.items():
+            if text:
+                emit("note", sid, {"text": text})
+        for key, inhand in (res.get("inhand") or {}).items():
+            emit("resource_mark", key, {"inhand": bool(inhand)})
+        for key, text in (res.get("notes") or {}).items():
+            if text:
+                emit("resource_note", key, {"text": text})
+    print(f"imported {imported} event(s) for tenant {args.tenant!r}, "
+          f"course {manifest.course.id!r}")
+    for s in skipped:
+        print(f"skipped: {s}", file=sys.stderr)
     return 0
 
 

@@ -128,10 +128,18 @@ STYLE = """\
 
 SCRIPT = """\
 const KEY = %(key)s;
+const API = %(api)s;          // null: localStorage mode; else: POST events here
+const INITIAL = %(initial)s;  // {inhand, notes} server-folded, or null
 const TIERS = %(tiers)s;
 
-let state = { inhand: {}, notes: {} };
-try { state = Object.assign(state, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+let state = Object.assign({ inhand: {}, notes: {} }, INITIAL || {});
+if (!API) {
+  try { state = Object.assign(state, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+}
+function send(kind, id, payload) {
+  fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, subject_id: id, payload }) }).catch(() => {});
+}
 
 const TIER1_IDS = (TIERS[0] || {groups:[]}).groups.flatMap(g => g.entries.map(e => e.id));
 const ALL = TIERS.flatMap(t => t.groups.flatMap(g => g.entries));
@@ -200,7 +208,8 @@ function wire() {
       state.inhand[id] = !state.inhand[id];
       entry.classList.toggle("inhand", state.inhand[id]);
       entry.querySelector(".mlabel").textContent = state.inhand[id] ? "In hand" : "Mark in hand";
-      updateMeter(); save();
+      updateMeter();
+      if (API) send("resource_mark", id, { inhand: !!state.inhand[id] }); else save();
       if (needOnly) setTimeout(applyFilter, 600);
     });
     entry.querySelector(".note").addEventListener("click", () => {
@@ -212,7 +221,10 @@ function wire() {
       state.notes[id] = ta.value;
       entry.classList.toggle("hasnote", !!ta.value);
       entry.querySelector(".note").textContent = "Note" + (ta.value ? " ●" : "");
-      save();
+      if (API) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => { send("resource_note", id, { text: ta.value }); toast("Saved"); }, 400);
+      } else save();
     });
   });
 }
@@ -263,7 +275,8 @@ def _chips(r: Resource) -> list[list[str]]:
     return chips
 
 
-def render_resources(mf: Manifest) -> str:
+def render_resources(mf: Manifest, *, api: str | None = None,
+                     initial: dict | None = None) -> str:
     c = mf.course
     e = html.escape
 
@@ -309,6 +322,8 @@ def render_resources(mf: Manifest) -> str:
 
     script = SCRIPT % {
         "key": json.dumps(c.resources_storage_key),
+        "api": json.dumps(api),
+        "initial": json.dumps(initial, ensure_ascii=False),
         "tiers": json.dumps(tiers_js, ensure_ascii=False),
     }
     return f"""<!DOCTYPE html>

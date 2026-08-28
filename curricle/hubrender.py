@@ -65,12 +65,19 @@ STYLE = """\
 
 SCRIPT = """\
 const KEY = %(key)s;
+const API = %(api)s;          // null: localStorage mode; else: POST events here
+const INITIAL = %(initial)s;  // server-folded state, or null
 const PHASES = %(phases)s;
 const TRACKS = %(tracks)s;
 
-let saved = {};
-try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
+let saved = INITIAL || {};
+if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
+function put(id, v) {
+  saved[id] = v;
+  if (API) fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "mark", subject_id: id, payload: { done: v } }) }).catch(() => {});
+  else try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+}
 
 const allUnits = PHASES.flatMap(p => p.units.map(u => u[0]));
 function refresh() {
@@ -97,7 +104,7 @@ for (const p of PHASES) {
     row.className = "unit" + (saved[id] ? " done" : "");
     const cb = document.createElement("input");
     cb.type = "checkbox"; cb.id = id; cb.checked = !!saved[id];
-    cb.onchange = () => { saved[id] = cb.checked; persist(); row.classList.toggle("done", cb.checked); refresh(); };
+    cb.onchange = () => { put(id, cb.checked); row.classList.toggle("done", cb.checked); refresh(); };
     const lb = document.createElement("label");
     lb.htmlFor = id; lb.textContent = label;
     row.appendChild(cb); row.appendChild(lb);
@@ -118,7 +125,7 @@ for (const track of TRACKS) {
     const b = document.createElement("span");
     b.className = "step" + (saved[id] ? " done" : "");
     b.textContent = label;
-    b.onclick = () => { saved[id] = !saved[id]; persist(); b.classList.toggle("done", saved[id]); };
+    b.onclick = () => { put(id, !saved[id]); b.classList.toggle("done", saved[id]); };
     el.appendChild(b);
   });
 }
@@ -126,7 +133,8 @@ refresh();
 """
 
 
-def render_hub(mf: Manifest) -> str:
+def render_hub(mf: Manifest, *, api: str | None = None,
+               initial: dict | None = None) -> str:
     c = mf.course
     e = html.escape
     units_by_id = {u.id: u for u in mf.units}
@@ -233,6 +241,8 @@ def render_hub(mf: Manifest) -> str:
 
     script = SCRIPT % {
         "key": json.dumps(c.progress_storage_key),
+        "api": json.dumps(api),
+        "initial": json.dumps(initial, ensure_ascii=False),
         "phases": json.dumps(phases_js, ensure_ascii=False),
         "tracks": json.dumps(tracks_js, ensure_ascii=False),
     }

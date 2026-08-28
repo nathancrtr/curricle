@@ -164,15 +164,29 @@ STYLE = """\
 SCRIPT = """\
 const KEY = %(key)s;
 const NOTES_KEY = %(notes_key)s;
+const API = %(api)s;          // null: localStorage mode; else: POST events here
+const INITIAL = %(initial)s;  // {progress, notes} server-folded, or null
 const PHASES = %(phases)s;
 const HUB_IDS = %(hub_ids)s;
 
-let progress = {}, notes = {};
-try { progress = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
-try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch (e) {}
+let progress = (INITIAL && INITIAL.progress) || {};
+let notes = (INITIAL && INITIAL.notes) || {};
+if (!API) {
+  try { progress = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+  try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch (e) {}
+}
+function send(kind, id, payload) {
+  fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, subject_id: id, payload }) }).catch(() => {});
+}
+function putMark(id, v) {
+  progress[id] = v;
+  if (API) send("mark", id, { done: v });
+  else persist(KEY, progress);
+}
 
 const isDone = e => e.steps ? e.steps.every(s => progress[s[0]]) : !!progress[e.id];
-const setDone = (e, v) => { if (e.steps) e.steps.forEach(s => progress[s[0]] = v); else progress[e.id] = v; };
+const setDone = (e, v) => { if (e.steps) e.steps.forEach(s => putMark(s[0], v)); else putMark(e.id, v); };
 
 const $ = id => document.getElementById(id);
 function persist(key, obj) { try { localStorage.setItem(key, JSON.stringify(obj)); toast("Saved"); } catch (e) {} }
@@ -247,7 +261,6 @@ function syncEntry(entry, e) {
   entry.classList.toggle("done", isDone(e));
   entry.querySelector(".mlabel").textContent = isDone(e) ? "Done" : "Mark done";
   updateMeter();
-  persist(KEY, progress);
   if (remainingOnly) setTimeout(applyFilter, 600);
 }
 
@@ -270,7 +283,7 @@ function wire() {
     if (e.steps) entry.querySelectorAll(".step-row input").forEach(cb => {
       cb.addEventListener("click", ev => ev.stopPropagation());
       cb.addEventListener("change", () => {
-        progress[cb.id] = cb.checked;
+        putMark(cb.id, cb.checked);
         cb.closest(".step-row").classList.toggle("done", cb.checked);
         syncEntry(entry, e);
       });
@@ -279,7 +292,11 @@ function wire() {
     let t;
     ta.addEventListener("input", () => {
       notes[e.id] = ta.value;
-      clearTimeout(t); t = setTimeout(() => persist(NOTES_KEY, notes), 500);
+      clearTimeout(t);
+      t = setTimeout(() => {
+        if (API) { send("note", e.id, { text: ta.value }); toast("Saved"); }
+        else persist(NOTES_KEY, notes);
+      }, 500);
     });
   });
 }
@@ -320,7 +337,8 @@ def _weeks_label(weeks: tuple[int, int | None] | None) -> str:
     return f"Weeks {start}–{end}"
 
 
-def render_curriculum(mf: Manifest) -> str:
+def render_curriculum(mf: Manifest, *, api: str | None = None,
+                      initial: dict | None = None) -> str:
     c = mf.course
     e = html.escape
     units_by_id = {u.id: u for u in mf.units}
@@ -396,6 +414,8 @@ def render_curriculum(mf: Manifest) -> str:
     script = SCRIPT % {
         "key": json.dumps(c.progress_storage_key),
         "notes_key": json.dumps(c.notes_storage_key),
+        "api": json.dumps(api),
+        "initial": json.dumps(initial, ensure_ascii=False),
         "phases": json.dumps(phases_js, ensure_ascii=False),
         "hub_ids": json.dumps(hub_ids),
     }

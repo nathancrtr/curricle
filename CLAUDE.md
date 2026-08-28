@@ -33,7 +33,31 @@ python -m curricle compile <course_root> --sidecar courses/<id>.course.yaml --ou
 - The YAML `on:` key parses as boolean True (YAML 1.1); the sidecar loader
   normalizes it. Don't rename schema fields to dodge YAML quirks.
 
+## The progress service (Phase 1)
+
+- `db.py` is the only module that may spell `progress_events` — a guard test
+  enforces it. Tenant-scoped rows are reached only through `TenantScope`,
+  built from an explicit tenant id. There is no default tenant anywhere:
+  an unconfigured caller gets an exception, not tenant 0.
+- Every table is classified `TENANT_SCOPED` or `TENANT_LESS` in `db.py`,
+  asserted at import; purge/export registries derive from the classification.
+  Adding a table means classifying it or the module refuses to load.
+- The event ledger is append-only; the fold (`progress.fold`) is pure and
+  orders by row id, never timestamp. Anything stored beside the ledger is a
+  projection — a disagreement is a bug in the projection, never the fold.
+- New event kinds are a migration (the `known_kind` CHECK) plus
+  `db.EVENT_KINDS` plus fold handling — deliberately ceremonious.
+- Schema changes go through Alembic (`migrations/`), never `create_all` in
+  production paths. Migration docstrings explain what and why, essay-style.
+- Tests bring their own Postgres: `tests/pg.py` boots a throwaway initdb
+  cluster per process (unix socket, temp dir, torn down at exit) and runs
+  the migration chain. The suite never reads a database URL from the
+  environment and so cannot be pointed at a real database. Never "fix" that.
+- Dev runbook: `export CURRICLE_DATABASE_URL=postgresql+psycopg:///curricle`,
+  `alembic upgrade head`, `python -m curricle serve --course … --tenant nathan`.
+
 ## What this repo is not (yet)
 
-No web app, no database, no LLM calls. Those are later phases
-(platform-design.md §9); resist pulling them forward into this layer.
+No LLM calls, no auth, no multi-tenant serving (single tenant per app
+instance, resolved at startup). Those are later phases (platform-design.md
+§9); resist pulling them forward into this layer.

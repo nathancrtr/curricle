@@ -66,7 +66,7 @@ class TestTextualFlow(unittest.TestCase):
 class TestRhymeSchemer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        sidecar = load_sidecar(os.path.join(HERE, "courses", "rhyme-schemer.course.yaml"))
+        sidecar = load_sidecar(os.path.join(RS_ROOT, "learning", "course.yaml"))
         cls.manifest, cls.issues = compile_course(RS_ROOT, sidecar)
 
     def test_compiles_without_errors(self):

@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>textual-flow — course hub</title>
+<style>
+  :root { --bg:#faf8f4; --panel:#fff; --ink:#2b2620; --muted:#7a7268; --line:#e3ddd2;
+          --accent:#7c5cbf; --good:#4a7a4e; --chip:#f3efe8; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 Georgia, serif; }
+  .wrap { max-width:980px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:28px; margin:0 0 4px; }
+  h2 { font-size:19px; margin:34px 0 10px; }
+  .sub { color:var(--muted); margin:0 0 6px; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+           padding:14px 16px; }
+  .cols { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; }
+  .phase { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .phase h3 { margin:0 0 2px; font-size:15.5px; }
+  .phase .goal { font:12.5px/1.45 ui-sans-serif,system-ui,sans-serif; color:var(--muted); margin:0 0 8px; }
+  .unit { display:flex; align-items:baseline; gap:8px; font:13.5px/1.7 ui-sans-serif,system-ui,sans-serif; }
+  .unit input { accent-color:var(--accent); transform:translateY(1px); }
+  .unit label { cursor:pointer; }
+  .unit.done label { color:var(--muted); text-decoration:line-through; }
+  .tag { font-size:10.5px; border:1px solid var(--line); border-radius:999px; padding:0 6px;
+         color:var(--muted); white-space:nowrap; }
+  .tag.w { border-color:#c9b8ec; color:var(--accent); }
+  #summary { border-left:3px solid var(--accent); background:var(--panel); padding:10px 14px;
+             margin:14px 0 0; font:14px/1.6 ui-sans-serif,system-ui,sans-serif; }
+  #bar { height:8px; background:var(--chip); border-radius:999px; overflow:hidden; margin-top:8px; }
+  #fill { height:100%; background:var(--accent); width:0; transition:width .3s; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .card h3 { margin:0 0 4px; font-size:15.5px; }
+  .card h3 a { color:var(--accent); text-decoration:none; }
+  .card p { margin:0; font:13px/1.5 ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
+  .say { font-family:ui-monospace,Menlo,monospace; font-size:13px; background:var(--chip);
+         padding:2px 7px; border-radius:6px; display:inline-block; margin:2px 0; }
+  ul.docs { margin:6px 0 0; padding-left:20px; font:14px/1.9 ui-sans-serif,system-ui,sans-serif; }
+  ul.docs a { color:var(--accent); text-decoration:none; }
+  .track { display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+           font:13.5px ui-sans-serif,system-ui,sans-serif; }
+  .track .step { border:1px solid var(--line); border-radius:999px; padding:3px 12px;
+                 background:var(--chip); cursor:pointer; }
+  .track .step.done { background:#eef4ec; border-color:var(--good); color:var(--good); }
+  .track .arrow { color:var(--muted); }
+  footer { margin-top:44px; font:12.5px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--chip);
+         padding:0 4px; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>textual-flow</h1>
+<p class="sub">Learn New Testament textual criticism and computational philology by building a simulation &amp; sensitivity laboratory for the CBGM — with Koine Greek alongside, start to finish.
+ Tick things off as they are truly done; progress lives in this browser only.</p>
+<div id="summary"></div>
+<div id="bar"><div id="fill"></div></div>
+<h2>The program track</h2>
+<div class="cols" id="phases"></div>
+<h2>The Koine Greek track <span class="sub" style="font-size:13px">(1.5-2 hrs/wk, near-daily)</span></h2>
+<div class="panel track" id="track-greek"></div>
+<h2>Widgets &amp; quizzes <span class="sub" style="font-size:13px">(self-contained — they open right here in the browser)</span></h2>
+<div class="cols">
+<div class="card"><h3><a href="interactive/widgets/coherence-explorer.html">Coherence Explorer</a></h3><p>Units 2–4. The toy tradition: flip the editors&#x27; local stemmata, watch ancestry move while raw agreement holds still.</p></div>
+<div class="card"><h3><a href="interactive/widgets/flow-explorer.html">Flow Explorer</a></h3><p>Unit 4. Textual flow per variation unit with the connectivity dial — same toy data, direction fixed, promiscuity variable.</p></div>
+<div class="card"><h3><a href="interactive/widgets/transmission-simulator.html">Transmission Simulator</a></h3><p>Units 8–11. Birth–death copying with loss and contamination — feel the parameter space before you sweep it.</p></div>
+<div class="card"><h3><a href="interactive/quizzes/phase-0-checkpoint.html">Phase 0 Checkpoint</a></h3><p>Nine questions on orientation: what the CBGM takes in, emits, and where the humans sit. Pass before Unit 1.</p></div>
+<div class="card"><h3><a href="interactive/quizzes/phase-1-checkpoint.html">Phase 1 Checkpoint</a></h3><p>Ten questions on the machinery you just reimplemented. Every option explains itself.</p></div>
+<div class="card"><h3><a href="interactive/quizzes/greek-alphabet-trainer.html">Greek Alphabet Trainer</a></h3><p>Phase 0, day one. Letter table with both pronunciation schemes, plus four streak drills. Use daily until boring.</p></div>
+<div class="card"><h3><a href="interactive/quizzes/apparatus-trainer.html">Apparatus Trainer</a></h3><p>Phase 4, Greek track. Decode NA-style apparatus entries: sigla, correctors, vid, and the bracket families.</p></div>
+</div>
+<h2>Worked with Claude <span class="sub" style="font-size:13px">(open a fresh chat in this repo and say the words)</span></h2>
+<div class="panel" style="font:14px/2 ui-sans-serif,system-ui,sans-serif">
+<div><span class="say">Teach me Unit 2 interactively.</span> — Socratic lessons exist for units 1, 2, 3, 4, 6, 8, 19; any other unit gets improvised from the curriculum.</div>
+<div><span class="say">Quiz me on Phase 1.</span> — live quizzing from the question bank, wrong answers taught, not just marked.</div>
+<div><span class="say">Drill me on Greek.</span> — alphabet rounds now; paradigms, parsing, and translate-checks as Decker advances.</div>
+<div><span class="say">Review my Unit 7 design doc — tear it apart.</span></div>
+<div><span class="say">My numbers disagree with open-cbgm. Help me find who&#x27;s wrong.</span></div>
+<div><span class="say">Draft the INTF email with me.</span> — the Phase 2 contact milestone (drafting together; sending is yours).</div>
+</div>
+<h2>Exercises <span class="sub" style="font-size:13px">(stub + failing tests; green bar = done — run in a terminal)</span></h2>
+<div class="cols">
+<div class="card"><h3>unit-01-starter — parse the apparatus (12 failing tests)</h3><p>The TEI parser. 12 failing tests; the oracle is unit-02&#x27;s fixture — same tradition, two encodings. <code>python -m unittest test_tei_parser -v</code></p></div>
+<div class="card"><h3>unit-02-starter — the CBGM&#x27;s two comparisons (13 failing tests)</h3><p>Pregenealogical + genealogical coherence and the ancestor ranking. 13 failing tests over hand-checked values. <code>python -m unittest test_coherence -v</code></p></div>
+<div class="card"><h3>unit-08-starter — the copying process (property tests)</h3><p>The birth–death copying process, property-tested: invariants for every seed, no golden outputs. <code>python -m unittest test_tradition -v</code></p></div>
+</div>
+<h2>The documents</h2>
+<div class="panel"><ul class="docs"><li><a href="curriculum.md">curriculum.md</a> — the whole course: 7 phases, 23 units</li>
+<li><a href="learning-resources.md">learning-resources.md</a> — every source, tiered by role</li>
+<li><a href="README.md">README.md</a> — how to drive all of this</li>
+<li><a href="../REVIEW.md">../REVIEW.md</a> — research positioning</li>
+<li><a href="../exploration/">../exploration/</a> — how this program was chosen</li></ul></div>
+<footer>textual-flow course hub · generated by curricle from the course manifest · course v1.0 — 2026-08-27 · progress is stored in this browser's localStorage</footer>
+</div>
+<script>
+const KEY = "tf-progress";
+const PHASES = [{"name": "Phase 0 — Orientation", "goal": "Know what you're building and why; get the existing tooling running; start Greek.", "units": [["p0-run", "open-cbgm built & run on 3 John, every output eyeballed", []], ["p0-read", "W&G front matter + fast skim; README + REVIEW read", []], ["p0-para", "Milestone paragraph: in, out, where the humans sit", ["quiz"]]]}, {"name": "Phase 1 — The CBGM from the inside", "goal": "Understand the method by reimplementing its core, cross-validated against open-cbgm at every step. By the end you have a working mini-CBGM in Python and there is nothing mystical left in the acronym.", "units": [["u1", "Unit 1 · Witnesses, variants, and the shape of the data", ["lesson", "tests"]], ["u2", "Unit 2 · Pregenealogical coherence", ["lesson", "widget", "tests"]], ["u3", "Unit 3 · Local stemmata and genealogical coherence", ["lesson"]], ["u4", "Unit 4 · Textual flow, connectivity, and the initial text", ["lesson", "widget", "quiz"]]]}, {"name": "Phase 2 — The critics and the dispute", "goal": "Master the methodological debate your program adjudicates, and reproduce its central artifact. This phase is reading-heavier than the others — the write-ups in Phases 4–6 draw their related-work sections directly from it.", "units": [["u5", "Unit 5 · The case for and against", []], ["u6", "Unit 6 · Carlson's bias argument, reproduced", ["lesson"]], ["u7", "Unit 7 · Stemmatology beyond the NT", []], ["p2-mail", "📮 Contact milestone: INTF + McCollum emails sent", []]]}, {"name": "Phase 3 — Building the simulator", "goal": "A synthetic-tradition pipeline, end-to-end into open-cbgm: generate a tradition with known history → export TEI → run the CBGM on it → score the answers against truth. This is capstone infrastructure; build it like production code.", "units": [["u8", "Unit 8 · Transmission as a generative process", ["lesson", "widget", "tests"]], ["u9", "Unit 9 · Mutation, readings, and the oracle editor", []], ["u10", "Unit 10 · TEI export and the validation loop", []], ["u11", "Unit 11 · Contamination", []]]}, {"name": "Phase 4 — The simulation study", "goal": "Run the experiments, measure the Carlson effect honestly, compare rival methods on identical synthetic data, and publish deliverable #1.", "units": [["u12", "Unit 12 · The Carlson experiment at scale", []], ["u13", "Unit 13 · Rivals on the same ground truth", []], ["u14", "Unit 14 · Write-up #1", []]]}, {"name": "Phase 5 — The sensitivity study", "goal": "Turn the perturbation machinery on the *real* ECM 3 John (and whatever the INTF licensing conversation opened up), and publish deliverable #2: how robust is a published critical text to its editors?", "units": [["u15", "Unit 15 · The perturbation harness", []], ["u16", "Unit 16 · Wobble metrics and the headline table", []], ["u17", "Unit 17 · Scale and scope (conditional)", []], ["u18", "Unit 18 · Write-up #2", []]]}, {"name": "Phase 6 — The philology apprenticeship → the LLM study", "goal": "Become competent enough at transcriptional reasoning to evaluate an LLM doing it; then run the local-stemma experiment — deliverable #3 and the capstone.", "units": [["u19", "Unit 19 · Transcriptional probability, by hand", ["lesson"]], ["u20", "Unit 20 · The task, the data, the traps", []], ["u21", "Unit 21 · The experiment", []], ["u22", "Unit 22 · Write-up #3 and the capstone close-out", []]]}];
+const TRACKS = [{"id": "greek", "stages": [["g-alpha", "alphabet"], ["g-nouns", "nouns & articles"], ["g-verbs", "verbs arrive"], ["g-1john", "reading 1 John"], ["g-app", "apparatus literate"], ["g-mark", "Mark with helps"]]}];
+
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
+
+const allUnits = PHASES.flatMap(p => p.units.map(u => u[0]));
+function refresh() {
+  const done = allUnits.filter(id => saved[id]).length;
+  let next = null;
+  for (const p of PHASES) { for (const u of p.units) if (!saved[u[0]]) { next = u[1]; break; } if (next) break; }
+  document.getElementById("fill").style.width = Math.round(100 * done / allUnits.length) + "%";
+  document.getElementById("summary").innerHTML = next
+    ? `<b>${done}/${allUnits.length}</b> program-track items done · next up: <b>${next}</b>`
+    : `<b>Course complete.</b>`;
+}
+
+const phasesDiv = document.getElementById("phases");
+for (const p of PHASES) {
+  const div = document.createElement("div");
+  div.className = "phase";
+  const h = document.createElement("h3"); h.textContent = p.name;
+  const g = document.createElement("p"); g.className = "goal"; g.textContent = p.goal;
+  div.appendChild(h); div.appendChild(g);
+  for (const [id, label, tags] of p.units) {
+    const row = document.createElement("div");
+    row.className = "unit" + (saved[id] ? " done" : "");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.id = id; cb.checked = !!saved[id];
+    cb.onchange = () => { saved[id] = cb.checked; persist(); row.classList.toggle("done", cb.checked); refresh(); };
+    const lb = document.createElement("label");
+    lb.htmlFor = id; lb.textContent = label;
+    row.appendChild(cb); row.appendChild(lb);
+    for (const t of tags || []) {
+      const s = document.createElement("span");
+      s.className = "tag" + (t === "widget" ? " w" : ""); s.textContent = t;
+      row.appendChild(s);
+    }
+    div.appendChild(row);
+  }
+  phasesDiv.appendChild(div);
+}
+
+for (const track of TRACKS) {
+  const el = document.getElementById("track-" + track.id);
+  track.stages.forEach(([id, label], i) => {
+    if (i) { const a = document.createElement("span"); a.className = "arrow"; a.textContent = "\u2192"; el.appendChild(a); }
+    const b = document.createElement("span");
+    b.className = "step" + (saved[id] ? " done" : "");
+    b.textContent = label;
+    b.onclick = () => { saved[id] = !saved[id]; persist(); b.classList.toggle("done", saved[id]); };
+    el.appendChild(b);
+  });
+}
+refresh();
+</script>
+</body>
+</html>

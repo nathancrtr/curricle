@@ -92,6 +92,33 @@ class TestRhymeSchemer(unittest.TestCase):
         self.assertEqual(self.manifest.course.capstone, "u15")
         self.assertEqual(self.manifest.unit("u15").phase, "p5")
 
+@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+class TestHubParity(unittest.TestCase):
+    """The generated hub must expose exactly the original hub's checkable ids."""
+
+    def test_generated_hub_matches_original_ids(self):
+        import json
+        import re
+        from curricle.hubrender import render_hub
+
+        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        manifest, _ = compile_course(TF_ROOT, sidecar)
+        gen = render_hub(manifest)
+
+        payload = re.search(r"const PHASES = (\[.*?\]);\nconst TRACKS = (\[.*?\]);\n",
+                            gen, re.S)
+        phases = json.loads(payload.group(1))
+        tracks = json.loads(payload.group(2))
+        gen_ids = [u[0] for p in phases for u in p["units"]]
+        gen_greek = [s[0] for t in tracks for s in t["stages"]]
+        self.assertEqual(gen_ids, TF_HUB_IDS)
+        self.assertEqual(gen_greek, TF_GREEK_IDS)
+        self.assertIn('const KEY = "tf-progress"', gen)
+        # The p0 milestone step carries the phase-quiz chip, as the original does.
+        p0_rows = phases[0]["units"]
+        self.assertEqual(p0_rows[-1], ["p0-para",
+                         "Milestone paragraph: in, out, where the humans sit", ["quiz"]])
+
 
 if __name__ == "__main__":
     unittest.main()

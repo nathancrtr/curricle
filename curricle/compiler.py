@@ -216,9 +216,10 @@ def _build_course(doc: MdDoc, sidecar: Sidecar, issues: Issues) -> Course:
     return Course(
         id=sc.id, title=sc.title, mode=sc.mode, version=version,
         pacing=Pacing(hours_per_week=sc.hours_per_week, cadence=sc.cadence),
-        docs=sc.docs, profile_line=sc.profile_line,
+        docs=sc.docs, description=sc.description, profile_line=sc.profile_line,
         out_of_scope=sc.out_of_scope, capstone=sc.capstone,
-        version_history=history,
+        version_history=history, trigger_phrases=sc.trigger_phrases,
+        storage_key=sc.storage_key,
     )
 
 
@@ -229,6 +230,7 @@ def _build_materials(sidecar: Sidecar) -> tuple[Material, ...]:
             id=m.id, kind=m.kind, title=m.title, path=m.path, unit=m.unit,
             phase=f"p{m.phase_num}" if m.phase_num is not None else None,
             track=m.track, also_units=m.also_units, grader=m.grader,
+            blurb=m.blurb,
         ))
     return tuple(out)
 

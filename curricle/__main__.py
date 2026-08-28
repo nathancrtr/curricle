@@ -25,6 +25,11 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--sidecar", required=True, help="path to course.yaml")
     c.add_argument("--out", help="write manifest YAML here (default: stdout summary only)")
     c.add_argument("--quiet", action="store_true", help="suppress warnings")
+    h = sub.add_parser("hub", help="render the course hub page from the manifest")
+    h.add_argument("course_root", help="path to the course repo root")
+    h.add_argument("--sidecar", required=True, help="path to course.yaml")
+    h.add_argument("--out", required=True, help="write the hub HTML here")
+    h.add_argument("--quiet", action="store_true", help="suppress warnings")
     args = parser.parse_args(argv)
 
     sidecar = load_sidecar(args.sidecar)
@@ -40,6 +45,13 @@ def main(argv: list[str] | None = None) -> int:
               f"{sum(1 for i in issues if i.level == 'warning')} warning(s)",
               file=sys.stderr)
         return 1
+
+    if args.command == "hub":
+        from .hubrender import render_hub
+        with open(args.out, "w", encoding="utf-8") as f:
+            f.write(render_hub(manifest))
+        print(f"wrote {args.out}")
+        return 0
 
     pids = manifest.progress_ids()
     print(f"{manifest.course.id}: {len(manifest.phases)} phases, "

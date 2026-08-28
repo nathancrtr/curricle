@@ -14,7 +14,7 @@ import yaml
 
 from .schema import (
     Condition, Docs, Grader, Resource, SchemaError,
-    Stage, Step, Track, ensure_empty, take,
+    Stage, Step, Track, TriggerPhrase, ensure_empty, take,
 )
 
 SIDECAR_VERSION = 1
@@ -27,12 +27,15 @@ class SidecarCourse:
     mode: str
     hours_per_week: tuple[int, int]
     cadence: str | None = None
+    description: str | None = None
     profile_line: str | None = None
     docs: Docs = field(default_factory=Docs)
     out_of_scope: tuple[str, ...] = ()
     capstone: str | None = None
     coverage_ignore: tuple[str, ...] = ()   # interactive/ paths that are support
                                             # files, not materials (generators…)
+    trigger_phrases: tuple[TriggerPhrase, ...] = ()
+    storage_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,7 @@ class SidecarMaterial:
     track: str | None = None
     also_units: tuple[str, ...] = ()
     grader: Grader | None = None
+    blurb: str | None = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +152,13 @@ def _course(d: dict, ctx: str) -> SidecarCourse:
         out_of_scope=tuple(take(d, "out_of_scope", ctx, default=[]) or []),
         capstone=take(d, "capstone", ctx),
         coverage_ignore=tuple(take(d, "coverage_ignore", ctx, default=[]) or []),
+        description=take(d, "description", ctx),
+        trigger_phrases=tuple(
+            TriggerPhrase(say=take(t, "say", ctx, required=True),
+                          note=take(t, "note", ctx))
+            for t in take(d, "trigger_phrases", ctx, default=[]) or []
+        ),
+        storage_key=take(d, "storage_key", ctx),
     )
     ensure_empty(d, ctx)
     return course
@@ -245,6 +256,7 @@ def _material(d: dict, ctx: str) -> SidecarMaterial:
             type=take(grader_d, "type", ctx, required=True),
             runner=take(grader_d, "runner", ctx),
             oracle=take(grader_d, "oracle", ctx),
+            command=take(grader_d, "command", ctx),
         )
         ensure_empty(grader_d, f"{ctx}.grader")
     mat = SidecarMaterial(
@@ -257,6 +269,7 @@ def _material(d: dict, ctx: str) -> SidecarMaterial:
         track=take(d, "track", ctx),
         also_units=tuple(take(d, "also_units", ctx, default=[]) or []),
         grader=grader,
+        blurb=take(d, "blurb", ctx),
     )
     ensure_empty(d, ctx)
     return mat

@@ -93,6 +93,12 @@ class Docs:
 
 
 @dataclass(frozen=True)
+class TriggerPhrase:
+    say: str
+    note: str | None = None
+
+
+@dataclass(frozen=True)
 class Course:
     id: str
     title: str
@@ -100,13 +106,21 @@ class Course:
     version: Version
     pacing: Pacing
     docs: Docs = field(default_factory=Docs)
+    description: str | None = None       # one-paragraph front-door prose
     profile_line: str | None = None
     out_of_scope: tuple[str, ...] = ()
     capstone: str | None = None
     version_history: tuple[Version, ...] = ()
+    trigger_phrases: tuple[TriggerPhrase, ...] = ()
+    storage_key: str | None = None       # legacy localStorage key (tf-progress);
+                                         # None derives "{id}-progress"
 
     def __post_init__(self) -> None:
         expect_enum(self.mode, COURSE_MODES, f"course {self.id}")
+
+    @property
+    def progress_storage_key(self) -> str:
+        return self.storage_key or f"{self.id}-progress"
 
 
 @dataclass(frozen=True)
@@ -213,6 +227,7 @@ class Grader:
     type: str
     runner: str | None = None
     oracle: str | None = None
+    command: str | None = None       # the literal "run this" line shown to learners
 
     def __post_init__(self) -> None:
         expect_enum(self.type, GRADER_TYPES, "grader")
@@ -229,6 +244,7 @@ class Material:
     track: str | None = None
     also_units: tuple[str, ...] = ()
     grader: Grader | None = None
+    blurb: str | None = None         # one- or two-sentence card description
 
     def __post_init__(self) -> None:
         expect_enum(self.kind, MATERIAL_KINDS, f"material {self.id}")
@@ -341,11 +357,13 @@ class Manifest:
             ) and "tests" not in tags:
                 tags.append("tests")
         if "quiz" not in tags:
+            phase_quizzes = {m.phase for m in self.materials
+                             if m.kind == "quiz" and m.phase}
             for phase in self.phases:
                 unit_entries = [e for e in phase.entries
                                 if any(u.id == e for u in self.units)]
                 if (unit_entries and unit_entries[-1] == unit_id
-                        and phase.checkpoint and phase.checkpoint.quiz):
+                        and phase.id in phase_quizzes):
                     tags.append("quiz")
         return tuple(tags)
 

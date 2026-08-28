@@ -18,7 +18,24 @@ course:
     curriculum_doc: learning/curriculum.md
     review: REVIEW.md
     exploration: exploration/
+  description: 'Learn New Testament textual criticism and computational philology by building a simulation
+    & sensitivity laboratory for the CBGM — with Koine Greek alongside, start to finish.
+
+    '
   capstone: u22
+  trigger_phrases:
+  - say: Teach me Unit 2 interactively.
+    note: Socratic lessons exist for units 1, 2, 3, 4, 6, 8, 19; any other unit gets improvised from the
+      curriculum.
+  - say: Quiz me on Phase 1.
+    note: live quizzing from the question bank, wrong answers taught, not just marked.
+  - say: Drill me on Greek.
+    note: alphabet rounds now; paradigms, parsing, and translate-checks as Decker advances.
+  - say: Review my Unit 7 design doc — tear it apart.
+  - say: My numbers disagree with open-cbgm. Help me find who's wrong.
+  - say: Draft the INTF email with me.
+    note: the Phase 2 contact milestone (drafting together; sending is yours).
+  storage_key: tf-progress
 tracks:
 - id: greek
   name: Koine Greek
@@ -912,7 +929,7 @@ milestones:
 - id: p2-mail
   phase: p2
   kind: contact
-  label: 'Contact milestone: INTF + McCollum emails sent'
+  label: '📮 Contact milestone: INTF + McCollum emails sent'
   detail: 'Two emails at end of Phase 2: INTF/Munster re reuse/publication terms; Joey McCollum intro.
     Drafts with Claude; sending is the learner''s own act.'
   after_unit: u7
@@ -957,36 +974,49 @@ materials:
   title: Coherence Explorer
   path: interactive/widgets/coherence-explorer.html
   unit: u2
+  blurb: 'Units 2–4. The toy tradition: flip the editors'' local stemmata, watch ancestry move while raw
+    agreement holds still.'
 - id: w-flow
   kind: widget
   title: Flow Explorer
   path: interactive/widgets/flow-explorer.html
   unit: u4
+  blurb: Unit 4. Textual flow per variation unit with the connectivity dial — same toy data, direction
+    fixed, promiscuity variable.
 - id: w-transmission
   kind: widget
   title: Transmission Simulator
   path: interactive/widgets/transmission-simulator.html
   unit: u8
+  blurb: Units 8–11. Birth–death copying with loss and contamination — feel the parameter space before
+    you sweep it.
 - id: q-phase-0
   kind: quiz
   title: Phase 0 Checkpoint
   path: interactive/quizzes/phase-0-checkpoint.html
   phase: p0
+  blurb: 'Nine questions on orientation: what the CBGM takes in, emits, and where the humans sit. Pass
+    before Unit 1.'
 - id: q-phase-1
   kind: quiz
   title: Phase 1 Checkpoint
   path: interactive/quizzes/phase-1-checkpoint.html
   phase: p1
+  blurb: Ten questions on the machinery you just reimplemented. Every option explains itself.
 - id: t-alphabet
   kind: trainer
   title: Greek Alphabet Trainer
   path: interactive/quizzes/greek-alphabet-trainer.html
   track: greek
+  blurb: Phase 0, day one. Letter table with both pronunciation schemes, plus four streak drills. Use
+    daily until boring.
 - id: t-apparatus
   kind: trainer
   title: Apparatus Trainer
   path: interactive/quizzes/apparatus-trainer.html
   track: greek
+  blurb: 'Phase 4, Greek track. Decode NA-style apparatus entries: sigla, correctors, vid, and the bracket
+    families.'
 - id: b-questions
   kind: question-bank
   title: Question Bank
@@ -998,6 +1028,8 @@ materials:
   unit: u1
   grader:
     type: unit-test
+    command: python -m unittest test_tei_parser -v
+  blurb: The TEI parser. 12 failing tests; the oracle is unit-02's fixture — same tradition, two encodings.
 - id: x-u02
   kind: exercise
   title: unit-02-starter — the CBGM's two comparisons (13 failing tests)
@@ -1005,6 +1037,9 @@ materials:
   unit: u2
   grader:
     type: unit-test
+    command: python -m unittest test_coherence -v
+  blurb: Pregenealogical + genealogical coherence and the ancestor ranking. 13 failing tests over hand-checked
+    values.
 - id: x-u08
   kind: exercise
   title: unit-08-starter — the copying process (property tests)
@@ -1012,3 +1047,5 @@ materials:
   unit: u8
   grader:
     type: property-test
+    command: python -m unittest test_tradition -v
+  blurb: 'The birth–death copying process, property-tested: invariants for every seed, no golden outputs.'

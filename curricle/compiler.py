@@ -144,6 +144,7 @@ def compile_course(course_root: str, sidecar: Sidecar) -> tuple[Manifest | None,
         course=_build_course(doc, sidecar, issues),
         tracks=sidecar.tracks,
         resources=sidecar.resources,
+        resource_tiers=sidecar.resource_tiers,
         phases=tuple(phases),
         units=tuple(units),
         milestones=milestones,
@@ -222,6 +223,8 @@ def _build_course(doc: MdDoc, sidecar: Sidecar, issues: Issues) -> Course:
         storage_key=sc.storage_key,
         preamble=tuple(line for line in doc.preamble
                        if not line.startswith("# ")),
+        resources_intro=sc.resources_intro,
+        reading_order=sc.reading_order,
     )
 
 

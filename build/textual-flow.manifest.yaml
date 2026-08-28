@@ -74,6 +74,21 @@ course:
     settles X." The write-up units bake this in.'
   - '**Working with Claude.** *"Teach me Unit 3 interactively"* runs a Socratic lesson guide; *"quiz me
     on Phase 1"* draws from the question bank. See the end of this file.'
+  resources_intro: '**Tier 1** is the core path — worked through substantially, in curriculum order. **Tier
+    2** deepens and fills gaps on demand. **Tier 3** is data, tools, and reference — looked up in, not
+    read. **Tier 4** is video & audio. Each entry says *why this one* and what access costs; mark a resource
+    "in hand" once your copy or access is sorted, and keep loan dates or purchase notes on the entry itself.
+    The unavoidable paid core is **≈ $120** (Wasserman & Gurry + the Mink volume + Decker) — everything
+    else has a free path or a library workaround.'
+  reading_order:
+  - Wasserman & Gurry (fast skim, then chapter-by-chapter through Phase 1)
+  - Parker, selectively (alongside Unit 1)
+  - Mink, pass 1 (Unit 3) — with the Genealogical Queries guide + live tool
+  - Gurry's *Critical Examination* + Mink pass 2 + the Carlson/Mink exchange (Phase 2)
+  - Handbook of Stemmatology ch. 5 + the Camps papers (Phases 2–3)
+  - Taming the BEAST + McCollum & Turnbull (+ McElreath as needed) (Phase 4)
+  - Royse + Metzger's *Commentary* + Willker (Phase 6)
+  - 'Greek: Decker continuously from week 0; STEP Bible from Phase 3; Wallace from Phase 5'
 tracks:
 - id: greek
   name: Koine Greek
@@ -97,123 +112,687 @@ tracks:
   - Greek by now
 resources:
 - key: wg
-  title: Wasserman & Gurry, A New Approach to Textual Criticism
+  title: 'A New Approach to Textual Criticism: An Introduction to the CBGM'
   url: https://cart.sbl-site.org/books/060399P
+  formats:
+  - TEXT
   tier: 1
+  group: Textual criticism & the CBGM
+  cite: Wasserman & Gurry · SBL Press · 2017
+  cost: paid ~$20
+  free: false
+  links:
+  - - SBL Press
+    - https://cart.sbl-site.org/books/060399P
+  why_this_one: The standard gentle on-ramp to the CBGM, written by a sympathetic critic (Gurry) and a
+    practitioner (Wasserman) — ~100 pages, readable in two sittings, and the only book-length introduction
+    that exists. The whole of Phases 0–1 hangs off it.
+  access_note: '**Buy it** — cheap enough to purchase without thinking; used copies are common.'
 - key: mink
-  title: Mink, "Contamination, Coherence, and Coincidence" (in Wachtel & Holmes, The Textual History of
-    the Greek NT)
+  title: “Contamination, Coherence, and Coincidence in Textual Transmission”
   url: https://cart.sbl-site.org/books/067008P
+  formats:
+  - TEXT
   tier: 1
+  group: Textual criticism & the CBGM
+  cite: Gerd Mink · in Wachtel & Holmes (eds.), The Textual History of the Greek New Testament, pp. 141–216
+    · SBL Text-Critical Studies 8 · 2011
+  cost: paid $37 pbk
+  free: false
+  links:
+  - - SBL Press
+    - https://cart.sbl-site.org/books/067008P
+  why_this_one: The primary source — the method from its inventor, in its fullest methodological statement.
+    Dense; the curriculum schedules three passes (definitions → worked examples → adversarial).
+  access_note: '**Not open access** — only the front matter is free. The $37 paperback buys the rest of
+    the volume''s status-quaestionis essays too.'
 - key: gurry
-  title: Gurry, A Critical Examination of the CBGM
+  title: A Critical Examination of the CBGM
   url: https://brill.com/display/title/35755
+  formats:
+  - TEXT
   tier: 1
+  group: Textual criticism & the CBGM
+  cite: Peter Gurry · Brill, NTTSD 55 · 2017
+  cost: paid — expensive
+  free: false
+  links:
+  - - Brill
+    - https://brill.com/display/title/35755
+  - - Free summary article (PDF)
+    - https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf
+  why_this_one: The deepest critical treatment — sympathetic but unsparing on editor-dependence, the initial-text
+    concept, and contamination handling; also the source of the “what did the CBGM actually change” counts
+    your write-ups will cite.
+  access_note: '**Brill pricing is hostile** — interlibrary loan is the move, or lean on the free summary
+    article (also listed in Tier 2) if the price wall wins.'
+- key: carlson
+  title: “A Bias at the Heart of the CBGM” + Mink's reply
+  url: https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm
+  formats:
+  - PAPER
+  tier: 1
+  group: Textual criticism & the CBGM
+  cite: 'Stephen Carlson · JBL 139.2 (2020): 319–340 — with Gerd Mink''s guest-post response · INTF blog
+    · 2020'
+  cost: free
+  free: true
+  links:
+  - - Open copy (ACU repository)
+    - https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm
+  - - Mink's reply (INTF blog)
+    - https://ntvmr.uni-muenster.de/intfblog/-/blogs/remarks-on-carlson-a-bias-at-the-heart-of-the-cbgm-guest-post-by-gerd-mink-
+  why_this_one: The dispute your simulation study adjudicates, in both principals' own words. Unit 6 reproduces
+    the paper's counterexample in code; read both slowly, together.
+  access_note: '**Free** — the JBL article via ACU''s repository, the reply on the INTF blog.'
+- key: parker
+  title: An Introduction to the New Testament Manuscripts and Their Texts
+  url: https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898
+  formats:
+  - TEXT
+  tier: 1
+  group: Textual criticism & the CBGM
+  cite: D.C. Parker · Cambridge UP · 2008
+  cost: paid ~$40–50 pbk
+  free: false
+  links:
+  - - Cambridge
+    - https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898
+  why_this_one: The material-culture grounding the CBGM literature assumes — what manuscripts physically
+    are, how editions get made, how the discipline thinks. Read selectively (Parts I–II) in Phase 1; return
+    whenever the data feels abstract.
+  access_note: '**Paperback or library** — read selectively, so a loan works fine.'
+- key: handbook
+  title: Handbook of Stemmatology
+  url: https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html
+  formats:
+  - TEXT
+  tier: 1
+  group: Stemmatology & simulation
+  cite: ed. Roelli · De Gruyter · 2020
+  cost: free — open access
+  free: true
+  links:
+  - - Open access (CC BY)
+    - https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html
+  why_this_one: The field's canonical reference, free — ch. 5 (computational methods) and the evaluation/artificial-traditions
+    material are Phases 2–3's theoretical backbone. Treat the rest as encyclopedia.
+  access_note: '**Free, CC BY.** Host moved: De Gruyter → degruyterbrill.com (the link is current).'
+- key: camps
+  title: “Lost Manuscripts and Extinct Texts” + “On the Transmission of Texts”
+  url: https://arxiv.org/abs/2210.16577
+  formats:
+  - PAPER
+  tier: 1
+  group: Stemmatology & simulation
+  cite: Camps & Randon-Furling · arXiv · 2022 / 2025
+  cost: free
+  free: true
+  links:
+  - - arXiv:2210.16577
+    - https://arxiv.org/abs/2210.16577
+  - - arXiv:2505.19246
+    - https://arxiv.org/abs/2505.19246
+  why_this_one: The published template for your Unit-8 generator — birth–death copying with loss, calibrated
+    to real traditions. The nearest thing to a spec for `simulate/`.
+  access_note: '**Free** — both on arXiv.'
+- key: decker
+  title: 'Reading Koine Greek: An Introduction and Integrated Workbook'
+  url: https://bakeracademic.com/pages/decker-reading-koine-greek-esources
+  formats:
+  - TEXT
+  tier: 1
+  group: Greek — the continuous track
+  cite: Rodney Decker · Baker Academic · 2014
+  cost: paid ~$55–65
+  free: false
+  links:
+  - - Baker eSources (free audio, flashcards)
+    - https://bakeracademic.com/pages/decker-reading-koine-greek-esources
+  why_this_one: The most linguistically literate of the standard grammars — verbal aspect handled the
+    way a linguistics BA wants it handled, reading-focused, LXX + NT examples from the start, exercises
+    integrated. 33 chapters ≈ the first 8–9 months of the track at one/week.
+  access_note: '**Buy it** — this is the daily companion for most of a year. The eSources page (audio,
+    flashcards) is free.'
+- key: step
+  title: STEP Bible
+  url: https://www.stepbible.org/
+  formats:
+  - DATA
+  tier: 1
+  group: Greek — the continuous track
+  cite: Tyndale House
+  cost: free
+  free: true
+  links:
+  - - stepbible.org
+    - https://www.stepbible.org/
+  why_this_one: Tagged Greek text with instant morphology/gloss on click — the reading scaffold that makes
+    1 John attackable at Decker-ch.-20 Greek. Your daily reading tool from Phase 3 on.
+  access_note: '**Free**, in the browser.'
+- key: metzger
+  title: A Textual Commentary on the Greek New Testament
+  url: urn:isbn:9783438060105
+  formats:
+  - TEXT
+  tier: 1
+  group: Greek — the continuous track
+  cite: Bruce Metzger · 2nd ed., 1994 · current printing Deutsche Bibelgesellschaft · ISBN 9783438060105
+  cost: paid ~$40–60
+  free: false
+  why_this_one: The committee's variant-by-variant reasoning — Phase 6's worked-example set for transcriptional
+    judgment. You'll adjudicate first, then read Metzger, every time.
+  access_note: '**No stable URL** — find by ISBN at the German Bible Society, Amazon, or Logos. Not needed
+    until Phase 6, so no rush.'
+- key: royse
+  title: Scribal Habits in Early Greek New Testament Papyri
+  url: https://cart.sbl-site.org/books/069551P
+  formats:
+  - TEXT
+  tier: 2
+  cite: James Royse · SBL paperback reprint
+  cost: paid $92 — ouch
+  free: false
+  links:
+  - - SBL Press
+    - https://cart.sbl-site.org/books/069551P
+  why_this_one: The empirical demolition of *lectio brevior* and the deepest study of what scribes actually
+    do; Phase 6's spine.
+  access_note: '**Library first** — the summary chapter + one papyrus chapter suffice if the price stings.'
+- key: myths
+  title: Myths and Mistakes in New Testament Textual Criticism
+  url: https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism
+  formats:
+  - TEXT
+  tier: 2
+  cite: Hixson & Gurry (eds.) · IVP Academic · 2019
+  cost: paid ~$25–40
+  free: false
+  links:
+  - - IVP
+    - https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism
+  why_this_one: Calibration on effect sizes and popular overclaims, from the field's younger generation;
+    fast, honest, useful for write-up framing.
+  access_note: '**Affordable** — used copies common.'
+- key: hmf
+  title: “Comparative computational textual criticism of the Gospel of Mark” + McCollum & Turnbull's BEAST
+    worked example
+  url: https://academic.oup.com/dsh/article/41/2/759/8540381
+  formats:
+  - PAPER
+  tier: 2
+  cite: Hyytiäinen, McCollum & Finney · DSH 41.2 · 2026 — and McCollum & Turnbull · DSH 39.1 · 2024
+  cost: paid — check green oa
+  free: false
+  links:
+  - - DSH 2026
+    - https://academic.oup.com/dsh/article/41/2/759/8540381
+  - - DSH 2024 (McCollum & Turnbull)
+    - https://academic.oup.com/dsh/article/39/1/258/7477852
+  why_this_one: 'The state of the art on *real* data, and (explicitly) what it lacks: ground truth — your
+    Unit-13 foil. The 2024 paper is the worked example of BEAST-on-collation you''ll follow.'
+  access_note: '**Paywalled at OUP** — check the authors'' pages for green OA copies before paying.'
+- key: mcelreath
+  title: Statistical Rethinking
+  url: https://xcelab.net/rm/statistical-rethinking/
+  formats:
+  - TEXT
+  tier: 2
+  cite: Richard McElreath · 2nd ed.
+  cost: book paid ~$70–90 · lectures free
+  free: true
+  links:
+  - - Book + course site
+    - https://xcelab.net/rm/statistical-rethinking/
+  - - 2023 lectures (complete playlist)
+    - https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus
+  why_this_one: Simulation-first Bayesian statistics for exactly your kind of mind; chs. 1–2 + lectures
+    before Unit 13 if posteriors feel like folklore. His style is your Phase 3 instinct applied to statistics.
+  access_note: '**Lectures are free** (2023 playlist is complete; a 2026 series tracks the 3rd-edition
+    drafts); the book is optional at this course''s depth.'
+- key: willker
+  title: An Online Textual Commentary on the Greek Gospels
+  url: http://www.willker.de/wie/TCG/index.html
+  formats:
+  - TEXT
+  tier: 2
+  cite: Wieland Willker · 10th ed.
+  cost: free
+  free: true
+  links:
+  - - willker.de
+    - http://www.willker.de/wie/TCG/index.html
+  why_this_one: ~2,600 pages of free variant-by-variant commentary; Phase 6 second opinions beyond Metzger.
+  access_note: '**Free.** Host moved: now on willker.de (the link is current).'
 - key: gurrysum
   title: Gurry's summary article on the CBGM
   url: https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf
+  formats:
+  - PAPER
   tier: 2
-- key: carlson
-  title: Carlson, "A Bias at the Heart of the CBGM" (JBL 139.2)
-  url: https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm
-  tier: 1
-- key: minkreply
-  title: Mink's reply to Carlson (INTF blog)
-  url: https://ntvmr.uni-muenster.de/intfblog/-/blogs/remarks-on-carlson-a-bias-at-the-heart-of-the-cbgm-guest-post-by-gerd-mink-
-  tier: 1
-- key: parker
-  title: Parker, An Introduction to the New Testament Manuscripts and Their Texts
-  url: https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898
-  tier: 1
-- key: handbook
-  title: Handbook of Stemmatology (ed. Roelli)
-  url: https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html
-  tier: 1
-- key: camps1
-  title: Camps & Randon-Furling, "Lost Manuscripts and Extinct Texts"
-  url: https://arxiv.org/abs/2210.16577
-  tier: 1
-- key: camps2
-  title: Camps & Randon-Furling, "On the Transmission of Texts"
-  url: https://arxiv.org/abs/2505.19246
-  tier: 1
-- key: hmf
-  title: Hyytiäinen, McCollum & Finney, "Comparative computational textual criticism of the Gospel of
-    Mark" (DSH 41.2)
-  url: https://academic.oup.com/dsh/article/41/2/759/8540381
-  tier: 2
-- key: mccturn
-  title: McCollum & Turnbull (DSH 39.1) — BEAST-on-collation worked example
-  url: https://academic.oup.com/dsh/article/39/1/258/7477852
-  tier: 2
-- key: mcelreath
-  title: McElreath, Statistical Rethinking
-  url: https://xcelab.net/rm/statistical-rethinking/
-  tier: 2
-- key: decker
-  title: Decker, Reading Koine Greek
-  url: https://bakeracademic.com/pages/decker-reading-koine-greek-esources
-  tier: 1
-- key: step
-  title: STEP Bible (Tyndale House)
-  url: https://www.stepbible.org/
-  tier: 1
+  cite: Peter Gurry · article-length distillation of the monograph
+  cost: free
+  free: true
+  links:
+  - - PDF
+    - https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf
+  why_this_one: The monograph's core argument in article form — the fallback if Brill's price wall wins
+    in Tier 1.
+  access_note: '**Free PDF.**'
 - key: wallace
-  title: Wallace, Greek Grammar Beyond the Basics
+  title: Greek Grammar Beyond the Basics
   url: https://zondervanacademic.com/products/greek-grammar-beyond-the-basics
+  formats:
+  - TEXT
   tier: 2
-- key: willker
-  title: Willker, An Online Textual Commentary on the Greek Gospels
-  url: http://www.willker.de/wie/TCG/index.html
+  cite: Daniel Wallace · Zondervan · 1996
+  cost: paid ~$55–65
+  free: false
+  links:
+  - - Zondervan
+    - https://zondervanacademic.com/products/greek-grammar-beyond-the-basics
+  why_this_one: The intermediate reference grammar; shelf item from Phase 5.
+  access_note: '**Not needed until Phase 5** — buy used when you get there.'
+- key: funk
+  title: A Beginning-Intermediate Grammar of Hellenistic Greek
+  url: https://www.ibiblio.org/bgreek/project/funk-grammar/pre-alpha/
+  formats:
+  - TEXT
   tier: 2
-- key: royse
-  title: Royse, Scribal Habits in Early Greek New Testament Papyri
-  url: https://cart.sbl-site.org/books/069551P
+  cite: Robert Funk · free online edition
+  cost: free
+  free: true
+  links:
+  - - ibiblio
+    - https://www.ibiblio.org/bgreek/project/funk-grammar/pre-alpha/
+  why_this_one: Free second angle when Decker's presentation of something doesn't land.
+  access_note: '**Free.** The site is bot-shielded; it loads fine in a normal browser.'
+- key: ehrman
+  title: 'The New Testament: A Historical Introduction'
+  url: https://global.oup.com/ushe/product/the-new-testament-9780197754023
+  formats:
+  - TEXT
   tier: 2
-- key: myths
-  title: Hixson & Gurry (eds.), Myths and Mistakes in New Testament Textual Criticism
-  url: https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism
+  cite: Ehrman & Méndez · 8th ed. · OUP · 2023
+  cost: paid ~$80–100 new
+  free: false
+  links:
+  - - OUP
+    - https://global.oup.com/ushe/product/the-new-testament-9780197754023
+  why_this_one: The standard critical NT introduction; background reading, not on the critical path.
+  access_note: '**Any recent edition serves — buy used**; older editions are cheap and fine.'
+- key: metzger-ehrman
+  title: The Text of the New Testament
+  url: https://global.oup.com/academic/product/the-text-of-the-new-testament-9780195161229
+  formats:
+  - TEXT
   tier: 2
+  cite: Metzger & Ehrman · 4th ed. · OUP · 2005
+  cost: paid ~$45–55
+  free: false
+  links:
+  - - OUP
+    - https://global.oup.com/academic/product/the-text-of-the-new-testament-9780195161229
+  why_this_one: The classic survey; where Parker is material-first, this is history-first. Optional but
+    orienting.
+  access_note: '**Optional** — used copies everywhere.'
+- key: holmes
+  title: The Text of the NT in Contemporary Research
+  url: https://brill.com/edcollbook/title/22127
+  formats:
+  - TEXT
+  tier: 2
+  cite: Ehrman & Holmes (eds.) · 2nd ed. · Brill · 2013
+  cost: paid ~$76 pbk
+  free: false
+  links:
+  - - Brill
+    - https://brill.com/edcollbook/title/22127
+  why_this_one: Status-quaestionis essays; mine per-topic (versions, patristics) when a write-up needs
+    a citation anchor.
+  access_note: '**Library / per-chapter** — you''ll want individual essays, not the volume.'
+- key: roos
+  title: “Evaluating methods for computer-assisted stemmatology”
+  url: https://doi.org/10.1093/llc/fqp002
+  formats:
+  - PAPER
+  tier: 2
+  cite: Roos & Heikkilä · Literary and Linguistic Computing 24 · 2009
+  cost: paid — paywalled
+  free: false
+  why_this_one: The artificial-tradition benchmark precedent behind Unit 7's design reading.
+  access_note: '**Paywalled with no good open copy** — the abstract plus the Handbook''s coverage of the
+    same material suffice; don''t pay for this one.'
+- key: exploration
+  title: This repo's own exploration/
+  url: ../exploration/
+  formats:
+  - TEXT
+  tier: 2
+  cite: field map · five candidate prior-art reviews · convergence record
+  cost: free
+  free: true
+  links:
+  - - exploration/
+    - ../exploration/
+  - - candidate 04
+    - ../exploration/candidates/04-local-genealogy.md
+  - - candidate 05
+    - ../exploration/candidates/05-cbgm-sensitivity.md
+  why_this_one: Candidates 04 and 05 are effectively this program's related-work sections pre-written;
+    the field map's §4 (reception discipline) governs every outward-facing artifact.
+  access_note: '**Already yours.**'
 - key: opencbgm
-  title: open-cbgm (reference CBGM implementation)
+  title: open-cbgm + standalone CLI
   url: https://github.com/jjmccollum/open-cbgm
+  formats:
+  - CODE
   tier: 3
+  cite: Joey McCollum · C++ · MIT
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/jjmccollum/open-cbgm
+  why_this_one: Reference CBGM implementation; ships the ECM 3 John TEI **with local stemmata** — the
+    program's home dataset.
 - key: teiphy
-  title: teiphy (TEI collation converter)
+  title: teiphy
   url: https://github.com/jjmccollum/teiphy
+  formats:
+  - CODE
   tier: 3
+  cite: Joey McCollum · Python · MIT
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/jjmccollum/teiphy
+  why_this_one: TEI collation → NEXUS/BEAST/PHYLIP; the Unit-13 bridge.
+- key: vmr2tei
+  title: vmr2tei
+  url: https://github.com/jjmccollum/vmr2tei
+  formats:
+  - CODE
+  tier: 3
+  cite: Joey McCollum
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/jjmccollum/vmr2tei
+  why_this_one: NTVMR apparatus → TEI; the door to more books.
 - key: gq
-  title: Genealogical Queries (INTF live CBGM databases)
+  title: Genealogical Queries (tool · guide · code)
   url: https://ntg.uni-muenster.de/
+  formats:
+  - DATA
   tier: 3
-- key: gqguide
-  title: Genealogical Queries guide
-  url: https://intf.uni-muenster.de/cbgm2/guide_en.html
+  cite: INTF, Münster
+  cost: free to use
+  free: true
+  links:
+  - - Live tool
+    - https://ntg.uni-muenster.de/
+  - - Guide
+    - https://intf.uni-muenster.de/cbgm2/guide_en.html
+  - - Code
+    - https://github.com/SCDH/intf-cbgm
+  why_this_one: INTF's live CBGM databases (Acts, Mark, Revelation, Catholic Letters); the guide is the
+    best module-by-module walkthrough. **DB content license unstated — that's the Phase-2 INTF email.**
+- key: ntvmr
+  title: NTVMR
+  url: https://ntvmr.uni-muenster.de/
+  formats:
+  - DATA
   tier: 3
-- key: tei
+  cite: INTF, Münster
+  cost: cc by-sa
+  free: true
+  links:
+  - - ntvmr.uni-muenster.de
+    - https://ntvmr.uni-muenster.de/
+  why_this_one: Manuscript images + TEI transcriptions (CC BY-SA); also hosts the Amsterdam conjectures
+    DB (CC BY-NC-ND — evaluation only).
+- key: sblgnt
+  title: SBLGNT + MorphGNT
+  url: https://sblgnt.com/
+  formats:
+  - DATA
+  tier: 3
+  cite: Logos / SBL
+  cost: cc by
+  free: true
+  links:
+  - - sblgnt.com
+    - https://sblgnt.com/
+  - - Text on GitHub
+    - https://github.com/LogosBible/SBLGNT
+  - - MorphGNT
+    - https://github.com/morphgnt/sblgnt
+  why_this_one: Open critical text with morphological tagging.
+- key: macula
+  title: MACULA Greek
+  url: https://github.com/Clear-Bible/macula-greek
+  formats:
+  - DATA
+  tier: 3
+  cite: Clear Bible
+  cost: cc by
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/Clear-Bible/macula-greek
+  why_this_one: Syntax trees + semantic annotations.
+- key: na28
+  title: NA28 online
+  url: https://www.die-bibel.de/en/bible/NA28/MAT.1
+  formats:
+  - DATA
+  tier: 3
+  cite: German Bible Society
+  cost: free text
+  free: true
+  links:
+  - - die-bibel.de
+    - https://www.die-bibel.de/en/bible/NA28/MAT.1
+  why_this_one: 'Free NA28 text (no apparatus online). Host moved: academic-bible.com → die-bibel.de (link
+    is current).'
+- key: csntm
+  title: CSNTM
+  url: https://www.csntm.org/
+  formats:
+  - DATA
+  tier: 3
+  cite: Center for the Study of NT Manuscripts
+  cost: free
+  free: true
+  links:
+  - - csntm.org
+    - https://www.csntm.org/
+  - - Collections
+    - https://collections.csntm.org/
+  why_this_one: Free high-res manuscript images — for when you want to *see* a witness.
+- key: beast
+  title: BEAST 2
+  url: https://www.beast2.org/
+  formats:
+  - CODE
+  tier: 3
+  cite: v2.7.8
+  cost: free
+  free: true
+  links:
+  - - beast2.org
+    - https://www.beast2.org/
+  why_this_one: Bayesian phylogenetics engine for Unit 13.
+- key: stemma
+  title: Carlson's stemma
+  url: https://github.com/stemmatic/stemma
+  formats:
+  - CODE
+  tier: 3
+  cite: Stephen Carlson
+  cost: no license file
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/stemmatic/stemma
+  why_this_one: His cladistic software. **No license file — use, don't redistribute.**
+- key: tc
+  title: 'TC: A Journal of Biblical Textual Criticism'
+  url: https://jbtc.org/
+  formats:
+  - DATA
+  tier: 3
+  cite: open-access venue
+  cost: free
+  free: true
+  links:
+  - - jbtc.org
+    - https://jbtc.org/
+  why_this_one: 'Publishes computational TC; a target for paper #1, and an archive to mine.'
+- key: etc
+  title: Evangelical Textual Criticism blog
+  url: http://evangelicaltextualcriticism.blogspot.com/
+  formats:
+  - DATA
+  tier: 3
+  cite: the field's news hub
+  cost: free
+  free: true
+  links:
+  - - Blog
+    - http://evangelicaltextualcriticism.blogspot.com/
+  why_this_one: 'Read monthly; guest-post when paper #1 lands.'
+- key: teimodule
   title: TEI Critical Apparatus module
   url: https://tei-c.org/release/doc/tei-p5-doc/en/html/TC.html
+  formats:
+  - DATA
   tier: 3
-- key: beast
-  title: BEAST 2 (Bayesian phylogenetics engine)
-  url: https://www.beast2.org/
-  tier: 3
-- key: ttb
-  title: Taming the BEAST (tutorial collection)
-  url: https://taming-the-beast.org/
-  tier: 4
-- key: nabible
-  title: NA28 online (die-bibel.de)
-  url: https://www.die-bibel.de/en/bible/NA28/MAT.1
-  tier: 3
+  cite: TEI P5 Guidelines
+  cost: free
+  free: true
+  links:
+  - - tei-c.org
+    - https://tei-c.org/release/doc/tei-p5-doc/en/html/TC.html
+  why_this_one: The schema your parser and exporter speak.
 - key: anki
-  title: Anki deck (Decker vocab)
+  title: Anki decks (Decker vocab · Mounce w/ audio)
   url: https://ankiweb.net/shared/info/1986594201
+  formats:
+  - DATA
   tier: 3
-- key: srlectures
-  title: Statistical Rethinking lectures (2023 playlist)
-  url: https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus
+  cite: shared decks
+  cost: free
+  free: true
+  links:
+  - - Decker deck
+    - https://ankiweb.net/shared/info/1986594201
+  - - Mounce deck
+    - https://ankiweb.net/shared/info/53361124
+  why_this_one: Shared decks occasionally get purged — **re-download early** and keep a local copy.
+- key: sidequest
+  title: Side-quest data (SQ1–3)
+  url: https://jhsonline.org/index.php/jhs/article/view/29632
+  formats:
+  - DATA
+  tier: 3
+  cite: Cooper Smith criteria · WLC/MACULA Hebrew · T'OMIM
+  cost: open — cc by / pd
+  free: true
+  links:
+  - - Cooper Smith (JHS)
+    - https://jhsonline.org/index.php/jhs/article/view/29632
+  - - MACULA Hebrew
+    - https://github.com/Clear-Bible/macula-hebrew
+  - - T'OMIM (Zenodo)
+    - https://doi.org/10.5281/zenodo.19135731
+  why_this_one: All open; see [candidate 03](../exploration/candidates/03-allusion-benchmark.md) for how
+    each slots into SQ1–3.
+- key: ddg
+  title: Daily Dose of Greek
+  url: https://dailydoseofgreek.com/
+  formats:
+  - VIDEO
   tier: 4
+  cite: weekday verse walkthroughs
+  cost: free
+  free: true
+  links:
+  - - dailydoseofgreek.com
+    - https://dailydoseofgreek.com/
+  why_this_one: Two-minute weekday verse walkthroughs; the lowest-friction way to keep the Greek habit
+    daily. The archive covers 1–3 John.
+  access_note: '**Free** — subscribe by email from week 0.'
+- key: mounce
+  title: Bill Mounce's free BBG course
+  url: https://www.billmounce.com/basicsofbiblicalgreek/grammar
+  formats:
+  - VIDEO
+  tier: 4
+  cite: chapter-by-chapter lectures, vocab audio, quizzes
+  cost: free
+  free: true
+  links:
+  - - Lectures
+    - https://www.billmounce.com/basicsofbiblicalgreek/grammar
+  - - Free dictionary
+    - https://www.billmounce.com/greek-dictionary
+  why_this_one: The video supplement when a Decker chapter needs a second voice — chapter order differs,
+    so map by topic.
+  access_note: '**Free.**'
+- key: srvideo
+  title: Statistical Rethinking lectures
+  url: https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus
+  formats:
+  - VIDEO
+  tier: 4
+  cite: McElreath · 2023 complete · 2026 in progress
+  cost: free
+  free: true
+  links:
+  - - 2023 playlist (complete)
+    - https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus
+  why_this_one: Pair with Unit 13. The 2026 series (playlist PLDcUM9US4XdNOlqSyhe38US8mFgmqzI14) tracks
+    the 3rd-edition drafts.
+  access_note: '**Free on YouTube.**'
+- key: ttb
+  title: Taming the BEAST
+  url: https://taming-the-beast.org/
+  formats:
+  - TEXT
+  - VIDEO
+  tier: 4
+  cite: the BEAST 2 tutorial collection
+  cost: free
+  free: true
+  links:
+  - - taming-the-beast.org
+    - https://taming-the-beast.org/
+  why_this_one: Actively maintained tutorials; do the introductory one before touching your own data in
+    Unit 13.
+  access_note: '**Free.**'
+resource_tiers:
+- num: 1
+  name: The core path
+  role: Worked through substantially, in curriculum order. These ten are the course's spine — the meter
+    above tracks them.
+  compact: false
+- num: 2
+  name: Supplementary & deepening
+  role: Pulled in on demand — when a write-up needs a citation anchor, a concept needs a second angle,
+    or the price of a Tier-1 item wins.
+  compact: false
+- num: 3
+  name: Data, tools & reference
+  role: Looked up in, not read. Licenses noted — they matter to what the program may publish.
+  compact: true
+- num: 4
+  name: Video & audio
+  role: Where video genuinely helps — language habit-forming and statistics lectures.
+  compact: false
 phases:
 - id: p0
   num: 0

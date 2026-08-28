@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 import yaml
 
 from .schema import (
-    Condition, Docs, Grader, Resource, SchemaError,
+    Condition, Docs, Grader, Resource, ResourceTier, SchemaError,
     Stage, Step, Track, TriggerPhrase, ensure_empty, take,
 )
 
@@ -36,6 +36,8 @@ class SidecarCourse:
                                             # files, not materials (generators…)
     trigger_phrases: tuple[TriggerPhrase, ...] = ()
     storage_key: str | None = None
+    resources_intro: str | None = None
+    reading_order: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -84,6 +86,7 @@ class Sidecar:
     course: SidecarCourse
     tracks: tuple[Track, ...] = ()
     resources: tuple[Resource, ...] = ()
+    resource_tiers: tuple[ResourceTier, ...] = ()
     units: tuple[SidecarUnit, ...] = ()
     milestones: tuple[SidecarMilestone, ...] = ()
     materials: tuple[SidecarMaterial, ...] = ()
@@ -113,6 +116,10 @@ def load_sidecar(path: str) -> Sidecar:
         _resource(r, f"{path}:resources[{i}]")
         for i, r in enumerate(take(data, "resources", path, default=[]) or [])
     )
+    resource_tiers = tuple(
+        _resource_tier(t, f"{path}:resource_tiers[{i}]")
+        for i, t in enumerate(take(data, "resource_tiers", path, default=[]) or [])
+    )
     units = tuple(
         _unit(u, f"{path}:units[{i}]")
         for i, u in enumerate(take(data, "units", path, default=[]) or [])
@@ -127,6 +134,7 @@ def load_sidecar(path: str) -> Sidecar:
     )
     ensure_empty(data, path)
     return Sidecar(course=course, tracks=tracks, resources=resources,
+                   resource_tiers=resource_tiers,
                    units=units, milestones=milestones, materials=materials)
 
 
@@ -153,6 +161,8 @@ def _course(d: dict, ctx: str) -> SidecarCourse:
         capstone=take(d, "capstone", ctx),
         coverage_ignore=tuple(take(d, "coverage_ignore", ctx, default=[]) or []),
         description=take(d, "description", ctx),
+        resources_intro=take(d, "resources_intro", ctx),
+        reading_order=tuple(take(d, "reading_order", ctx, default=[]) or []),
         trigger_phrases=tuple(
             TriggerPhrase(say=take(t, "say", ctx, required=True),
                           note=take(t, "note", ctx))
@@ -184,13 +194,26 @@ def _track(d: dict, ctx: str) -> Track:
 
 
 def _resource(d: dict, ctx: str) -> Resource:
+    links = tuple(
+        (str(pair[0]), str(pair[1]))
+        for pair in take(d, "links", ctx, default=[]) or []
+    )
+    url = take(d, "url", ctx)
+    if not url:
+        if not links:
+            raise SchemaError(f"{ctx}: needs 'url' or a non-empty 'links'")
+        url = links[0][1]
     res = Resource(
         key=take(d, "key", ctx, required=True),
         title=take(d, "title", ctx, required=True),
-        url=take(d, "url", ctx, required=True),
+        url=url,
         formats=tuple(take(d, "formats", ctx, default=[]) or []),
         tier=take(d, "tier", ctx),
+        group=take(d, "group", ctx),
+        cite=take(d, "cite", ctx),
         cost=take(d, "cost", ctx),
+        free=take(d, "free", ctx),
+        links=links,
         why_this_one=take(d, "why_this_one", ctx),
         covers=take(d, "covers", ctx),
         verified_at=str(take(d, "verified_at", ctx) or "") or None,
@@ -198,6 +221,17 @@ def _resource(d: dict, ctx: str) -> Resource:
     )
     ensure_empty(d, ctx)
     return res
+
+
+def _resource_tier(d: dict, ctx: str) -> ResourceTier:
+    tier = ResourceTier(
+        num=int(take(d, "num", ctx, required=True)),
+        name=take(d, "name", ctx, required=True),
+        role=take(d, "role", ctx, required=True),
+        compact=bool(take(d, "compact", ctx, default=False)),
+    )
+    ensure_empty(d, ctx)
+    return tier
 
 
 def _unit(d: dict, ctx: str) -> SidecarUnit:

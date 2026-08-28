@@ -44,7 +44,7 @@ class TestTextualFlow(unittest.TestCase):
         self.assertEqual(len(self.manifest.phases), 7)
         self.assertEqual(len(self.manifest.units), 23)
         self.assertEqual(len(self.manifest.materials), 18)
-        self.assertEqual(len(self.manifest.resources), 29)
+        self.assertEqual(len(self.manifest.resources), 43)
 
     def test_every_phase_after_p0_has_goal_and_units(self):
         for p in self.manifest.phases:
@@ -164,6 +164,41 @@ class TestCurriculumViewParity(unittest.TestCase):
     def test_checkpoint_track_goals_render(self):
         p1 = self.payload[1]
         self.assertEqual(p1["checkpoint"]["goals"][0][0], "Koine Greek")
+
+
+@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+class TestResourcesViewParity(unittest.TestCase):
+    """The generated resources view keeps the original's state contract."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        import re
+        from curricle.resrender import render_resources
+        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        manifest, _ = compile_course(TF_ROOT, sidecar)
+        cls.gen = render_resources(manifest)
+        cls.tiers = json.loads(
+            re.search(r"const TIERS = (\[.*?\]);\n\nlet state", cls.gen, re.S).group(1))
+
+    def test_storage_key_is_legacy(self):
+        self.assertIn('const KEY = "tf-resources"', self.gen)
+
+    def test_tier1_core_path_matches_original(self):
+        # The original page's TIER1_IDS, in order — the in-hand meter contract.
+        t1 = [e["id"] for g in self.tiers[0]["groups"] for e in g["entries"]]
+        self.assertEqual(t1, ["wg", "mink", "gurry", "carlson", "parker",
+                              "handbook", "camps", "decker", "step", "metzger"])
+
+    def test_tier_shapes(self):
+        counts = [sum(len(g["entries"]) for g in t["groups"]) for t in self.tiers]
+        self.assertEqual(counts, [10, 13, 16, 4])
+        self.assertTrue(self.tiers[2]["compact"])       # tier 3 is the dense one
+
+    def test_urn_url_renders_linkless(self):
+        entries = [e for t in self.tiers for g in t["groups"] for e in g["entries"]]
+        metzger = next(e for e in entries if e["id"] == "metzger")
+        self.assertEqual(metzger["links"], [])
 
 
 if __name__ == "__main__":

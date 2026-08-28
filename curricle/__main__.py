@@ -26,7 +26,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--out", help="write manifest YAML here (default: stdout summary only)")
     c.add_argument("--quiet", action="store_true", help="suppress warnings")
     for name, helptext in (("hub", "render the course hub page from the manifest"),
-                           ("curriculum", "render the curriculum view from the manifest")):
+                           ("curriculum", "render the curriculum view from the manifest"),
+                           ("resources", "render the resources view from the manifest")):
         h = sub.add_parser(name, help=helptext)
         h.add_argument("course_root", help="path to the course repo root")
         h.add_argument("--sidecar", required=True, help="path to course.yaml")
@@ -48,11 +49,13 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 1
 
-    if args.command in ("hub", "curriculum"):
+    if args.command in ("hub", "curriculum", "resources"):
         if args.command == "hub":
             from .hubrender import render_hub as render
-        else:
+        elif args.command == "curriculum":
             from .currender import render_curriculum as render
+        else:
+            from .resrender import render_resources as render
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(render(manifest))
         print(f"wrote {args.out}")

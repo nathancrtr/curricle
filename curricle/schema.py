@@ -116,6 +116,8 @@ class Course:
                                          # None derives "{id}-progress"
     preamble: tuple[str, ...] = ()       # curriculum.md prose before Phase 0,
                                          # one markdown paragraph per item
+    resources_intro: str | None = None   # standfirst for the resources view
+    reading_order: tuple[str, ...] = ()  # "suggested reading order" items
 
     def __post_init__(self) -> None:
         expect_enum(self.mode, COURSE_MODES, f"course {self.id}")
@@ -126,10 +128,17 @@ class Course:
 
     @property
     def notes_storage_key(self) -> str:
+        return self._sibling_key("curriculum-notes")
+
+    @property
+    def resources_storage_key(self) -> str:
+        return self._sibling_key("resources")
+
+    def _sibling_key(self, suffix: str) -> str:
         base = self.progress_storage_key
         if base.endswith("-progress"):
-            return base[: -len("-progress")] + "-curriculum-notes"
-        return f"{self.id}-curriculum-notes"
+            return base[: -len("progress")] + suffix
+        return f"{self.id}-{suffix}"
 
 
 @dataclass(frozen=True)
@@ -156,14 +165,30 @@ class Track:
 class Resource:
     key: str
     title: str
-    url: str
+    url: str                                  # primary link target
     formats: tuple[str, ...] = ()
     tier: int | None = None
-    cost: str | None = None
+    group: str | None = None                  # sub-heading within the tier
+    cite: str | None = None                   # author · publisher · year line
+    cost: str | None = None                   # the cost chip text ("paid ~$20")
+    free: bool | None = None                  # a genuine no-cost path exists
+    links: tuple[tuple[str, str], ...] = ()   # (label, url); first is primary
     why_this_one: str | None = None
     covers: str | None = None
     verified_at: str | None = None
     access_note: str | None = None
+
+    @property
+    def all_links(self) -> tuple[tuple[str, str], ...]:
+        return self.links or (("Link", self.url),)
+
+
+@dataclass(frozen=True)
+class ResourceTier:
+    num: int
+    name: str
+    role: str                                 # what belonging to this tier means
+    compact: bool = False                     # dense rendering (tools/reference)
 
 
 @dataclass(frozen=True)
@@ -298,6 +323,7 @@ class Manifest:
     course: Course
     tracks: tuple[Track, ...]
     resources: tuple[Resource, ...]
+    resource_tiers: tuple[ResourceTier, ...]
     phases: tuple[Phase, ...]
     units: tuple[Unit, ...]
     milestones: tuple[Milestone, ...]

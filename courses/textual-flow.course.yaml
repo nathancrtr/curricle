@@ -1,0 +1,336 @@
+# Sidecar for the textual-flow course manifest compiler.
+# Harvested 2026-08-28 from learning/curriculum.html (glosses, L table),
+# learning/index.html (p0 steps, Greek ladder, p2-mail), learning/README.md,
+# learning/learning-resources.md (tiers), and the interactive/ tree.
+
+sidecar_version: 1
+course:
+  id: textual-flow
+  title: "Textual criticism & computational philology"
+  mode: research
+  hours_per_week: [3, 5]
+  docs:
+    readme: learning/README.md
+    resources_doc: learning/learning-resources.md
+    curriculum_doc: learning/curriculum.md
+    review: REVIEW.md
+    exploration: exploration/
+  capstone: u22
+
+tracks:
+  - id: greek
+    name: "Koine Greek"
+    cadence: "1.5-2 hrs/wk, near-daily"
+    stages:
+      - {id: g-alpha, label: "alphabet"}
+      - {id: g-nouns, label: "nouns & articles"}
+      - {id: g-verbs, label: "verbs arrive"}
+      - {id: g-1john, label: "reading 1 John"}
+      - {id: g-app, label: "apparatus literate"}
+      - {id: g-mark, label: "Mark with helps"}
+    row_labels: ["Greek track"]
+    checkpoint_labels: ["Greek by now"]
+
+resources:
+  - key: wg
+    title: "Wasserman & Gurry, A New Approach to Textual Criticism"
+    url: "https://cart.sbl-site.org/books/060399P"
+    tier: 1
+  - key: mink
+    title: "Mink, \"Contamination, Coherence, and Coincidence\" (in Wachtel & Holmes, The Textual History of the Greek NT)"
+    url: "https://cart.sbl-site.org/books/067008P"
+    tier: 1
+  - key: gurry
+    title: "Gurry, A Critical Examination of the CBGM"
+    url: "https://brill.com/display/title/35755"
+    tier: 1
+  - key: gurrysum
+    title: "Gurry's summary article on the CBGM"
+    url: "https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf"
+    tier: 2
+  - key: carlson
+    title: "Carlson, \"A Bias at the Heart of the CBGM\" (JBL 139.2)"
+    url: "https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm"
+    tier: 1
+  - key: minkreply
+    title: "Mink's reply to Carlson (INTF blog)"
+    url: "https://ntvmr.uni-muenster.de/intfblog/-/blogs/remarks-on-carlson-a-bias-at-the-heart-of-the-cbgm-guest-post-by-gerd-mink-"
+    tier: 1
+  - key: parker
+    title: "Parker, An Introduction to the New Testament Manuscripts and Their Texts"
+    url: "https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898"
+    tier: 1
+  - key: handbook
+    title: "Handbook of Stemmatology (ed. Roelli)"
+    url: "https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html"
+    tier: 1
+  - key: camps1
+    title: "Camps & Randon-Furling, \"Lost Manuscripts and Extinct Texts\""
+    url: "https://arxiv.org/abs/2210.16577"
+    tier: 1
+  - key: camps2
+    title: "Camps & Randon-Furling, \"On the Transmission of Texts\""
+    url: "https://arxiv.org/abs/2505.19246"
+    tier: 1
+  - key: hmf
+    title: "Hyytiäinen, McCollum & Finney, \"Comparative computational textual criticism of the Gospel of Mark\" (DSH 41.2)"
+    url: "https://academic.oup.com/dsh/article/41/2/759/8540381"
+    tier: 2
+  - key: mccturn
+    title: "McCollum & Turnbull (DSH 39.1) — BEAST-on-collation worked example"
+    url: "https://academic.oup.com/dsh/article/39/1/258/7477852"
+    tier: 2
+  - key: mcelreath
+    title: "McElreath, Statistical Rethinking"
+    url: "https://xcelab.net/rm/statistical-rethinking/"
+    tier: 2
+  - key: decker
+    title: "Decker, Reading Koine Greek"
+    url: "https://bakeracademic.com/pages/decker-reading-koine-greek-esources"
+    tier: 1
+  - key: step
+    title: "STEP Bible (Tyndale House)"
+    url: "https://www.stepbible.org/"
+    tier: 1
+  - key: wallace
+    title: "Wallace, Greek Grammar Beyond the Basics"
+    url: "https://zondervanacademic.com/products/greek-grammar-beyond-the-basics"
+    tier: 2
+  - key: willker
+    title: "Willker, An Online Textual Commentary on the Greek Gospels"
+    url: "http://www.willker.de/wie/TCG/index.html"
+    tier: 2
+  - key: royse
+    title: "Royse, Scribal Habits in Early Greek New Testament Papyri"
+    url: "https://cart.sbl-site.org/books/069551P"
+    tier: 2
+  - key: myths
+    title: "Hixson & Gurry (eds.), Myths and Mistakes in New Testament Textual Criticism"
+    url: "https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism"
+    tier: 2
+  - key: opencbgm
+    title: "open-cbgm (reference CBGM implementation)"
+    url: "https://github.com/jjmccollum/open-cbgm"
+    tier: 3
+  - key: teiphy
+    title: "teiphy (TEI collation converter)"
+    url: "https://github.com/jjmccollum/teiphy"
+    tier: 3
+  - key: gq
+    title: "Genealogical Queries (INTF live CBGM databases)"
+    url: "https://ntg.uni-muenster.de/"
+    tier: 3
+  - key: gqguide
+    title: "Genealogical Queries guide"
+    url: "https://intf.uni-muenster.de/cbgm2/guide_en.html"
+    tier: 3
+  - key: tei
+    title: "TEI Critical Apparatus module"
+    url: "https://tei-c.org/release/doc/tei-p5-doc/en/html/TC.html"
+    tier: 3
+  - key: beast
+    title: "BEAST 2 (Bayesian phylogenetics engine)"
+    url: "https://www.beast2.org/"
+    tier: 3
+  - key: ttb
+    title: "Taming the BEAST (tutorial collection)"
+    url: "https://taming-the-beast.org/"
+    tier: 4
+  - key: nabible
+    title: "NA28 online (die-bibel.de)"
+    url: "https://www.die-bibel.de/en/bible/NA28/MAT.1"
+    tier: 3
+  - key: anki
+    title: "Anki deck (Decker vocab)"
+    url: "https://ankiweb.net/shared/info/1986594201"
+    tier: 3
+  - key: srlectures
+    title: "Statistical Rethinking lectures (2023 playlist)"
+    url: "https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus"
+    tier: 4
+
+units:
+  - id: u0
+    num: 0
+    phase_body: true
+    gloss: "Make open-cbgm run on 3 John, skim the map of the field, start the alphabet — and say in one paragraph where the humans sit in the pipe."
+    steps:
+      - {id: p0-run, label: "open-cbgm built & run on 3 John, every output eyeballed"}
+      - {id: p0-read, label: "W&G front matter + fast skim; README + REVIEW read"}
+      - {id: p0-para, label: "Milestone paragraph: in, out, where the humans sit"}
+  - id: u1
+    num: 1
+    gloss: "Parse the ECM's TEI into your own data model — and meet the apparatus as a sparse matrix with an opinionated schema."
+  - id: u2
+    num: 2
+    gloss: "Percent agreement over jointly extant units — the pure-similarity layer that deliberately claims no direction."
+  - id: u3
+    num: 3
+    gloss: "Thousands of per-unit directed judgments aggregate into witness-level ancestry — and one flipped arrow can make a tie."
+  - id: u4
+    num: 4
+    gloss: "Flow diagrams, the connectivity prior, and the reconstructed witness A — where the editors' dials live."
+  - id: u5
+    num: 5
+    gloss: "The critics read closely, both sides at full strength — and every testable claim goes into dispute.md."
+  - id: u6
+    num: 6
+    gloss: "The 2020 counterexample, encoded as TEI and re-run — dormant six years, now executable."
+  - id: u7
+    num: 7
+    gloss: "What the wider field learned about validating methods on artificial traditions — and the simulator's design doc."
+  - id: u8
+    num: 8
+    gloss: "A birth–death copying process that produces manuscript traditions with their true history attached."
+  - id: u9
+    num: 9
+    gloss: "Copying errors create readings; the oracle editor reports the truth corrupted at rate ε — one parameter, three studies."
+  - id: u10
+    num: 10
+    gloss: "Synthetic tradition → TEI → open-cbgm → scored against truth: one command, and the machine the papers come from."
+  - id: u11
+    num: 11
+    gloss: "Block and per-reading mixture, with every event recorded — simulate the thing the method claims to survive."
+  - id: u12
+    num: 12
+    gloss: "The sweep: how often, and how badly, does the potential-ancestor criterion misorder Carlson-type witnesses?"
+  - id: u13
+    num: 13
+    gloss: "BEAST and NeighborNet on the same synthetic traditions — three method families scored on identical truth."
+  - id: u14
+    num: 14
+    gloss: "Paper #1: calibration, the measured bias, contamination limits — and what it does and doesn't say about the NT."
+  - id: u15
+    num: 15
+    gloss: "Scripted perturbation of the real inputs: stemma flips, connectivity sweeps, witness and unit bootstraps."
+  - id: u16
+    num: 16
+    gloss: "Four stability metrics, one table: dial turned → what moves, how much — read the fragile units in Greek."
+  - id: u17
+    num: 17
+    gloss: "If INTF said yes: Acts, Mark, Revelation (~17,500 more units). If not: deepen 3 John and document the constraint honestly."
+    condition: {on: "INTF licensing answer", state: pending}
+  - id: u18
+    num: 18
+    gloss: "Paper #2: how robust is the ECM text to its editors' judgments — framed by paper #1's calibration."
+  - id: u19
+    num: 19
+    gloss: "Twenty local stemmata built by hand, before looking at the editors' — your own ε, measured."
+  - id: u20
+    num: 20
+    gloss: "Dataset built, labels shuffled, the trivial-star floor computed, memorization probed — the traps built out before the run."
+  - id: u21
+    num: 21
+    gloss: "The prompted runs across three evidence conditions, scored — and the disagreement taxonomy that is the study's heart."
+  - id: u22
+    num: 22
+    gloss: "Paper #3 with its baselines and floors, then PROGRAM.md: what do we now know that nobody knew two years ago?"
+
+milestones:
+  - id: p2-mail
+    phase_num: 2
+    kind: contact
+    after_unit: u7
+    label: "Contact milestone: INTF + McCollum emails sent"
+    detail: "Two emails at end of Phase 2: INTF/Munster re reuse/publication terms; Joey McCollum intro. Drafts with Claude; sending is the learner's own act."
+
+materials:
+  # Lessons
+  - id: l-u01
+    kind: lesson
+    title: "Witnesses, Variants, and the Shape of the Data"
+    path: interactive/lessons/unit-01-collation-data-model.md
+    unit: u1
+  - id: l-u02
+    kind: lesson
+    title: "Pregenealogical Coherence"
+    path: interactive/lessons/unit-02-pregenealogical-coherence.md
+    unit: u2
+  - id: l-u03
+    kind: lesson
+    title: "Local Stemmata & Genealogical Coherence"
+    path: interactive/lessons/unit-03-local-stemmata.md
+    unit: u3
+  - id: l-u04
+    kind: lesson
+    title: "Textual Flow, Connectivity, and the Initial Text"
+    path: interactive/lessons/unit-04-textual-flow.md
+    unit: u4
+  - id: l-u06
+    kind: lesson
+    title: "The Carlson Bias Argument"
+    path: interactive/lessons/unit-06-carlson-bias.md
+    unit: u6
+  - id: l-u08
+    kind: lesson
+    title: "Designing the Simulator"
+    path: interactive/lessons/unit-08-simulation-design.md
+    unit: u8
+  - id: l-u19
+    kind: lesson
+    title: "Transcriptional Probability"
+    path: interactive/lessons/unit-19-transcriptional-probability.md
+    unit: u19
+
+  # Widgets
+  - id: w-coherence
+    kind: widget
+    title: "Coherence Explorer"
+    path: interactive/widgets/coherence-explorer.html
+    unit: u2
+  - id: w-flow
+    kind: widget
+    title: "Flow Explorer"
+    path: interactive/widgets/flow-explorer.html
+    unit: u4
+  - id: w-transmission
+    kind: widget
+    title: "Transmission Simulator"
+    path: interactive/widgets/transmission-simulator.html
+    unit: u8
+
+  # Quizzes & trainers
+  - id: q-phase-0
+    kind: quiz
+    title: "Phase 0 Checkpoint"
+    path: interactive/quizzes/phase-0-checkpoint.html
+    phase_num: 0
+  - id: q-phase-1
+    kind: quiz
+    title: "Phase 1 Checkpoint"
+    path: interactive/quizzes/phase-1-checkpoint.html
+    phase_num: 1
+  - id: t-alphabet
+    kind: trainer
+    title: "Greek Alphabet Trainer"
+    path: interactive/quizzes/greek-alphabet-trainer.html
+    track: greek
+  - id: t-apparatus
+    kind: trainer
+    title: "Apparatus Trainer"
+    path: interactive/quizzes/apparatus-trainer.html
+    track: greek
+  - id: b-questions
+    kind: question-bank
+    title: "Question Bank"
+    path: interactive/quizzes/question-bank.md
+
+  # Exercises (starter directories; graded by their own tests)
+  - id: x-u01
+    kind: exercise
+    title: "unit-01-starter — parse the apparatus (12 failing tests)"
+    path: interactive/exercises/unit-01-starter/
+    unit: u1
+    grader: {type: unit-test}
+  - id: x-u02
+    kind: exercise
+    title: "unit-02-starter — the CBGM's two comparisons (13 failing tests)"
+    path: interactive/exercises/unit-02-starter/
+    unit: u2
+    grader: {type: unit-test}
+  - id: x-u08
+    kind: exercise
+    title: "unit-08-starter — the copying process (property tests)"
+    path: interactive/exercises/unit-08-starter/
+    unit: u8
+    grader: {type: property-test}

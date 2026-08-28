@@ -1,0 +1,97 @@
+"""Integration: the two mature courses must compile clean of errors.
+
+These tests run against the sibling repos when present and skip otherwise —
+the corpus is the compiler's real test suite (platform-design.md §8).
+"""
+
+import os
+import unittest
+
+from curricle.compiler import compile_course
+from curricle.sidecar import load_sidecar
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+REPOS = os.path.dirname(HERE)
+TF_ROOT = os.path.join(REPOS, "textual-flow")
+RS_ROOT = os.path.join(REPOS, "rhyme-schemer")
+
+# The hub's exact checkable set (index.html), which the manifest must reproduce.
+TF_HUB_IDS = [
+    "p0-run", "p0-read", "p0-para",
+    "u1", "u2", "u3", "u4", "u5", "u6", "u7", "p2-mail",
+    "u8", "u9", "u10", "u11", "u12", "u13", "u14", "u15", "u16", "u17",
+    "u18", "u19", "u20", "u21", "u22",
+]
+TF_GREEK_IDS = ["g-alpha", "g-nouns", "g-verbs", "g-1john", "g-app", "g-mark"]
+
+
+@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+class TestTextualFlow(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        cls.manifest, cls.issues = compile_course(TF_ROOT, sidecar)
+
+    def test_compiles_without_errors(self):
+        self.assertIsNotNone(self.manifest, [str(i) for i in self.issues])
+
+    def test_progress_ids_match_the_hub_exactly(self):
+        # Migration safety: localStorage state keyed by these ids must map 1:1.
+        self.assertEqual(list(self.manifest.progress_ids()),
+                         TF_HUB_IDS + TF_GREEK_IDS)
+
+    def test_shape(self):
+        self.assertEqual(len(self.manifest.phases), 7)
+        self.assertEqual(len(self.manifest.units), 23)
+        self.assertEqual(len(self.manifest.materials), 18)
+        self.assertEqual(len(self.manifest.resources), 29)
+
+    def test_every_phase_after_p0_has_goal_and_units(self):
+        for p in self.manifest.phases:
+            self.assertTrue(p.goal, f"{p.id} missing goal")
+            self.assertTrue(p.entries, f"{p.id} has no entries")
+
+    def test_track_goals_captured(self):
+        with_goals = [p.id for p in self.manifest.phases
+                      if p.checkpoint and p.checkpoint.track_goals]
+        self.assertEqual(with_goals, ["p1", "p2", "p3", "p4", "p5"])
+
+    def test_conditional_unit(self):
+        u17 = self.manifest.unit("u17")
+        self.assertIsNotNone(u17.condition)
+        self.assertEqual(u17.condition.state, "pending")
+
+
+@unittest.skipUnless(os.path.isdir(RS_ROOT), "rhyme-schemer repo not present")
+class TestRhymeSchemer(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sidecar = load_sidecar(os.path.join(HERE, "courses", "rhyme-schemer.course.yaml"))
+        cls.manifest, cls.issues = compile_course(RS_ROOT, sidecar)
+
+    def test_compiles_without_errors(self):
+        self.assertIsNotNone(self.manifest, [str(i) for i in self.issues])
+
+    def test_shape(self):
+        self.assertEqual(len(self.manifest.phases), 6)
+        self.assertEqual(len(self.manifest.units), 16)   # u0..u15
+        self.assertEqual(len(self.manifest.materials), 32)
+
+    def test_version_history(self):
+        self.assertEqual(self.manifest.course.version.rev, "1.2")
+        self.assertEqual([v.rev for v in self.manifest.course.version_history], ["1.1"])
+
+    def test_shared_widget_attaches_twice(self):
+        # The rhyme-score sandbox belongs to u7 and also appears in u9.
+        mats7 = {m.id for m in self.manifest.materials_for_unit("u7")}
+        mats9 = {m.id for m in self.manifest.materials_for_unit("u9")}
+        self.assertIn("w-sandbox", mats7)
+        self.assertIn("w-sandbox", mats9)
+
+    def test_capstone_resolves(self):
+        self.assertEqual(self.manifest.course.capstone, "u15")
+        self.assertEqual(self.manifest.unit("u15").phase, "p5")
+
+
+if __name__ == "__main__":
+    unittest.main()

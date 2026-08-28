@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>textual-flow — curriculum</title>
+<style>
+  :root { --bg:#faf8f4; --panel:#fff; --ink:#2b2620; --muted:#7a7268; --faint:#a29a8e;
+          --line:#e3ddd2; --line-soft:#eee9e0; --accent:#7c5cbf; --accent-ink:#fff;
+          --marker:rgba(124,92,191,.16); --good:#4a7a4e; --chip:#f3efe8; }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:15px/1.6 Georgia, 'Times New Roman', serif; }
+  a { color:var(--accent); }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
+  .wrap { max-width:820px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:56px 0 26px; }
+  .eyebrow { font:11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase;
+             color:var(--faint); margin:0 0 18px; }
+  .eyebrow a { color:var(--accent); text-decoration:none; }
+  h1 { font-weight:400; font-size:clamp(34px,6.5vw,50px); line-height:1.06;
+       letter-spacing:-.01em; margin:0; }
+  .standfirst { max-width:54ch; margin:18px 0 0; color:var(--muted); font-size:16px; }
+  .how { margin:30px 0 0; padding:16px 18px; border:1px solid var(--line); border-radius:8px;
+         background:var(--panel); }
+  .how h2 { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.14em;
+            text-transform:uppercase; color:var(--faint); margin:0 0 10px; }
+  .how p { margin:0 0 10px; font-size:14.5px; }
+  .how p:last-child { margin-bottom:0; }
+  .controls { display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px;
+              margin:30px 0 0; padding:14px 0;
+              border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .meter { display:flex; align-items:center; gap:12px; }
+  .ticks { display:flex; gap:3px; flex-wrap:wrap; max-width:340px; }
+  .tick { width:10px; height:5px; border-radius:1px; background:var(--line);
+          transition:background .35s ease; }
+  .tick.on { background:var(--accent); }
+  .count { font:11.5px ui-monospace,Menlo,monospace; letter-spacing:.05em;
+           color:var(--muted); white-space:nowrap; }
+  .spacer { flex:1 1 auto; }
+  button { font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer; }
+  .filter { font:11px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
+            color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:6px 13px;
+            transition:.2s; }
+  .filter:hover { border-color:var(--accent); color:var(--ink); }
+  .filter[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
+  .phase { margin:52px 0 0; }
+  .phase-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
+                padding-bottom:9px; border-bottom:2px solid var(--ink); }
+  .phase-tag { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase; }
+  .phase-name { font-size:19px; font-style:italic; color:var(--muted); }
+  .phase-weeks { font:11px ui-monospace,Menlo,monospace; color:var(--faint); margin-left:auto; }
+  .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:64ch; }
+  .entry { border-bottom:1px solid var(--line-soft); }
+  .entry.hidden { display:none; }
+  .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
+          text-align:left; padding:20px 0 4px; }
+  .head:hover .title { text-decoration:underline; text-decoration-color:var(--line);
+                       text-underline-offset:4px; }
+  .num { font:11.5px ui-monospace,Menlo,monospace; color:var(--faint); padding-top:6px; }
+  .body-col { min-width:0; }
+  .title { font-weight:400; font-size:20px; line-height:1.25; margin:0; }
+  .tag { display:inline-block; vertical-align:2px; margin-left:8px;
+         font:500 9px ui-monospace,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase;
+         color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:1px 7px; }
+  .tag.w { color:var(--accent); border-color:#cfc0ea; }
+  .gloss { position:relative; margin:9px 0 0; font-size:14.5px; max-width:60ch; color:var(--ink); }
+  .gloss-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
+                background:var(--marker); border-radius:.6em .2em .5em .3em;
+                transform:scaleX(0); transform-origin:0 50%;
+                transition:transform .55s cubic-bezier(.2,.7,.3,1); }
+  .gloss-text { position:relative; z-index:1; }
+  .entry.done .gloss-mark { transform:scaleX(1); }
+  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px;
+             margin:10px 0 0; padding:0 0 18px 60px; }
+  .act { font:10.5px ui-monospace,Menlo,monospace; letter-spacing:.1em; text-transform:uppercase;
+         color:var(--muted); transition:color .2s; }
+  .act:hover { color:var(--ink); }
+  .chev { display:inline-block; transition:transform .3s ease; margin-right:6px; }
+  .entry.open .chev { transform:rotate(90deg); }
+  .mark { display:flex; align-items:center; gap:7px; }
+  .dot { width:9px; height:9px; border-radius:50%; border:1px solid var(--faint);
+         background:transparent; transition:.3s; }
+  .entry.done .dot { background:var(--accent); border-color:var(--accent); }
+  .detail { display:grid; grid-template-rows:0fr; transition:grid-template-rows .35s cubic-bezier(.4,0,.2,1); }
+  .entry.open .detail { grid-template-rows:1fr; }
+  .detail-inner { overflow:hidden; }
+  .detail-pad { padding:0 0 26px 60px; max-width:66ch; }
+  .row { margin:0 0 12px; font-size:14.5px; }
+  .row b.lbl { display:block; font:500 10px ui-monospace,Menlo,monospace; letter-spacing:.14em;
+               text-transform:uppercase; color:var(--faint); margin:0 0 3px; }
+  .row a { text-underline-offset:2px; }
+  .key { border-left:3px solid var(--accent); background:var(--panel); padding:9px 13px;
+         border-radius:0 6px 6px 0; }
+  .steps { margin:0 0 12px; }
+  .step-row { display:flex; align-items:baseline; gap:8px; font-size:14.5px; margin:0 0 4px; }
+  .step-row input { accent-color:var(--accent); }
+  .step-row.done label { color:var(--muted); text-decoration:line-through; }
+  .notes-label { display:block; font:500 10px ui-monospace,Menlo,monospace; letter-spacing:.14em;
+                 text-transform:uppercase; color:var(--faint); margin:18px 0 6px; }
+  textarea { width:100%; min-height:64px; resize:vertical; font:14px/1.55 ui-sans-serif,system-ui,sans-serif;
+             color:var(--ink); background:var(--panel); border:1px solid var(--line);
+             border-radius:6px; padding:10px 12px; }
+  textarea::placeholder { color:var(--faint); }
+  .checkpoint { margin:26px 0 0; padding:14px 17px; background:var(--panel);
+                border:1px solid var(--line); border-left:3px solid var(--good); border-radius:8px;
+                font-size:14.5px; }
+  .checkpoint b.cp { display:block; font:500 10.5px ui-monospace,Menlo,monospace;
+                     letter-spacing:.14em; text-transform:uppercase; color:var(--good); margin:0 0 6px; }
+  .checkpoint .track-goal { margin-top:8px; color:var(--muted); }
+  details.check { margin:22px 0 0; padding:12px 16px; background:var(--panel);
+                  border:1px solid var(--line); border-radius:8px; font-size:14.5px; }
+  details.check summary { cursor:pointer; font-weight:700; }
+  details.check div { margin-top:10px; color:var(--muted); }
+  .section { margin:56px 0 0; }
+  .section > h2 { font-size:22px; font-weight:400; margin:0 0 6px; padding-bottom:8px;
+                  border-bottom:2px solid var(--ink); }
+  .section p, .section li { font-size:14.5px; }
+  .section .sub { color:var(--muted); margin:10px 0 0; }
+  .say { font:13px ui-monospace,Menlo,monospace; background:var(--chip); padding:2px 7px;
+         border-radius:6px; }
+  .saylist { list-style:none; padding:0; margin:12px 0 0; }
+  .saylist li { margin:0 0 9px; }
+  code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--chip);
+         padding:0 4px; border-radius:4px; }
+  .empty { display:none; padding:44px 0; text-align:center; font-style:italic;
+           font-size:18px; color:var(--muted); }
+  .empty.show { display:block; }
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+           font:12.5px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
+  .saving { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px);
+            font:10px ui-monospace,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase;
+            background:var(--ink); color:var(--bg); padding:7px 14px; border-radius:3px;
+            opacity:0; pointer-events:none; transition:.25s; }
+  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  @media (max-width:620px) {
+    .head { grid-template-columns:1fr; }
+    .num { padding:0 0 4px; }
+    .actions, .detail-pad { padding-left:0; }
+    .phase-weeks { margin-left:0; }
+  }
+  @media (prefers-reduced-motion:reduce) {
+    * { transition-duration:.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow"><a href="index.html">← course hub</a> &nbsp;·&nbsp; the curriculum ·
+    7 phases · 23 units</p>
+    <h1>Textual criticism &amp; computational philology</h1>
+    <p class="standfirst">Learn New Testament textual criticism and computational philology by building a simulation &amp; sensitivity laboratory for the CBGM — with Koine Greek alongside, start to finish.
+</p>
+    <div class="how"><p>Learn New Testament textual criticism and computational philology <b>by building textual-flow</b> — a simulation and sensitivity laboratory for the Coherence-Based Genealogical Method (CBGM) — through to three research deliverables: a simulation study with known ground truth, a sensitivity analysis of a published critical text, and an LLM local-stemma experiment. For a senior software engineer at ~3–5 hrs/week; roughly 18–24 months, in phases that each stand alone.</p><h2>How this curriculum works</h2><p><b>The research program is the spine.</b> This is a research-driven course: the artifact you're building is a <i>research question and its answer</i>, not just an app. The question (versioned in the repo's <code>REVIEW.md</code> and <code>exploration/convergence.md</code>): <i>how robust is the CBGM — and the New Testament text it now decides — to the human judgments and structural assumptions inside it?</i> Every unit either builds a piece of the apparatus that answers it or builds the background you need to answer it credibly. Where prior work exists (open-cbgm, the artificial-tradition literature), you read it as worked examples; where it doesn't (everything this program contributes), you build it.</p><p><b>Two tracks, interleaved.</b> The <b>program track</b> (~2–3 hrs/wk) builds the laboratory. The <b>Greek track</b> (~1.5–2 hrs/wk, steady) runs continuously from week 0 — languages reward little-and-often far more than bingeing, so treat it as a near-daily 15–25 minute habit rather than a weekly block. Each phase states its Greek goal; the program track is scheduled assuming Greek is happening alongside. The two converge deliberately: the Johannine epistles are simultaneously the simplest Greek in the NT <i>and</i> the ECM data your laboratory runs on. By Phase 5 you will be reading, in Greek, the very variation units your perturbation harness is flipping.</p><p><b>Each unit has:</b> Build (the implementation step) · Read (precise sources — see <code>learning-resources.md</code> for every citation) · Concepts · Exercise · Milestone, and sometimes a Key Insight or an interactive piece in <code>interactive/</code>.</p><p><b>Pacing.</b> One unit ≈ one week at the stated hours, but the variance is real: Unit 3 (genealogical coherence) and Unit 12 (the experiment grid) run long; Units 5 and 14 run short. Phases end with checkpoints; if a checkpoint feels shaky, camp there — the dependency map at the end shows what is load-bearing.</p><p><b>Tests are your grader.</b> From Unit 2 onward you maintain a test suite. The house style (inherited from rhyme-schemer): structural property tests and ordering assertions you trust over exact numbers — plus, unique to this project, <b>cross-validation against open-cbgm</b>: wherever you reimplement a CBGM computation, a test asserts your numbers match Joey McCollum's implementation on the same input. When they disagree, one of you is wrong, and finding out which is always worth the hour.</p><p><b>Reception discipline is part of the method.</b> This field has scar tissue (Morton, Radday — see <code>exploration/field-map.md</code> §4). Every written deliverable follows the rules learned there: calibrated instrument with stated uncertainty, validated on ground truth the guild accepts, never "the computer settles X." The write-up units bake this in.</p><p><b>Working with Claude.</b> <i>"Teach me Unit 3 interactively"</i> runs a Socratic lesson guide; <i>"quiz me on Phase 1"</i> draws from the question bank. See the end of this file.</p></div>
+    <div class="controls">
+      <div class="meter">
+        <div class="ticks" id="ticks" aria-hidden="true"></div>
+        <span class="count" id="count"></span>
+      </div>
+      <span class="spacer"></span>
+      <button class="filter" id="filter" aria-pressed="false">Remaining only</button>
+    </div>
+  </header>
+
+  <main id="list"></main>
+  <p class="empty" id="empty">Nothing remaining at this filter.</p>
+
+  <section class="section"><h2>Working with Claude</h2><ul class="saylist"><li><span class="say">Teach me Unit 2 interactively.</span> — Socratic lessons exist for units 1, 2, 3, 4, 6, 8, 19; any other unit gets improvised from the curriculum.</li><li><span class="say">Quiz me on Phase 1.</span> — live quizzing from the question bank, wrong answers taught, not just marked.</li><li><span class="say">Drill me on Greek.</span> — alphabet rounds now; paradigms, parsing, and translate-checks as Decker advances.</li><li><span class="say">Review my Unit 7 design doc — tear it apart.</span></li><li><span class="say">My numbers disagree with open-cbgm. Help me find who&#x27;s wrong.</span></li><li><span class="say">Draft the INTF email with me.</span> — the Phase 2 contact milestone (drafting together; sending is yours).</li></ul></section>
+
+  <footer>
+    Rendered by curricle from the course manifest — canonical text:
+    <a href="curriculum.md">curriculum.md</a> (v1.0, 2026-08-27) ·
+    progress marks are shared with <a href="index.html">the hub</a> and live in this
+    browser's localStorage · <a href="index.html">← back to the hub</a>
+  </footer>
+</div>
+<div class="saving" id="toast">Saved</div>
+<script>
+const KEY = "tf-progress";
+const NOTES_KEY = "tf-curriculum-notes";
+const PHASES = [{"tag": "phase 0", "name": "Orientation", "weeks": "Weeks 0–2", "goal": "Know what you're building and why; get the existing tooling running; start Greek.", "entries": [{"id": "u0", "num": "00", "title": "Orientation", "gloss": "Make open-cbgm run on 3 John, skim the map of the field, start the alphabet — and say in one paragraph where the humans sit in the pipe.", "tags": ["quiz"], "rows": [["Build", "Clone and build <a href=\"https://github.com/jjmccollum/open-cbgm\" target=\"_blank\" rel=\"noopener\">open-cbgm</a> (and <code>open-cbgm-standalone</code>). Run the full pipeline on the bundled ECM <b>3 John</b> collation (137 witnesses × 116 variation units): populate the cache, print a witness comparison, generate one textual-flow diagram and the global stemma. Don't understand it yet — just make it run and look at every output artifact.", ""], ["Read", "this repo's <code>README.md</code> and <code>REVIEW.md</code> (where this program sits in the field); <code>exploration/convergence.md</code> (why these questions); Wasserman &amp; Gurry, <i>A New Approach to Textual Criticism</i>, front matter + ch. 1 — and skim the whole book fast (~100 pp.) for shape, not mastery.", ""], ["Concepts", "why \"the original text\" became \"the initial text (<i>Ausgangstext</i>)\"; the CBGM pipeline at cartoon level (local decisions → coherence → textual flow → global stemma); what an ECM variation unit is; what this program will do to that pipeline (perturb it, simulate it, imitate its human layer).", ""], ["Greek track", "the alphabet until it's boring. Decker, <i>Reading Koine Greek</i> chs. 1–2; write the alphabet daily; pick a pronunciation and stop worrying about it (Erasmian if you want to match Mounce/Daily Dose materials; reconstructed Koine if your linguist's conscience insists — Decker discusses the options). Set up the Anki deck. The boring machine: <code>interactive/quizzes/greek-alphabet-trainer.html</code> — reference table + four streak drills.", ""], ["Milestone", "open-cbgm outputs in hand for 3 John; a paragraph in your own words: what does the CBGM take in, what does it emit, and where in that pipe do humans sit?", ""], ["Interactive", "quiz <code>interactive/quizzes/phase-0-checkpoint.html</code> — take it after the skim; it grades the milestone paragraph's ingredients.", ""]], "check": {"q": "The CBGM is often called a method for \"reconstructing the stemma of the New Testament.\" Its own inventor denies this. Before Phase 1 — what <i>does</i> it claim to reconstruct, if not a stemma of manuscripts?", "ans": "Relationships between the <i>texts</i> carried by witnesses, not the <i>manuscripts</i> themselves. A 14th-century manuscript can carry a very ancient text. The distinction — texts flow through manuscripts but aren't identical to them — is the method's founding move, and Unit 1 makes it precise."}, "steps": [["p0-run", "open-cbgm built & run on 3 John, every output eyeballed"], ["p0-read", "W&G front matter + fast skim; README + REVIEW read"], ["p0-para", "Milestone paragraph: in, out, where the humans sit"]]}], "checkpoint": null}, {"tag": "phase 1", "name": "The CBGM from the inside", "weeks": "Weeks 3–10", "goal": "Understand the method by reimplementing its core, cross-validated against open-cbgm at every step. By the end you have a working mini-CBGM in Python and there is nothing mystical left in the acronym.", "entries": [{"id": "u1", "num": "01", "title": "Witnesses, variants, and the shape of the data", "gloss": "Parse the ECM's TEI into your own data model — and meet the apparatus as a sparse matrix with an opinionated schema.", "tags": ["lesson", "tests"], "rows": [["Build", "A TEI collation parser. Read the 3 John TEI XML from open-cbgm's <code>examples/</code>; parse it (lxml or ElementTree) into your own model: <code>VariationUnit</code>, <code>Reading</code>, <code>Witness</code>, attestations. Print summary tables: units per chapter, readings per unit, coverage per witness (lacunae!).", ""], ["Read", "Wasserman &amp; Gurry ch. 1 carefully this time; Parker, <i>An Introduction to the NT Manuscripts and Their Texts</i>, the chapters on what manuscripts are and how an edition is made (Parts I–II selectively); the TEI Critical Apparatus module docs as reference while parsing.", ""], ["Concepts", "witness, reading, variation unit, lacuna, correction hands (424C!); positive vs. negative apparatus; why \"witness\" ≠ \"manuscript\" (versions, fathers); the ECM as data, not book.", ""], ["Exercise", "Answer from your parser, with code: which witness has the most lacunose text of 3 John? Which variation unit has the most readings? How many units are binary?", ""], ["Milestone", "<code>parse_collation()</code> with tests; the summary tables committed as a notebook or doc.", ""], ["Key insight", "A critical apparatus is a <i>sparse matrix with an opinionated schema</i> — witnesses × units, mostly empty, every cell a philological judgment. You've spent a career normalizing other people's opinionated schemas; this one is just older.", "key"], ["Interactive", "lesson <code>interactive/lessons/unit-01-collation-data-model.md</code>; starter <code>interactive/exercises/unit-01-starter/</code> — the toy tradition as TEI, 12 failing tests, and the oracle is unit-02's fixture (same tradition, two encodings — your parser proves it).", ""]], "check": null, "steps": null}, {"id": "u2", "num": "02", "title": "Pregenealogical coherence", "gloss": "Percent agreement over jointly extant units — the pure-similarity layer that deliberately claims no direction.", "tags": ["lesson", "widget", "tests"], "rows": [["Build", "Implement percentage agreement: for every witness pair, agreements / jointly-extant units. Produce each witness's ranked \"closest relatives\" table. <b>Cross-validate:</b> open-cbgm's witness comparison output for the same pairs must match your numbers.", ""], ["Read", "Wasserman &amp; Gurry, the pregenealogical coherence chapter; the INTF <i>Genealogical Queries</i> guide (<code>intf.uni-muenster.de/cbgm2/guide_en.html</code>), \"comparison of witnesses\" and \"potential ancestors\" modules — then use the live tool at <code>ntg.uni-muenster.de</code> on the Catholic Letters and find the same witnesses you've been computing.", ""], ["Concepts", "pregenealogical = <i>no direction yet</i>, pure similarity; why percentages (not raw counts) — the lacunae problem; coherent vs. incoherent attestation; connectivity as \"how many relatives count as close.\"", ""], ["Exercise", "<code>interactive/exercises/unit-02-starter/</code> — a stub + failing tests over a small fixture collation with hand-computed expected values. Make them pass, then point the same code at real 3 John.", ""], ["Milestone", "Green tests; your agreement matrix matches open-cbgm; you can say what it means that 01 and 03 are (or aren't) close in 3 John.", ""], ["Interactive", "lesson <code>interactive/lessons/unit-02-pregenealogical-coherence.md</code>; widget <code>interactive/widgets/coherence-explorer.html</code> (the toy tradition — inspect its agreement pane now, ignore the rest until Units 3–4).", ""]], "check": null, "steps": null}, {"id": "u3", "num": "03", "title": "Local stemmata and genealogical coherence", "gloss": "Thousands of per-unit directed judgments aggregate into witness-level ancestry — and one flipped arrow can make a tie.", "tags": ["lesson"], "rows": [["Build", "Extend the parser to read the local stemmata encoded in the TEI (<code>&lt;graph&gt;</code> elements). Implement the genealogical comparison: for each witness pair (W1, W2), count units where W1's reading is prior, posterior, equal, or unrelated per the local stemma. Derive potential-ancestor rankings. Cross-validate against open-cbgm.", ""], ["Read", "Mink, \"Contamination, Coherence, and Coincidence\" (in Wachtel &amp; Holmes, <i>The Textual History of the Greek NT</i>) — first pass: read for the <i>definitions</i> (local stemma, coherence, potential ancestor), skip the worked examples; you'll return in Unit 5. Wasserman &amp; Gurry's corresponding chapter as the gentler parallel text.", ""], ["Concepts", "a local stemma is a <i>directed graph over readings, not witnesses</i> — the single most commonly confused point in the entire method; how thousands of tiny directed judgments aggregate into witness-level directionality; \"potential ancestor\" as a statistical, not historical, claim; the iterative loop (local decisions → coherence → revised local decisions) and why critics call it circular while Mink calls it hermeneutic.", ""], ["Exercise", "Pick three 3 John variation units. From the TEI, draw their local stemmata by hand. Then find one witness pair whose ancestor-direction flips if you reverse <i>one</i> local stemma — compute it.", ""], ["Milestone", "Potential-ancestor tables matching open-cbgm; your hand-worked flip example written up (it is the sensitivity study in embryo — keep it).", ""], ["Key insight", "The local stemma layer is ~<i>n</i> thousand independent human judgments feeding one aggregation function. You have seen this architecture before: labeled training data feeding a model. Phase 6 takes that analogy literally.", "key"], ["Interactive", "lesson <code>interactive/lessons/unit-03-local-stemmata.md</code>; the widget's local-stemma toggles now make sense — flip arrows and watch the ancestor rankings move.", ""]], "check": null, "steps": null}, {"id": "u4", "num": "04", "title": "Textual flow, connectivity, and the initial text", "gloss": "Flow diagrams, the connectivity prior, and the reconstructed witness A — where the editors' dials live.", "tags": ["lesson", "widget", "quiz"], "rows": [["Build", "Generate textual-flow diagrams from your own data structures (emit Graphviz DOT) for a \"perfectly coherent\" unit and a fragmented one. Implement the connectivity parameter and show how a flow diagram changes at connectivity 5 vs. 499. Reproduce one diagram that matches open-cbgm's.", ""], ["Read", "Wasserman &amp; Gurry, the textual flow + initial text chapters; the <i>Genealogical Queries</i> guide's coherence-at-variant-passages module, used live against your diagrams.", ""], ["Concepts", "textual flow as \"for this attestation, where did the reading most plausibly flow from, given global coherence\"; connectivity as a <i>prior on transmission promiscuity</i>; the initial text A as a witness-like construct; why the ECM editors sometimes print a split (diamond) — editorial abstention as data.", ""], ["Exercise", "Find a 3 John unit where the attestation of some reading is <i>incoherent</i> (supporters aren't close relatives). What are the two possible historical stories, and which does the flow diagram favor at each connectivity setting?", ""], ["Milestone", "Your mini-CBGM produces flow diagrams; a short note: \"the three dials a human sets in this method are ___\" (local stemmata, connectivity, witness selection — you'll spend Phase 5 turning them).", ""], ["Interactive", "lesson <code>interactive/lessons/unit-04-textual-flow.md</code>; widget <code>interactive/widgets/flow-explorer.html</code> (the toy tradition's flow diagrams with the connectivity dial — the u3 experiment is the unit in miniature); then quiz <code>interactive/quizzes/phase-1-checkpoint.html</code>.", ""]], "check": null, "steps": null}], "checkpoint": {"text": "You have reimplemented the CBGM's computational core and verified it against the reference implementation. You can define pregenealogical vs. genealogical coherence precisely, read a textual-flow diagram, and name exactly where human judgment enters the pipeline.", "goals": [["Koine Greek", "Decker through ~ch. 8; you can parse articles and first/second-declension nouns and are reading the exercise sentences without dread."]]}}, {"tag": "phase 2", "name": "The critics and the dispute", "weeks": "Weeks 11–16", "goal": "Master the methodological debate your program adjudicates, and reproduce its central artifact. This phase is reading-heavier than the others — the write-ups in Phases 4–6 draw their related-work sections directly from it.", "entries": [{"id": "u5", "num": "05", "title": "The case for and against", "gloss": "The critics read closely, both sides at full strength — and every testable claim goes into dispute.md.", "tags": [], "rows": [["Build", "Nothing new — annotate. Maintain a <code>notes/dispute.md</code> capturing every <i>testable</i> claim you encounter, in a table: claim · source · what data would decide it.", ""], ["Read", "Gurry, <i>A Critical Examination of the CBGM</i>, the chapters on the method's assumptions and its effect on the text (his count of NA28 changes); Mink's \"Contamination, Coherence, and Coincidence,\" second pass — now the worked examples; Hixson &amp; Gurry (eds.), <i>Myths and Mistakes</i>, ch. on \"myths about variants\" for calibration on effect sizes.", ""], ["Concepts", "contamination as the method's <i>raison d'être</i> and its Achilles' heel; editor-dependence (GIGO surface); the \"initial text\" debate (Epp); what the CBGM changed in practice (~34 Catholic-Letters decisions) vs. the rhetoric around it.", ""], ["Exercise", "From Gurry's list of NA28 changes in the Catholic Letters, pick two, look them up in <i>Genealogical Queries</i>, and reconstruct in one paragraph each why coherence tipped the editors.", ""], ["Milestone", "<code>notes/dispute.md</code> with ≥10 testable claims — this is the requirements document for your simulator.", ""]], "check": null, "steps": null}, {"id": "u6", "num": "06", "title": "Carlson's bias argument, reproduced", "gloss": "The 2020 counterexample, encoded as TEI and re-run — dormant six years, now executable.", "tags": ["lesson"], "rows": [["Build", "Encode Carlson's 5-witness, 18-passage counterexample (JBL 2020) as a TEI collation. Run it through open-cbgm <i>and</i> your mini-CBGM. Reproduce the misordering: the potential-ancestor criterion demoting the faithful copyist of an old exemplar.", ""], ["Read", "Carlson, \"A Bias at the Heart of the CBGM\" (JBL 139.2, open copy via ACU repository); Mink's reply (\"Remarks on Carlson,\" INTF blog, 2020); both slowly, with your <code>dispute.md</code> open.", ""], ["Concepts", "<i>why</i> the bias arises (a witness preserving many superseded-but-prior readings looks \"posterior on average\"); Mink's two defenses (illegitimate hypothetical witnesses; wrong module tested) and what each would predict <i>if the experiment were run properly</i> — which nobody has done, which is Unit 12.", ""], ["Exercise", "Perturb Carlson's example: how small can you make it and keep the misordering? At what mixture rate does it disappear? (Hand exploration now; the grid comes in Phase 4.)", ""], ["Milestone", "<code>carlson-2020/</code> directory in the repo: the encoded example, a script, a README showing the reproduced effect. Six years dormant, now executable — this artifact alone is worth a blog post.", ""], ["Interactive", "lesson <code>interactive/lessons/unit-06-carlson-bias.md</code>.", ""]], "check": null, "steps": null}, {"id": "u7", "num": "07", "title": "Stemmatology beyond the NT", "gloss": "What the wider field learned about validating methods on artificial traditions — and the simulator's design doc.", "tags": [], "rows": [["Build", "Skeleton of the simulator package (<code>textual_flow/simulate/</code>): empty modules, interfaces, and a design doc mapping the artificial-tradition literature's choices (tradition size, loss rate, mixture model) onto constructor parameters.", ""], ["Read", "<i>Handbook of Stemmatology</i> (open access), ch. 5 (computational methods) and the sections on evaluation with artificial traditions; Roos &amp; Heikkilä (LLC 2009) for the benchmark idea; Camps &amp; Randon-Furling, \"Lost Manuscripts and Extinct Texts\" (arXiv) as the generative-model template; skim Hyytiäinen–McCollum–Finney (DSH 2026) to see the state of the art on <i>real</i> data and confirm what it lacks (ground truth).", ""], ["Concepts", "stemma vs. phylogeny vs. network; contamination breaks trees; artificial traditions as the field's own answer to \"how would we know a method works?\"; birth–death processes as an engineer's model of copying-and-loss.", ""], ["Exercise", "Write the design doc's key table: every parameter of your future simulator, its range, and which <i>published claim</i> from <code>dispute.md</code> it exists to test.", ""], ["Milestone", "Design doc reviewed (bring it to Claude: \"tear this apart\"); simulator skeleton committed.", ""]], "check": null, "steps": null}, {"id": "p2-mail", "num": "·", "title": "📮 Contact milestone: INTF + McCollum emails sent", "gloss": "Two emails at end of Phase 2: INTF/Munster re reuse/publication terms; Joey McCollum intro. Drafts with Claude; sending is the learner's own act.", "tags": ["contact"], "rows": [], "check": null, "steps": null}], "checkpoint": {"text": "You can state both sides of the Carlson–Mink dispute in their strongest forms, you have reproduced its central example in running code, and your simulator's design is an itemized answer to \"what would settle this?\"", "goals": [["Koine Greek", "Decker through ~ch. 14; verbs have arrived (present/imperfect); you're translating short LXX/NT sentences daily."]]}}, {"tag": "phase 3", "name": "Building the simulator", "weeks": "Weeks 17–26", "goal": "A synthetic-tradition pipeline, end-to-end into open-cbgm: generate a tradition with known history → export TEI → run the CBGM on it → score the answers against truth. This is capstone infrastructure; build it like production code.", "entries": [{"id": "u8", "num": "08", "title": "Transmission as a generative process", "gloss": "A birth–death copying process that produces manuscript traditions with their true history attached.", "tags": ["lesson", "widget", "tests"], "rows": [["Build", "<code>simulate/tradition.py</code>: a birth–death copying process over a timeline — manuscripts are created by copying an extant exemplar, survive, decay, are lost; a sampling step decides which survive to be \"extant witnesses.\" Pure tree mode first (single exemplar per copy). Parameters: birth/death rates, timeline length, target extant count.", ""], ["Read", "Camps &amp; Randon-Furling (both papers) — for the model family and for honest priors on loss rates; your own design doc.", ""], ["Concepts", "the <i>true stemma</i> as a byproduct of generation; why massive loss (&gt;90% of medieval traditions) makes reconstruction hard <i>in principle</i>; seeding and reproducibility discipline for simulation science (every tradition regenerable from a config + seed).", ""], ["Exercise", "<code>interactive/exercises/unit-08-starter/</code> — property tests for the generator (every witness has exactly one parent in tree mode; the true stemma is acyclic; extant count hits target; agreement decays with stemmatic distance). Make them pass.", ""], ["Milestone", "Traditions generating; a gallery of five true stemmata rendered via Graphviz at different loss rates.", ""], ["Interactive", "widget <code>interactive/widgets/transmission-simulator.html</code> — the browser version of what you just built; use it to <i>feel</i> the parameter space before you sweep it. Lesson <code>interactive/lessons/unit-08-simulation-design.md</code>.", ""]], "check": null, "steps": null}, {"id": "u9", "num": "09", "title": "Mutation, readings, and the oracle editor", "gloss": "Copying errors create readings; the oracle editor reports the truth corrupted at rate ε — one parameter, three studies.", "tags": [], "rows": [["Build", "<code>simulate/mutation.py</code>: variation units arise by copying errors — per-copy mutation probability, reading multiplicity, back-mutation/coincidental agreement rate. Then <code>simulate/oracle.py</code>: the <b>oracle editor</b> — emits local stemmata for each unit from the <i>true</i> reading genealogy, corrupted at error rate ε (flip a direction, merge readings, declare \"unclear\") — because the real CBGM never sees truth, only an editor's judgment of it.", ""], ["Read", "Nothing new — this unit is pure design + code. Revisit <code>dispute.md</code>: which claims need which corruption modes.", ""], ["Concepts", "ε as <i>the</i> bridge parameter: it models editorial fallibility in simulation, it is what Phase 5 perturbs on real data, and it is what Phase 6 measures empirically with an LLM. One parameter, three studies.", ""], ["Exercise", "Generate a 20-witness tradition; hand-check three units: does the emitted local stemma at ε=0 match the true reading history? At ε=0.2, what kinds of lies does the oracle tell?", ""], ["Milestone", "Full synthetic collations with ground-truth sidecar files (true stemma, true initial text, true ancestor relations per pair).", ""]], "check": null, "steps": null}, {"id": "u10", "num": "10", "title": "TEI export and the validation loop", "gloss": "Synthetic tradition → TEI → open-cbgm → scored against truth: one command, and the machine the papers come from.", "tags": [], "rows": [["Build", "<code>simulate/export.py</code>: synthetic tradition → TEI XML in open-cbgm's dialect (your Unit-1 parser round-trips it — test that). Then the moment of truth: open-cbgm consumes a synthetic tradition and emits its answers. <code>score.py</code>: initial-text recovery rate, potential-ancestor rank correlation (Kendall τ against true ancestor sets), flow-diagram edge accuracy.", ""], ["Read", "open-cbgm's README/design paper for its TEI expectations; teiphy's docs (you'll want its format conversions in Unit 13).", ""], ["Concepts", "the validation question stated properly: <i>on clean tree-shaped data with a perfect editor, the CBGM should shine</i> — establishing that it does is not a gotcha, it's the calibration every later result rests on.", ""], ["Exercise", "Run the loop at ε=0, no contamination, three tradition sizes. Does the CBGM recover the initial text? Where does recovery degrade first as loss increases?", ""], ["Milestone", "<b>The pipeline</b>: one command from config+seed to scored CBGM performance. This is the machine the papers come from.", ""]], "check": null, "steps": null}, {"id": "u11", "num": "11", "title": "Contamination", "gloss": "Block and per-reading mixture, with every event recorded — simulate the thing the method claims to survive.", "tags": [], "rows": [["Build", "<code>simulate/contamination.py</code>: block mixture (change of exemplar mid-text) and per-reading mixture (sporadic correction against a second exemplar), each at configurable rates; the true history records every mixture event.", ""], ["Read", "Mink's contamination sections, third visit — now as an adversary: what does his method <i>predict</i> it can survive? The <i>Handbook</i>'s contamination discussion.", ""], ["Concepts", "why contamination breaks tree methods structurally; coherence as Mink's wager that it's survivable statistically; simulating the thing a method claims to handle is the sharpest test available.", ""], ["Exercise", "Reproduce, in one synthetic tradition, the qualitative shape of Carlson's counterexample — a faithful copy of an old exemplar in a contaminated neighborhood — <i>without</i> hand-construction. If you can generate it, you can measure its frequency.", ""], ["Milestone", "Contamination modes tested and documented; the experiment grid for Phase 4 written down and (lightly) pre-registered — declare your metrics and hypotheses in the repo <i>before</i> running the sweep.", ""]], "check": null, "steps": null}], "checkpoint": {"text": "You own an end-to-end laboratory: generate → corrupt → export → run CBGM → score against truth, all seeded and reproducible. Nobody has ever had this for the CBGM.", "goals": [["Koine Greek", "Decker through ~ch. 20 (aorist unlocked). <b>Start reading 1 John</b> alongside — a chapter a week with STEP Bible's tagged text; it will humble and then encourage you."]]}}, {"tag": "phase 4", "name": "The simulation study", "weeks": "Weeks 27–36", "goal": "Run the experiments, measure the Carlson effect honestly, compare rival methods on identical synthetic data, and publish deliverable #1.", "entries": [{"id": "u12", "num": "12", "title": "The Carlson experiment at scale", "gloss": "The sweep: how often, and how badly, does the potential-ancestor criterion misorder Carlson-type witnesses?", "tags": [], "rows": [["Build", "The sweep: contamination rate × ε × tradition size × loss rate, N seeds per cell. Metric of record: how often, and how badly, does the potential-ancestor criterion misorder witnesses of Carlson's type (defined mechanically from true history)? Plus the global metrics from Unit 10.", ""], ["Read", "Nothing new. Rerun your pre-registration checklist before looking at results.", ""], ["Concepts", "effect size over anecdote; when a hand-built counterexample generalizes and when it's a corner case — the answer is an empirical distribution now, not a debate.", ""], ["Exercise", "Before the sweep finishes, write down (sealed) what you expect Mink's and Carlson's predictions to be per cell. Score both afterward.", ""], ["Milestone", "The results notebook: the bias measured as a function of contamination and ε. Whatever it shows, it's the first of its kind.", ""]], "check": null, "steps": null}, {"id": "u13", "num": "13", "title": "Rivals on the same ground truth", "gloss": "BEAST and NeighborNet on the same synthetic traditions — three method families scored on identical truth.", "tags": [], "rows": [["Build", "teiphy-convert your synthetic collations; run Bayesian phylogenetics (BEAST 2) and a distance method (NeighborNet via SplitsTree) on the same traditions; score all three families against truth with the same metrics.", ""], ["Read", "Taming the BEAST, the introductory tutorial + one dated-tips tutorial; McCollum &amp; Turnbull (DSH 2024) as the worked example of BEAST-on-collation; McElreath <i>Statistical Rethinking</i> chs. 1–2 (and the 2023/2026 lectures) if Bayesian machinery feels like folklore — his simulation-first style is exactly your Phase 3 instinct applied to statistics.", ""], ["Concepts", "what a posterior over trees even is; clock models in one paragraph; the crucial scoping note from <code>REVIEW.md</code>: rivals-on-<i>real</i>-data is published five times over — rivals-on-<i>synthetic</i>-data is yours.", ""], ["Exercise", "One tradition, three methods, one page: where do they agree, where does each fail, and does failure correlate with the contamination you injected?", ""], ["Milestone", "The comparison table across the grid. (BEAST runs are overnight-scale; batch them.)", ""]], "check": null, "steps": null}, {"id": "u14", "num": "14", "title": "Write-up #1", "gloss": "Paper #1: calibration, the measured bias, contamination limits — and what it does and doesn't say about the NT.", "tags": [], "rows": [["Build", "The paper: \"Running the CBGM on synthetic traditions with known ground truth.\" Structure: calibration (it works on clean data) → the measured Carlson effect → contamination limits → method comparison → what this does and doesn't say about the NT text (reception rules!).", ""], ["Read", "Two models of tone: the Hyytiäinen–McCollum–Finney DSH paper; Carlson's JBL piece. Note how each earns its claims.", ""], ["Concepts", "the venue ladder (<code>exploration/candidates/05</code> §5): preprint → <i>TC</i> or <i>DSH</i>; ETC-blog summary for the field's attention; McCollum and Carlson get courtesy previews (you have their attention from Phase 2).", ""], ["Milestone", "Preprint out. <b>This is the program's \"move within a year\" commitment kept</b> (convergence doc, action 3).", ""], ["Interactive", "quiz <code>interactive/quizzes/apparatus-trainer.html</code> — because the Greek track now needs it (below).", ""]], "check": null, "steps": null}], "checkpoint": {"text": "Deliverable #1 exists and is public. You can defend every number in it.", "goals": [["Koine Greek", "Decker finished or nearly (chs. ~28–33 are reference-grade; don't stall on them); 1–3 John read in Greek; and — via the apparatus-trainer and die-bibel.de's NA28 — you can decode an apparatus entry: witnesses, readings, the sigla that once looked like line noise."]]}}, {"tag": "phase 5", "name": "The sensitivity study", "weeks": "Weeks 37–48", "goal": "Turn the perturbation machinery on the <i>real</i> ECM 3 John (and whatever the INTF licensing conversation opened up), and publish deliverable #2: how robust is a published critical text to its editors?", "entries": [{"id": "u15", "num": "15", "title": "The perturbation harness", "gloss": "Scripted perturbation of the real inputs: stemma flips, connectivity sweeps, witness and unit bootstraps.", "tags": [], "rows": [["Build", "<code>sensitivity/</code>: scripted perturbation of real collation inputs — local-stemma flips at 5/10/20% (stratified: units the editors marked split/uncertain first — their own confidence is your prior), connectivity sweeps (absolute and quantile), witness leave-one-out and bootstrap, variation-unit bootstrap. Driver over open-cbgm's CLI with the SQLite cache.", ""], ["Read", "Your own Unit-3 flip example (told you to keep it); <code>exploration/candidates/05</code> §1 for the four wobble metrics; Knight's corrections problem (JBL 2019) for one perturbation mode reviewers will ask about.", ""], ["Concepts", "anchoring perturbation rates in <i>observed</i> editorial disagreement (ECM1→ECM2 revisions, NA28↔THGNT differences) so no one can call them arbitrary.", ""], ["Exercise", "First real result: at a 10% flip rate on low-confidence units, how many of 3 John's 116 initial-text decisions ever flip across 500 runs? Which ones, and are the editors' diamonds among them?", ""], ["Milestone", "The harness, tested; first wobble distributions plotted.", ""]], "check": null, "steps": null}, {"id": "u16", "num": "16", "title": "Wobble metrics and the headline table", "gloss": "Four stability metrics, one table: dial turned → what moves, how much — read the fragile units in Greek.", "tags": [], "rows": [["Build", "The full metric suite from the pre-registration: (i) initial-text decision stability, (ii) potential-ancestor rank stability (Kendall τ), (iii) flow-diagram edge stability, (iv) substemma/global-stemma stability. One table: <i>dial turned → what moves, how much</i>.", ""], ["Read", "Mink's rebuttal once more — perturb through to the substemma/global-stemma layer, because \"you tested the wrong module\" is the rebuttal you already know is coming.", ""], ["Concepts", "robustness as a <i>property of specific decisions</i>, not the method wholesale — expect (and want) the result \"most decisions are rock-solid; these N are editorially load-bearing.\"", ""], ["Exercise", "For the three least stable variation units: read them. In Greek. What is actually at stake in each (a particle? a christological clause?) — this paragraph is what guild readers will quote.", ""], ["Milestone", "The headline table; the Greek-informed close reading of the fragile units.", ""]], "check": null, "steps": null}, {"id": "u17", "num": "17", "title": "Scale and scope (conditional)", "gloss": "If INTF said yes: Acts, Mark, Revelation (~17,500 more units). If not: deepen 3 John and document the constraint honestly.", "tags": [], "rows": [["Build", "If INTF said yes (Phase 2 contact): extend to Acts/Mark/Revelation via the Genealogical Queries API data (~17,500 more units); the harness was built for this. If not: deepen 3 John + Catholic Letters (GQ 2.0) and document the constraint honestly.", ""], ["Read", "<code>exploration/candidates/04</code> §3 (the API inventory — endpoints, counts).", ""], ["Milestone", "The study at its final scope; data/license provenance documented to publication standard.", ""]], "check": null, "steps": null}, {"id": "u18", "num": "18", "title": "Write-up #2", "gloss": "Paper #2: how robust is the ECM text to its editors' judgments — framed by paper #1's calibration.", "tags": [], "rows": [["Build", "\"How robust is the ECM text to its editors' judgments?\" — sensitivity results framed by the simulation study's calibration (paper #1 tells you what wobble <i>means</i>; that pairing is the program's unfair advantage).", ""], ["Milestone", "Preprint #2 out; ETC-blog summary; the INTF gets first sight as promised.", ""]], "check": null, "steps": null}], "checkpoint": {"text": "Deliverable #2 is public: the first published sensitivity analysis of the CBGM. You have read every unstable variation unit in Greek yourself.", "goals": [["Koine Greek", "intermediate reading (Mark with helps; Wallace as shelf reference); you can follow a <i>Textual Commentary</i> entry and have opinions about it."]]}}, {"tag": "phase 6", "name": "The philology apprenticeship → the LLM study", "weeks": "Weeks 49–66", "goal": "Become competent enough at transcriptional reasoning to evaluate an LLM doing it; then run the local-stemma experiment — deliverable #3 and the capstone.", "entries": [{"id": "u19", "num": "19", "title": "Transcriptional probability, by hand", "gloss": "Twenty local stemmata built by hand, before looking at the editors' — your own ε, measured.", "tags": ["lesson"], "rows": [["Build", "Nothing yet — <i>you</i> are the system under training. For 20 of 3 John's variation units (sampled across difficulty), construct local stemmata by hand, with written rationales in the discipline's vocabulary, <i>before</i> looking at the editors'. Score yourself with the metrics you'll later apply to the model.", ""], ["Read", "Royse, <i>Scribal Habits</i>, the summary chapter + one papyrus chapter (the $92 pain is worth it; the library may help); Metzger, <i>Textual Commentary</i>, 15 entries as worked examples — always committing your own judgment first; Willker's <i>Textual Commentary</i> (free) for second opinions; Hixson &amp; Gurry for base-rate sanity.", ""], ["Concepts", "harmonization, homoioteleuton, itacism, Atticism, <i>lectio brevior/difficilior</i> and its modern demotion (Royse!), assimilation to parallels; the committee's reasoning genre.", ""], ["Exercise", "Your 20 hand-built stemmata vs. the editors': agreement rate, and a written analysis of every disagreement. This number — <i>your</i> ε — is the human baseline for Unit 21.", ""], ["Milestone", "The annotated 20; you now know from the inside what the LLM is being asked to do.", ""], ["Interactive", "lesson <code>interactive/lessons/unit-19-transcriptional-probability.md</code>.", ""]], "check": null, "steps": null}, {"id": "u20", "num": "20", "title": "The task, the data, the traps", "gloss": "Dataset built, labels shuffled, the trivial-star floor computed, memorization probed — the traps built out before the run.", "tags": [], "rows": [["Build", "<code>local_stemma/</code>: harvest variation units (3 John TEI + whatever GQ scope is licensed); shuffle reading labels (the \"a = initial text\" leak); compute the <b>trivial-star baseline</b> (how many editorial stemmata are just <code>* → a → rest</code>? — this number gates the whole study); memorization probes (can the model recite ECM apparatus? Metzger-famous vs. long-tail stratification).", ""], ["Read", "<code>exploration/candidates/04</code> §1 (task definition, evaluation design, the three traps: circularity, iteration leakage, label leakage); Logion and Ithaca papers as the genre's exemplars.", ""], ["Concepts", "predicting editors ≠ predicting truth — the honest framing is <i>reproducibility of editorial judgment by an independent reasoner</i>; why high agreement and structured disagreement are both publishable.", ""], ["Milestone", "Dataset built; baselines and probes run; evaluation pre-registered.", ""]], "check": null, "steps": null}, {"id": "u21", "num": "21", "title": "The experiment", "gloss": "The prompted runs across three evidence conditions, scored — and the disagreement taxonomy that is the study's heart.", "tags": [], "rows": [["Build", "Prompted frontier-LLM runs: local-evidence-only vs. +coherence-summary vs. +transcriptional-checklist conditions; parse responses to digraphs; score (edge P/R/F1, root accuracy, calibrated abstention vs. editorial diamonds); stratify by fame, difficulty, and unit type.", ""], ["Read", "Nothing new. Spend the hours on error analysis instead.", ""], ["Exercise", "For 50 disagreements, the Greek-heavy heart: is the model's transcriptional story philologically coherent even where it differs from the editors? Categorize: model-wrong / defensible-alternative / editors-should-look-again.", ""], ["Milestone", "Results in; the disagreement taxonomy drafted.", ""]], "check": null, "steps": null}, {"id": "u22", "num": "22", "title": "Write-up #3 and the capstone close-out", "gloss": "Paper #3 with its baselines and floors, then PROGRAM.md: what do we now know that nobody knew two years ago?", "tags": [], "rows": [["Build", "\"Can a language model reconstruct the ECM's local stemmata?\" — with the Unit-19 human baseline, the trivial-star floor, memorization stratification, and the triage-instrument framing (the ECM's John and Paul volumes are being edited <i>now</i>; a validated disagreement queue has a live customer). Then the capstone synthesis: a <code>PROGRAM.md</code> retrospective connecting all three deliverables to the question you started with — what do we now know about the CBGM's robustness that nobody knew two years ago?", ""], ["Milestone", "Preprint #3; <code>PROGRAM.md</code>; update <code>REVIEW.md</code> to reflect what the program actually established. <b>Capstone complete.</b>", ""], ["SQ1 (during Phase 2)", "Benchmark schema + annotation manual: encode Cooper Smith's eight direction-of-dependence criteria (JHS 2023, open) as a formal annotation schema; design the disagreement-as-data record format (per-scholar attribution). No Hebrew needed.", ""], ["SQ2 (during Phase 3)", "Null-model prototype: genre-stratified, rarity-weighted permutation test for chance lexical overlap, built on transliterated/lemmatized text via WLC + MACULA identifiers. Pure engineering.", ""], ["SQ3 (during Phase 4)", "Outreach: emails to David Smiley and the intertextual.bible curator — the schema and null model give you something concrete to show. Their responses decide whether this becomes a collaboration, a Phase-7 program, or a graceful release.", ""]], "check": null, "steps": null}], "checkpoint": null}];
+const HUB_IDS = ["p0-run", "p0-read", "p0-para", "u1", "u2", "u3", "u4", "u5", "u6", "u7", "p2-mail", "u8", "u9", "u10", "u11", "u12", "u13", "u14", "u15", "u16", "u17", "u18", "u19", "u20", "u21", "u22"];
+
+let progress = {}, notes = {};
+try { progress = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch (e) {}
+
+const isDone = e => e.steps ? e.steps.every(s => progress[s[0]]) : !!progress[e.id];
+const setDone = (e, v) => { if (e.steps) e.steps.forEach(s => progress[s[0]] = v); else progress[e.id] = v; };
+
+const $ = id => document.getElementById(id);
+function persist(key, obj) { try { localStorage.setItem(key, JSON.stringify(obj)); toast("Saved"); } catch (e) {} }
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1200);
+}
+
+const ALL = PHASES.flatMap(p => p.entries);
+const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function render() {
+  $("list").innerHTML = PHASES.map(p => `
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-tag">${p.tag}</span>
+        <span class="phase-name">${p.name}</span>
+        <span class="phase-weeks">${p.weeks}</span>
+      </div>
+      <p class="phase-goal">${p.goal}</p>
+      ${p.entries.map(e => `
+        <article class="entry${isDone(e) ? " done" : ""}" data-id="${e.id}">
+          <button class="head" aria-expanded="false">
+            <span class="num">${e.num}</span>
+            <span class="body-col">
+              <h3 class="title">${e.title}${(e.tags || []).map(t =>
+                `<span class="tag${t === "widget" ? " w" : ""}">${t}</span>`).join("")}</h3>
+              ${e.gloss ? `<p class="gloss"><span class="gloss-mark"></span><span class="gloss-text">${e.gloss}</span></p>` : ""}
+            </span>
+          </button>
+          <div class="actions">
+            <button class="act toggle"><span class="chev">›</span><span class="tlabel">Full unit</span></button>
+            <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
+          </div>
+          <div class="detail"><div class="detail-inner"><div class="detail-pad">
+            ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `
+              <div class="step-row${progress[sid] ? " done" : ""}">
+                <input type="checkbox" id="${sid}" ${progress[sid] ? "checked" : ""}>
+                <label for="${sid}">${slabel}</label>
+              </div>`).join("")}</div>` : ""}
+            ${e.rows.map(([lbl, html, cls]) =>
+              `<div class="row ${cls || ""}"><b class="lbl">${lbl}</b>${html}</div>`).join("")}
+            ${e.check ? `<details class="check"><summary>Check yourself: ${e.check.q}</summary><div>${e.check.ans}</div></details>` : ""}
+            <label class="notes-label" for="n-${e.id}">Your note</label>
+            <textarea id="n-${e.id}" placeholder="What stuck, what to chase, where the numbers disagreed…">${esc(notes[e.id] || "")}</textarea>
+          </div></div></div>
+        </article>`).join("")}
+      ${p.checkpoint ? `<div class="checkpoint"><b class="cp">— ${p.tag} checkpoint —</b>${p.checkpoint.text}${(p.checkpoint.goals || []).map(g => `<div class="track-goal"><b>${g[0]}:</b> ${g[1]}</div>`).join("")}</div>` : ""}
+    </section>`).join("");
+  $("ticks").innerHTML = HUB_IDS.map(() => `<span class="tick"></span>`).join("");
+  wire();
+  updateMeter();
+  applyFilter();
+}
+
+function updateMeter() {
+  const done = HUB_IDS.filter(i => progress[i]).length;
+  $("count").textContent = `${done} of ${HUB_IDS.length} done`;
+  document.querySelectorAll(".tick").forEach((t, i) => t.classList.toggle("on", !!progress[HUB_IDS[i]]));
+}
+
+function openEntry(entry, want) {
+  const on = want !== undefined ? want : !entry.classList.contains("open");
+  entry.classList.toggle("open", on);
+  entry.querySelector(".head").setAttribute("aria-expanded", String(on));
+  entry.querySelector(".tlabel").textContent = on ? "Hide unit" : "Full unit";
+}
+
+function syncEntry(entry, e) {
+  entry.classList.toggle("done", isDone(e));
+  entry.querySelector(".mlabel").textContent = isDone(e) ? "Done" : "Mark done";
+  updateMeter();
+  persist(KEY, progress);
+  if (remainingOnly) setTimeout(applyFilter, 600);
+}
+
+function wire() {
+  document.querySelectorAll(".entry").forEach(entry => {
+    const e = ALL.find(x => x.id === entry.dataset.id);
+    entry.querySelector(".head").addEventListener("click", ev => {
+      if (ev.target.closest("a")) return;
+      openEntry(entry);
+    });
+    entry.querySelector(".toggle").addEventListener("click", () => openEntry(entry));
+    entry.querySelector(".mark").addEventListener("click", () => {
+      setDone(e, !isDone(e));
+      if (e.steps) entry.querySelectorAll(".step-row").forEach(r => {
+        r.querySelector("input").checked = isDone(e);
+        r.classList.toggle("done", isDone(e));
+      });
+      syncEntry(entry, e);
+    });
+    if (e.steps) entry.querySelectorAll(".step-row input").forEach(cb => {
+      cb.addEventListener("click", ev => ev.stopPropagation());
+      cb.addEventListener("change", () => {
+        progress[cb.id] = cb.checked;
+        cb.closest(".step-row").classList.toggle("done", cb.checked);
+        syncEntry(entry, e);
+      });
+    });
+    const ta = entry.querySelector("textarea");
+    let t;
+    ta.addEventListener("input", () => {
+      notes[e.id] = ta.value;
+      clearTimeout(t); t = setTimeout(() => persist(NOTES_KEY, notes), 500);
+    });
+  });
+}
+
+let remainingOnly = false;
+function applyFilter() {
+  let shown = 0;
+  document.querySelectorAll(".entry").forEach(entry => {
+    const hide = remainingOnly && isDone(ALL.find(x => x.id === entry.dataset.id));
+    entry.classList.toggle("hidden", hide);
+    if (!hide) shown++;
+  });
+  document.querySelectorAll(".phase").forEach(ph => {
+    const any = [...ph.querySelectorAll(".entry")].some(x => !x.classList.contains("hidden"));
+    ph.style.display = any ? "" : "none";
+  });
+  $("empty").classList.toggle("show", shown === 0);
+}
+$("filter").addEventListener("click", () => {
+  remainingOnly = !remainingOnly;
+  $("filter").setAttribute("aria-pressed", String(remainingOnly));
+  $("filter").textContent = remainingOnly ? "Show all" : "Remaining only";
+  applyFilter();
+});
+
+render();
+</script>
+</body>
+</html>

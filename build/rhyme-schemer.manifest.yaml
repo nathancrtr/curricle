@@ -26,6 +26,29 @@ course:
     note: Units 2, 8, 10, 13, 14 and the frontiers revised to fold in the external research review (`REVIEW.md`)
       — corpora-first evaluation, the post-2010 detection literature, ALINE, and the workshop-paper path.
       Project-driven; revise as the repo and your understanding evolve.
+  preamble:
+  - Learn NLP and computational phonology **by building rhyme-schemer** — from the phonetic foundation
+    already in the repo, through the rhyme-scoring kernel, to a working visualizer of rhyme schemes in
+    hip-hop lyrics. For a senior software engineer at ~3–5 hrs/week; roughly 6 months.
+  - '## How this curriculum works'
+  - '**The repo is the spine.** This is a project-driven course: each unit takes rhyme-schemer from one
+    working state to the next. The theory is just-in-time — you read the chapter or paper that unblocks
+    *this* step, not a survey. Where the code already exists (the whole phonetic foundation), you read
+    it as a worked example and prove your understanding by extending it; where it doesn''t (everything
+    from `rhyme_score` onward), you build it, usually by making a failing test pass.'
+  - '**Two tracks, interleaved.** Every unit pairs an **implementation** step with the **concept** it
+    embodies. You''ll never wire up a function without understanding the phonology or algorithm behind
+    it, and never meet a concept without immediately coding it.'
+  - '**Each unit has:** Build (the implementation step) · Read (precise sources) · Concepts · Exercise
+    · Milestone, and sometimes a Key Insight or an interactive piece in `interactive/`.'
+  - '**Pacing.** One unit ≈ one week at 3–5 hrs. Phase 1 moves fast because you''re reading existing code;
+    the build phases are slower. Some units run long — Unit 8 (alignment) especially. That''s expected.'
+  - '**The repo''s own tests are your grader.** rhyme-schemer''s `tests/` already model the house style:
+    structural property tests (identity, symmetry, range) and ordering assertions you trust over exact
+    numbers. New exercises follow that style, and many ship as failing tests in `interactive/exercises/`.'
+  - '**Working with Claude.** This course is built to be worked through with Claude. Triggers like *"teach
+    me Unit 5 interactively"* run a Socratic lesson guide; *"quiz me on Phase 1"* draws from the question
+    bank. See the end of this file.'
 phases:
 - id: p0
   num: 0

@@ -36,6 +36,44 @@ course:
   - say: Draft the INTF email with me.
     note: the Phase 2 contact milestone (drafting together; sending is yours).
   storage_key: tf-progress
+  preamble:
+  - 'Learn New Testament textual criticism and computational philology **by building textual-flow** —
+    a simulation and sensitivity laboratory for the Coherence-Based Genealogical Method (CBGM) — through
+    to three research deliverables: a simulation study with known ground truth, a sensitivity analysis
+    of a published critical text, and an LLM local-stemma experiment. For a senior software engineer at
+    ~3–5 hrs/week; roughly 18–24 months, in phases that each stand alone.'
+  - '## How this curriculum works'
+  - '**The research program is the spine.** This is a research-driven course: the artifact you''re building
+    is a *research question and its answer*, not just an app. The question (versioned in the repo''s `REVIEW.md`
+    and `exploration/convergence.md`): *how robust is the CBGM — and the New Testament text it now decides
+    — to the human judgments and structural assumptions inside it?* Every unit either builds a piece of
+    the apparatus that answers it or builds the background you need to answer it credibly. Where prior
+    work exists (open-cbgm, the artificial-tradition literature), you read it as worked examples; where
+    it doesn''t (everything this program contributes), you build it.'
+  - '**Two tracks, interleaved.** The **program track** (~2–3 hrs/wk) builds the laboratory. The **Greek
+    track** (~1.5–2 hrs/wk, steady) runs continuously from week 0 — languages reward little-and-often
+    far more than bingeing, so treat it as a near-daily 15–25 minute habit rather than a weekly block.
+    Each phase states its Greek goal; the program track is scheduled assuming Greek is happening alongside.
+    The two converge deliberately: the Johannine epistles are simultaneously the simplest Greek in the
+    NT *and* the ECM data your laboratory runs on. By Phase 5 you will be reading, in Greek, the very
+    variation units your perturbation harness is flipping.'
+  - '**Each unit has:** Build (the implementation step) · Read (precise sources — see `learning-resources.md`
+    for every citation) · Concepts · Exercise · Milestone, and sometimes a Key Insight or an interactive
+    piece in `interactive/`.'
+  - '**Pacing.** One unit ≈ one week at the stated hours, but the variance is real: Unit 3 (genealogical
+    coherence) and Unit 12 (the experiment grid) run long; Units 5 and 14 run short. Phases end with checkpoints;
+    if a checkpoint feels shaky, camp there — the dependency map at the end shows what is load-bearing.'
+  - '**Tests are your grader.** From Unit 2 onward you maintain a test suite. The house style (inherited
+    from rhyme-schemer): structural property tests and ordering assertions you trust over exact numbers
+    — plus, unique to this project, **cross-validation against open-cbgm**: wherever you reimplement a
+    CBGM computation, a test asserts your numbers match Joey McCollum''s implementation on the same input.
+    When they disagree, one of you is wrong, and finding out which is always worth the hour.'
+  - '**Reception discipline is part of the method.** This field has scar tissue (Morton, Radday — see
+    `exploration/field-map.md` §4). Every written deliverable follows the rules learned there: calibrated
+    instrument with stated uncertainty, validated on ground truth the guild accepts, never "the computer
+    settles X." The write-up units bake this in.'
+  - '**Working with Claude.** *"Teach me Unit 3 interactively"* runs a Socratic lesson guide; *"quiz me
+    on Phase 1"* draws from the question bank. See the end of this file.'
 tracks:
 - id: greek
   name: Koine Greek

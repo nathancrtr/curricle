@@ -114,6 +114,8 @@ class Course:
     trigger_phrases: tuple[TriggerPhrase, ...] = ()
     storage_key: str | None = None       # legacy localStorage key (tf-progress);
                                          # None derives "{id}-progress"
+    preamble: tuple[str, ...] = ()       # curriculum.md prose before Phase 0,
+                                         # one markdown paragraph per item
 
     def __post_init__(self) -> None:
         expect_enum(self.mode, COURSE_MODES, f"course {self.id}")
@@ -121,6 +123,13 @@ class Course:
     @property
     def progress_storage_key(self) -> str:
         return self.storage_key or f"{self.id}-progress"
+
+    @property
+    def notes_storage_key(self) -> str:
+        base = self.progress_storage_key
+        if base.endswith("-progress"):
+            return base[: -len("-progress")] + "-curriculum-notes"
+        return f"{self.id}-curriculum-notes"
 
 
 @dataclass(frozen=True)

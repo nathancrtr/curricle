@@ -220,6 +220,8 @@ def _build_course(doc: MdDoc, sidecar: Sidecar, issues: Issues) -> Course:
         out_of_scope=sc.out_of_scope, capstone=sc.capstone,
         version_history=history, trigger_phrases=sc.trigger_phrases,
         storage_key=sc.storage_key,
+        preamble=tuple(line for line in doc.preamble
+                       if not line.startswith("# ")),
     )
 
 

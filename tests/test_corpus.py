@@ -120,5 +120,51 @@ class TestHubParity(unittest.TestCase):
                          "Milestone paragraph: in, out, where the humans sit", ["quiz"]])
 
 
+@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+class TestCurriculumViewParity(unittest.TestCase):
+    """The generated curriculum view keeps the original's state contract."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        import re
+        from curricle.currender import render_curriculum
+        sidecar = load_sidecar(os.path.join(HERE, "courses", "textual-flow.course.yaml"))
+        manifest, _ = compile_course(TF_ROOT, sidecar)
+        cls.gen = render_curriculum(manifest)
+        cls.payload = json.loads(
+            re.search(r"const PHASES = (\[.*?\]);\nconst HUB_IDS", cls.gen, re.S).group(1))
+        cls.hub_ids = json.loads(
+            re.search(r"const HUB_IDS = (\[.*?\]);", cls.gen).group(1))
+
+    def test_storage_keys_are_legacy(self):
+        self.assertIn('const KEY = "tf-progress"', self.gen)
+        self.assertIn('const NOTES_KEY = "tf-curriculum-notes"', self.gen)
+
+    def test_meter_ids_are_the_program_track(self):
+        self.assertEqual(self.hub_ids, TF_HUB_IDS)
+
+    def test_stepped_unit_replaces_composite_mapping(self):
+        entries = [e for p in self.payload for e in p["entries"]]
+        u0 = next(e for e in entries if e["id"] == "u0")
+        self.assertEqual([s[0] for s in u0["steps"]], ["p0-run", "p0-read", "p0-para"])
+
+    def test_milestone_renders_as_entry(self):
+        entries = [e for p in self.payload for e in p["entries"]]
+        ms = next(e for e in entries if e["id"] == "p2-mail")
+        self.assertEqual(ms["tags"], ["contact"])
+
+    def test_key_insight_rows_carry_key_class(self):
+        entries = [e for p in self.payload for e in p["entries"]]
+        u1 = next(e for e in entries if e["id"] == "u1")
+        row = next(r for r in u1["rows"] if r[0] == "Key insight")
+        self.assertEqual(row[2], "key")
+        self.assertIn("<i>sparse matrix with an opinionated schema</i>", row[1])
+
+    def test_checkpoint_track_goals_render(self):
+        p1 = self.payload[1]
+        self.assertEqual(p1["checkpoint"]["goals"][0][0], "Koine Greek")
+
+
 if __name__ == "__main__":
     unittest.main()

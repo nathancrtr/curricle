@@ -15,6 +15,7 @@ from __future__ import annotations
 import html
 import json
 
+from .inlinemd import inline_html
 from .schema import Manifest
 
 STYLE = """\
@@ -87,7 +88,9 @@ for (const p of PHASES) {
   const div = document.createElement("div");
   div.className = "phase";
   const h = document.createElement("h3"); h.textContent = p.name;
-  const g = document.createElement("p"); g.className = "goal"; g.textContent = p.goal;
+  const g = document.createElement("p"); g.className = "goal";
+  g.innerHTML = p.goal;   // pre-rendered by the generator; no user content
+
   div.appendChild(h); div.appendChild(g);
   for (const [id, label, tags] of p.units) {
     const row = document.createElement("div");
@@ -146,8 +149,8 @@ def render_hub(mf: Manifest) -> str:
                     rows.append([u.id, f"Unit {u.num} · {u.title}", tags])
             else:
                 rows.append([entry, milestones_by_id[entry].label, []])
-        phases_js.append({"name": f"Phase {p.num} — {p.title}", "goal": p.goal,
-                          "units": rows})
+        phases_js.append({"name": f"Phase {p.num} — {p.title}",
+                          "goal": inline_html(p.goal), "units": rows})
     tracks_js = [{"id": t.id, "stages": [[s.id, s.label] for s in t.stages]}
                  for t in mf.tracks]
 

@@ -1,15 +1,12 @@
 """The profile pipeline: evidence ledger, review discipline, projection."""
 
-import os
 import unittest
 
 from curricle import db, profile
 from curricle.profilerender import render_skill_md
 
+from corpuspaths import HAVE_TF, TF_ROOT
 from pg import test_engine
-
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TF_ROOT = os.path.join(os.path.dirname(HERE), "textual-flow")
 
 SEED = [
     {"field": "meta", "key": "description", "text": "A test learner.",
@@ -121,7 +118,7 @@ class LedgerTest(unittest.TestCase):
             conn.rollback()
 
 
-@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class CheckpointEvidenceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

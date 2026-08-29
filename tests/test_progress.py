@@ -14,13 +14,10 @@ from curricle import db, progress
 from curricle.compiler import compile_course
 from curricle.sidecar import load_sidecar
 
+from corpuspaths import HAVE_TF, TF_ROOT
 from pg import test_engine
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REPOS = os.path.dirname(HERE)
-TF_ROOT = os.path.join(REPOS, "textual-flow")
-
-_HAVE_TF = os.path.isdir(TF_ROOT)
 
 
 def tf_manifest():
@@ -29,7 +26,7 @@ def tf_manifest():
     return manifest
 
 
-@unittest.skipUnless(_HAVE_TF, "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class LedgerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -144,7 +141,7 @@ class ScopeGuardTest(unittest.TestCase):
         self.assertEqual(offenders, [])
 
 
-@unittest.skipUnless(_HAVE_TF, "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class WebAppTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

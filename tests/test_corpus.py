@@ -5,15 +5,17 @@ the corpus is the compiler's real test suite (platform-design.md §8).
 """
 
 import os
+import sys
 import unittest
 
 from curricle.compiler import compile_course
 from curricle.sidecar import load_sidecar
 
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REPOS = os.path.dirname(HERE)
-TF_ROOT = os.path.join(REPOS, "textual-flow")
-RS_ROOT = os.path.join(REPOS, "rhyme-schemer")
+try:
+    from corpuspaths import HAVE_RS, HAVE_TF, RS_ROOT, TF_ROOT
+except ModuleNotFoundError:  # run as tests.test_corpus, without `discover`
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from corpuspaths import HAVE_RS, HAVE_TF, RS_ROOT, TF_ROOT
 
 # The hub's exact checkable set (index.html), which the manifest must reproduce.
 TF_HUB_IDS = [
@@ -25,7 +27,7 @@ TF_HUB_IDS = [
 TF_GREEK_IDS = ["g-alpha", "g-nouns", "g-verbs", "g-1john", "g-app", "g-mark"]
 
 
-@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class TestTextualFlow(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -62,7 +64,7 @@ class TestTextualFlow(unittest.TestCase):
         self.assertEqual(u17.condition.state, "pending")
 
 
-@unittest.skipUnless(os.path.isdir(RS_ROOT), "rhyme-schemer repo not present")
+@unittest.skipUnless(HAVE_RS, "rhyme-schemer repo not present")
 class TestRhymeSchemer(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -92,7 +94,7 @@ class TestRhymeSchemer(unittest.TestCase):
         self.assertEqual(self.manifest.course.capstone, "u15")
         self.assertEqual(self.manifest.unit("u15").phase, "p5")
 
-@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class TestHubParity(unittest.TestCase):
     """The generated hub must expose exactly the original hub's checkable ids."""
 
@@ -120,7 +122,7 @@ class TestHubParity(unittest.TestCase):
                          "Milestone paragraph: in, out, where the humans sit", ["quiz"]])
 
 
-@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class TestCurriculumViewParity(unittest.TestCase):
     """The generated curriculum view keeps the original's state contract."""
 
@@ -166,7 +168,7 @@ class TestCurriculumViewParity(unittest.TestCase):
         self.assertEqual(p1["checkpoint"]["goals"][0][0], "Koine Greek")
 
 
-@unittest.skipUnless(os.path.isdir(TF_ROOT), "textual-flow repo not present")
+@unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
 class TestResourcesViewParity(unittest.TestCase):
     """The generated resources view keeps the original's state contract."""
 

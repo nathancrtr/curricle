@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime
 import html
 
+from . import theme
 from .inlinemd import inline_html
 from .profile import ProfileState
 
@@ -116,47 +117,41 @@ _FIELD_TITLES = {
     "demonstrated": "Demonstrated in course work",
 }
 
-_STYLE = """\
-  :root { --bg:#faf8f4; --panel:#fff; --ink:#2b2620; --muted:#7a7268; --faint:#a29a8e;
-          --line:#e3ddd2; --accent:#7c5cbf; --good:#4a7a4e; --warn:#b3543a; --chip:#f3efe8; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.6 Georgia, 'Times New Roman', serif; }
-  a { color:var(--accent); }
-  .wrap { max-width:820px; margin:0 auto; padding:0 24px 90px; }
-  .masthead { padding:56px 0 10px; }
-  .eyebrow { font:11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase;
-             color:var(--faint); margin:0 0 18px; }
-  .eyebrow a { color:var(--accent); text-decoration:none; }
-  h1 { font-weight:400; font-size:clamp(30px,5.5vw,42px); margin:0; }
-  h2 { font-size:20px; font-weight:400; margin:40px 0 6px; padding-bottom:8px;
-       border-bottom:2px solid var(--ink); }
-  .claim { border-bottom:1px solid #eee9e0; padding:12px 0; font-size:14.5px; }
-  .tier { font:500 9px ui-monospace,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase;
-          border:1px solid var(--line); border-radius:999px; padding:1px 7px; color:var(--muted);
-          margin-left:8px; vertical-align:1px; white-space:nowrap; }
-  .tier.demonstrated { color:var(--good); border-color:#bcd2bd; }
-  .tier.thin { color:var(--warn); border-color:#e4c4b8; }
-  .src { font:11px ui-monospace,Menlo,monospace; color:var(--faint); margin-top:4px; }
-  .pendingbox { background:var(--panel); border:1px solid var(--line);
-                border-left:3px solid var(--warn); border-radius:8px; padding:14px 17px;
-                margin:24px 0; }
-  .pendingbox h2 { border:none; margin:0 0 8px; padding:0; font-size:17px; }
+_STYLE = theme.style("""\
+  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:40px 0 10px; }
+  h1 { font-weight:700; font-size:clamp(28px,5vw,38px); letter-spacing:-.01em;
+       margin:14px 0 0; }
+  .lede { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:60ch; }
+  h2 { font-size:20px; font-weight:700; margin:44px 0 4px; }
+  .claim { border-bottom:1px solid var(--line-soft); padding:14px 0; font-size:14.5px;
+           line-height:1.6; }
+  .claim:last-of-type { border-bottom:none; }
+  .tier { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.03em;
+          border-radius:999px; padding:2px 9px; background:var(--chip);
+          color:var(--muted); margin-left:8px; vertical-align:1px; white-space:nowrap; }
+  .tier.demonstrated { background:var(--good-soft); color:var(--good-text); }
+  .tier.thin { background:var(--warn-soft); color:var(--warn-text); }
+  .src { font-size:12px; font-weight:500; color:var(--muted); margin-top:5px; }
+  .pendingbox { background:var(--panel); border:1.5px solid var(--accent);
+                border-radius:18px; box-shadow:var(--shadow); padding:18px 22px;
+                margin:26px 0; }
+  .pendingbox h2 { margin:0 0 4px; font-size:18px; }
+  .pendingbox .note { font-size:13.5px; color:var(--muted); margin:0 0 8px; }
   .proposal { display:flex; gap:14px; align-items:baseline; flex-wrap:wrap;
-              border-bottom:1px solid #eee9e0; padding:10px 0; font-size:14.5px; }
+              border-bottom:1px solid var(--line-soft); padding:12px 0; font-size:14.5px; }
   .proposal:last-child { border-bottom:none; }
-  .proposal .text { flex:1 1 24rem; }
-  button { font:11px ui-monospace,Menlo,monospace; letter-spacing:.1em; text-transform:uppercase;
-           background:none; border:1px solid var(--line); border-radius:999px; padding:5px 13px;
-           color:var(--muted); cursor:pointer; }
-  button.yes { color:var(--good); border-color:#bcd2bd; }
-  button.no { color:var(--warn); border-color:#e4c4b8; }
-  button:hover { border-color:var(--accent); color:var(--ink); }
-  code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--chip);
-         padding:0 4px; border-radius:4px; }
-  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--line);
-           font:12.5px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
-"""
+  .proposal .text { flex:1 1 24rem; line-height:1.6; }
+  button { display:inline-flex; align-items:center; min-height:36px;
+           font-size:13.5px; font-weight:600; background:var(--panel);
+           border:1.5px solid var(--line); border-radius:999px; padding:5px 16px;
+           color:var(--muted); cursor:pointer;
+           transition:border-color .2s, color .2s, background .2s; }
+  button.yes { color:var(--good-text); border-color:var(--good); }
+  button.yes:hover { background:var(--good-soft); }
+  button.no { color:var(--warn-text); }
+  button.no:hover { background:var(--warn-soft); border-color:var(--warn-text); }
+""")
 
 
 def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
@@ -176,7 +171,7 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
                 f'<button class="no" onclick="act(\'reject\',\'{e(p.field)}\',\'{e(p.key)}\')">Reject</button>'
                 "</div>")
         parts.append('<div class="pendingbox"><h2>Awaiting your review</h2>'
-                     "<p style=\"font-size:13.5px;color:var(--muted);margin:0 0 6px\">"
+                     '<p class="note">'
                      "The system proposes; you publish. Nothing below renders into "
                      "the profile until accepted.</p>"
                      + "".join(rows) + "</div>")
@@ -192,7 +187,10 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
                          f'<span class="tier {e(c.tier)}">{e(c.tier)}</span>{src}</div>')
         parts.append(f"<h2>{e(_FIELD_TITLES[field])}</h2>" + "".join(items))
 
-    body = "\n".join(parts) or "<p>No profile evidence yet.</p>"
+    body = "\n".join(parts) or (
+        '<p class="lede">Nothing on the record yet. Assert something in your '
+        "own voice (<code>python -m curricle profile assert</code>) or let course "
+        "activity propose evidence as you work.</p>")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -205,8 +203,12 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="/">← curricle</a> &nbsp;·&nbsp; the learner profile · tenant {e(tenant_slug)}</p>
+    <p class="eyebrow"><a href="/">← your courses</a>
+    <span class="sep">·</span> the learner profile
+    <span class="sep">·</span> tenant {e(tenant_slug)}</p>
     <h1>What the record says about you</h1>
+    <p class="lede">Every course is calibrated from this ledger — the better it
+    knows you, the less time you spend on things you already know.</p>
   </header>
   {body}
   <footer>

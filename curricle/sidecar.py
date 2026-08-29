@@ -38,6 +38,7 @@ class SidecarCourse:
     storage_key: str | None = None
     resources_intro: str | None = None
     reading_order: tuple[str, ...] = ()
+    dialect: str = "bullets"      # curriculum.md dialect: bullets | headings
 
 
 @dataclass(frozen=True)
@@ -163,6 +164,7 @@ def _course(d: dict, ctx: str) -> SidecarCourse:
         description=take(d, "description", ctx),
         resources_intro=take(d, "resources_intro", ctx),
         reading_order=tuple(take(d, "reading_order", ctx, default=[]) or []),
+        dialect=take(d, "dialect", ctx, default="bullets"),
         trigger_phrases=tuple(
             TriggerPhrase(say=take(t, "say", ctx, required=True),
                           note=take(t, "note", ctx))

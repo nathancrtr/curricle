@@ -11,7 +11,7 @@ import os
 import re
 from dataclasses import dataclass
 
-from .mdparse import MdDoc, MdPhase, MdRow, parse_curriculum
+from .mdparse import DIALECTS, MdDoc, MdPhase, MdRow
 from .schema import (
     Check, Checkpoint, Course, Manifest, MANIFEST_VERSION, Material, Milestone,
     Pacing, Phase, Row, Unit, Version,
@@ -53,8 +53,12 @@ def compile_course(course_root: str, sidecar: Sidecar) -> tuple[Manifest | None,
     if not os.path.exists(curriculum_path):
         issues.error(curriculum_rel, "curriculum file not found")
         return None, issues
+    parse = DIALECTS.get(sidecar.course.dialect)
+    if parse is None:
+        issues.error("course", f"unknown dialect {sidecar.course.dialect!r}")
+        return None, issues
     with open(curriculum_path, encoding="utf-8") as f:
-        doc = parse_curriculum(f.read())
+        doc = parse(f.read())
     if not doc.phases:
         issues.error(curriculum_rel, "no '## Phase N — Title' headers found")
         return None, issues

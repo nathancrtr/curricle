@@ -40,7 +40,10 @@ class CourseHandle:
 
 def load_course(root: str) -> CourseHandle:
     root = os.path.abspath(os.path.expanduser(root))
-    sidecar = load_sidecar(os.path.join(root, "learning", "course.yaml"))
+    sidecar_path = os.path.join(root, "learning", "course.yaml")
+    if not os.path.exists(sidecar_path):
+        sidecar_path = os.path.join(root, "course.yaml")
+    sidecar = load_sidecar(sidecar_path)
     manifest, issues = compile_course(root, sidecar)
     if manifest is None:
         raise RuntimeError(

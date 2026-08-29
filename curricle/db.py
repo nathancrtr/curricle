@@ -87,11 +87,28 @@ profile_events = sa.Table(
     sa.Index("ix_profile_events_tenant", "tenant_id"),
 )
 
+token_ledger = sa.Table(
+    "token_ledger", metadata,
+    sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
+    sa.Column("tenant_id", sa.Integer,
+              sa.ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False),
+    sa.Column("stage", sa.Text, nullable=False),     # role name; every call has one
+    sa.Column("model", sa.Text, nullable=False),
+    sa.Column("input_tokens", sa.Integer, nullable=False),
+    sa.Column("output_tokens", sa.Integer, nullable=False),
+    sa.Column("cache_write_tokens", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("cache_read_tokens", sa.Integer, nullable=False, server_default="0"),
+    sa.Column("cost_usd", sa.Numeric(10, 6), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True),
+              nullable=False, server_default=sa.func.now()),
+    sa.Index("ix_token_ledger_tenant_stage", "tenant_id", "stage"),
+)
+
 # ---------------------------------------------------------------------------
 # T2: classification, asserted at import
 # ---------------------------------------------------------------------------
 
-TENANT_SCOPED = frozenset({"progress_events", "profile_events"})
+TENANT_SCOPED = frozenset({"progress_events", "profile_events", "token_ledger"})
 TENANT_LESS = frozenset({"tenants"})
 
 _all_tables = frozenset(metadata.tables)
@@ -210,6 +227,22 @@ class TenantScope:
             tenant_id=self.tenant_id, kind=kind, field=field,
             key=key, payload=payload,
         )
+
+    def ledger_insert(self, stage: str, model: str, input_tokens: int,
+                      output_tokens: int, cache_write_tokens: int,
+                      cache_read_tokens: int, cost_usd) -> sa.Insert:
+        return sa.insert(token_ledger).values(
+            tenant_id=self.tenant_id, stage=stage, model=model,
+            input_tokens=input_tokens, output_tokens=output_tokens,
+            cache_write_tokens=cache_write_tokens,
+            cache_read_tokens=cache_read_tokens, cost_usd=cost_usd,
+        )
+
+    def ledger_stage_cost(self, stage: str) -> sa.Select:
+        return sa.select(
+            sa.func.coalesce(sa.func.sum(token_ledger.c.cost_usd), 0)
+        ).where(token_ledger.c.tenant_id == self.tenant_id,
+                token_ledger.c.stage == stage)
 
 
 def for_tenant(tenant_id: int) -> TenantScope:

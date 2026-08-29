@@ -74,19 +74,38 @@ def main(argv: list[str] | None = None) -> int:
     pa.add_argument("--tier", default="attested")
     pa.add_argument("--source")
 
+    f = sub.add_parser("factory", help="the course factory (metered LLM jobs)")
+    fsub = f.add_subparsers(dest="factory_command", required=True)
+    fb = fsub.add_parser("build-phase", help="build a phase's interactive layer into a draft")
+    fb.add_argument("course_root")
+    fb.add_argument("--phase", required=True, type=int)
+    fb.add_argument("--tenant", required=True)
+    fb.add_argument("--lesson", help="unit id for the Socratic lesson guide")
+    fb.add_argument("--widget", help="unit id for the widget")
+    fb.add_argument("--widget-concept", help="what the widget makes manipulable")
+    fb.add_argument("--exercise", help="unit id for the scaffolded exercise")
+    fb.add_argument("--no-quiz", action="store_true")
+    fb.add_argument("--no-bank", action="store_true")
+    fb.add_argument("--dry-run", action="store_true",
+                    help="assemble prompts and report sizes; no API calls")
+    fp = fsub.add_parser("promote", help="apply a reviewed draft to the course")
+    fp.add_argument("course_root")
+    fp.add_argument("--phase", required=True, type=int)
+
     args = parser.parse_args(argv)
 
     if args.command == "tenant":
         return _tenant(args)
     if args.command == "profile":
         return _profile(args)
+    if args.command == "factory":
+        return _factory(args)
     if args.command == "serve":
         return _serve(args)
     if args.command == "import-progress":
         return _import_progress(args)
 
-    sidecar_path = args.sidecar or os.path.join(
-        args.course_root, "learning", "course.yaml")
+    sidecar_path = args.sidecar or default_sidecar_path(args.course_root)
     sidecar = load_sidecar(sidecar_path)
     manifest, issues = compile_course(args.course_root, sidecar)
 
@@ -126,6 +145,15 @@ def main(argv: list[str] | None = None) -> int:
                            allow_unicode=True, width=100)
         print(f"wrote {args.out}")
     return 0
+
+
+def default_sidecar_path(course_root: str) -> str:
+    """learning/course.yaml by convention; course.yaml for courses whose
+    content lives at the repo root (ml-ai)."""
+    preferred = os.path.join(course_root, "learning", "course.yaml")
+    if os.path.exists(preferred):
+        return preferred
+    return os.path.join(course_root, "course.yaml")
 
 
 def _tenant(args) -> int:
@@ -185,6 +213,75 @@ def _profile(args) -> int:
             print(text)
         return 0
     return 1
+
+
+def _factory(args) -> int:
+    from . import db, factory, profile
+    from .compiler import compile_course
+
+    sidecar_path = default_sidecar_path(args.course_root)
+    sidecar = load_sidecar(sidecar_path)
+    manifest, issues = compile_course(args.course_root, sidecar)
+    if manifest is None:
+        for i in issues:
+            print(i, file=sys.stderr)
+        return 1
+    curriculum_rel = sidecar.course.docs.curriculum_doc or "learning/curriculum.md"
+    content_root = os.path.join(args.course_root,
+                                os.path.dirname(curriculum_rel))
+    phase_id = f"p{args.phase}"
+
+    if args.factory_command == "promote":
+        moved = factory.promote(args.course_root, content_root,
+                                sidecar_path, phase_id)
+        for m in moved:
+            print(f"promoted: {m}")
+        print("compile clean; draft removed. Remember to add the new "
+              "materials to the owning units' Interactive sections in "
+              "the curriculum prose.")
+        return 0
+
+    spec = factory.BuildSpec(
+        phase_id=phase_id, lesson_unit=args.lesson, widget_unit=args.widget,
+        widget_concept=args.widget_concept, exercise_unit=args.exercise,
+        quiz=not args.no_quiz, bank=not args.no_bank)
+
+    engine = db.make_engine()
+    with engine.begin() as conn:
+        scope = db.for_tenant(db.tenant_id_for(conn, args.tenant))
+        prof = profile.load_profile(conn, scope)
+
+    from .llm import Runner, load_models_config
+    config = load_models_config()
+
+    if args.dry_run:
+        from .profilerender import render_skill_md
+        profile_len = len(render_skill_md(prof))
+        phase = next(p for p in manifest.phases if p.id == phase_id)
+        ctx_len = len(factory.phase_md(manifest, phase))
+        n_calls = sum([bool(args.lesson), bool(args.widget),
+                       bool(args.exercise), not args.no_quiz, not args.no_bank])
+        print(f"dry run: {n_calls} role call(s) on "
+              f"{config.tiers[config.roles['lesson-writer']]}; "
+              f"profile {profile_len}ch + phase context {ctx_len}ch per call; "
+              f"budget ${config.budgets['default']:.2f}/stage; "
+              f"rough cost ~${n_calls * 0.35:.2f}")
+        return 0
+
+    runner = Runner(engine, scope, config)
+    report = factory.build_phase(runner, manifest, prof, content_root, spec)
+    factory.write_build_manifest(
+        report, args.phase,
+        next((m.path for m in manifest.materials
+              if m.kind == "question-bank"), None))
+    print(f"draft written to {report.draft_dir}")
+    for a in report.artifacts:
+        print(f"  {a.role:16s} -> {a.rel_path or a.note}")
+    for role, cost in report.costs.items():
+        print(f"  {role:16s} {cost}")
+    print("Review the draft, then: python -m curricle factory promote "
+          f"{args.course_root} --phase {args.phase}")
+    return 0
 
 
 def _serve(args) -> int:

@@ -31,9 +31,10 @@ CHECKPOINT_RE = re.compile(r"^###\s*—\s*Phase (\d+) Checkpoint\s*—\s*$")
 ROW_RE = re.compile(r"^- \*\*(.+?):?\*\*:?\s*(.*)$")
 # **Goal:** … (phase-level bold label line, also used for checkpoint track goals)
 BOLD_LABEL_RE = re.compile(r"^\*\*(.+?):?\*\*:?\s*(.*)$")
-# *Curriculum v1.2 — August 2026: …*   /   *Version 1.0 — 2026-08-27. …*
+# *Curriculum v1.2 — August 2026: …*  /  *Version 1.0 — 2026-08-27. …*
+# /  *Curriculum version 2.0 — June 2026. …*
 VERSION_RE = re.compile(
-    r"^\*(?:Curriculum v|Version )(\d+(?:\.\d+)*)\s*—\s*([^:.]+)[:.]\s*(.*?)\*?\s*$"
+    r"^\*(?:Curriculum v(?:ersion )?|Version )(\d+(?:\.\d+)*)\s*—\s*([^:.]+)[:.]\s*(.*?)\*?\s*$"
 )
 CHECK_YOURSELF_RE = re.compile(r"^>\s*\*\*Check yourself:?\*\*:?\s*(.*)$")
 # **Greek by now:** — a labeled span *inline* in checkpoint prose (textual-flow
@@ -206,6 +207,111 @@ def _absorb_checkpoint_line(checkpoint: MdCheckpoint, line: str) -> None:
     # parts then alternates label, text, label, text, …
     for label, text in zip(parts[1::2], parts[2::2]):
         checkpoint.labeled_lines.append((label.strip(), text.strip()))
+
+
+# ---------------------------------------------------------------------------
+# The "headings" dialect (ml-ai's generation): H1 phases, "## Module N: Title"
+# units, H3 field sections whose bodies are the row content, checkpoints as
+# blockquoted headings. Same document model out; the compiler doesn't care
+# which dialect fed it.
+# ---------------------------------------------------------------------------
+
+H1_PHASE_RE = re.compile(r"^# Phase (?P<num>\d+) — (?P<title>.+?)\s*$")
+H2_UNIT_RE = re.compile(r"^## (?:Module|Unit) (?P<num>\d+):? (?P<title>.+?)\s*$")
+H3_FIELD_RE = re.compile(r"^### (.+?)\s*$")
+BQ_CHECKPOINT_RE = re.compile(r"^>\s*#+\s*—\s*Phase (\d+) Checkpoint\s*—\s*$")
+META_LINE_RE = re.compile(r"^\*\*Track [AB]:\*\* .+$")
+
+
+def parse_curriculum_headings(text: str) -> MdDoc:
+    doc = MdDoc()
+    lines = text.splitlines()
+    phase: MdPhase | None = None
+    unit: MdUnit | None = None
+    section_label: str | None = None
+    section_lines: list[str] = []
+    checkpoint: MdCheckpoint | None = None
+
+    def flush_section() -> None:
+        nonlocal section_label, section_lines
+        if section_label is not None and unit is not None:
+            content = "\n".join(section_lines).strip()
+            if content:
+                unit.rows.append(MdRow(label=section_label, content=content, line=0))
+        section_label, section_lines = None, []
+
+    for i, line in enumerate(lines):
+        m = H1_PHASE_RE.match(line)
+        if m:
+            flush_section()
+            phase = MdPhase(num=int(m.group("num")), title=m.group("title"),
+                            line=i + 1)
+            doc.phases.append(phase)
+            unit = None
+            checkpoint = None
+            continue
+
+        m = BQ_CHECKPOINT_RE.match(line)
+        if m and phase is not None:
+            flush_section()
+            checkpoint = MdCheckpoint(phase_num=int(m.group(1)), prose="")
+            phase.checkpoint = checkpoint
+            unit = None
+            continue
+
+        m = H2_UNIT_RE.match(line)
+        if m and phase is not None:
+            flush_section()
+            unit = MdUnit(num=int(m.group("num")), title=m.group("title"),
+                          line=i + 1)
+            phase.units.append(unit)
+            checkpoint = None
+            continue
+
+        m = H3_FIELD_RE.match(line)
+        if m and unit is not None:
+            flush_section()
+            section_label = m.group(1)
+            continue
+
+        m = VERSION_RE.match(line)
+        if m:
+            doc.versions.append((m.group(1), m.group(2).strip(), m.group(3).strip()))
+            continue
+
+        if checkpoint is not None and line.startswith(">"):
+            _absorb_checkpoint_line(checkpoint, line[1:].strip())
+            continue
+
+        if section_label is not None:
+            section_lines.append(line)
+            continue
+
+        stripped = line.strip()
+        if not stripped or stripped in ("---",):
+            continue
+        if unit is not None:
+            if META_LINE_RE.match(stripped):
+                unit.rows.append(MdRow(label="Tracks", content=stripped, line=i + 1))
+            else:
+                unit.extra_prose.append(line)
+        elif phase is not None:
+            m = BOLD_LABEL_RE.match(stripped)
+            if m and m.group(1) == "Goal" and not phase.goal:
+                phase.goal = m.group(2)
+            else:
+                phase.extra_prose.append(line)
+        else:
+            doc.preamble.append(line)
+
+    flush_section()
+    return doc
+
+
+DIALECTS = {
+    "bullets": parse_curriculum,
+    "headings": parse_curriculum_headings,
+}
 
 
 def _with_continuations(lines: list[str], i: int, first: str) -> tuple[str, int]:

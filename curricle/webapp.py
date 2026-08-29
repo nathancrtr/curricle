@@ -20,10 +20,11 @@ from dataclasses import dataclass
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from . import db, progress
+from . import db, profile, progress
 from .compiler import compile_course
 from .currender import render_curriculum
 from .hubrender import render_hub
+from .profilerender import render_profile_page
 from .resrender import render_resources
 from .schema import Manifest
 from .sidecar import load_sidecar
@@ -78,7 +79,32 @@ def create_app(course_roots: list[str], tenant_slug: str,
                 f"<body style=\"font:16px/1.6 Georgia,serif;background:#faf8f4;"
                 f"color:#2b2620;max-width:640px;margin:3rem auto;padding:0 1rem\">"
                 f"<h1 style=\"font-weight:400\">curricle</h1>"
-                f"<p>Signed-in tenant: <b>{tenant_slug}</b></p><ul>{items}</ul>")
+                f"<p>Signed-in tenant: <b>{tenant_slug}</b> · "
+                f'<a href="/profile">the learner profile</a></p><ul>{items}</ul>')
+
+    @app.get("/profile", response_class=HTMLResponse)
+    def profile_page() -> str:
+        with engine.begin() as conn:
+            state = profile.load_profile(conn, scope)
+        return render_profile_page(state, tenant_slug)
+
+    @app.post("/api/profile/events")
+    async def post_profile_event(request: Request) -> JSONResponse:
+        body = await request.json()
+        kind, fld, key = body.get("kind"), body.get("field"), body.get("key")
+        payload = body.get("payload", {})
+        if not all(isinstance(x, str) for x in (kind, fld, key)):
+            raise HTTPException(422, "kind, field, key are required strings")
+        if kind == "propose" and not payload.get("source"):
+            # Anything arriving over the wire as a proposal names its source.
+            raise HTTPException(422, "propose requires payload.source")
+        try:
+            with engine.begin() as conn:
+                profile.append_profile_event(conn, scope, kind, fld, key, payload)
+                state = profile.load_profile(conn, scope)
+        except profile.InvalidProfileEvent as exc:
+            raise HTTPException(422, str(exc))
+        return JSONResponse({"ok": True, "pending": len(state.pending)})
 
     @app.get("/c/{slug}/")
     def course_root(slug: str) -> RedirectResponse:
@@ -123,6 +149,11 @@ def create_app(course_roots: list[str], tenant_slug: str,
             with engine.begin() as conn:
                 progress.append_event(conn, scope, h.manifest,
                                       kind, subject_id, payload)
+                if kind == "checkpoint_result":
+                    # Checkpoint results become proposed profile evidence —
+                    # the misses matter as much as the score (§Phase 2).
+                    profile.propose_from_checkpoint(conn, scope, h.manifest,
+                                                    subject_id, payload)
                 state = progress.load_state(conn, scope, h.manifest.course.id)
         except progress.InvalidEvent as exc:
             raise HTTPException(422, str(exc))

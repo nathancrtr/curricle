@@ -39,6 +39,12 @@ EVENT_KINDS = (
     "session_note",      # {text} free-form, subject_id may name a unit or ""
 )
 
+# The profile-evidence vocabulary. `assert` is the learner speaking in their
+# own voice — accepted on arrival, because the human is the authority on
+# themselves. `propose` is anything the system (or later, an agent) believes
+# and must have ratified: the agent proposes, the human publishes.
+PROFILE_EVENT_KINDS = ("assert", "propose", "accept", "reject", "retract")
+
 tenants = sa.Table(
     "tenants", metadata,
     sa.Column("id", sa.Integer, primary_key=True),
@@ -65,11 +71,27 @@ progress_events = sa.Table(
     sa.Index("ix_progress_events_tenant_course", "tenant_id", "course"),
 )
 
+profile_events = sa.Table(
+    "profile_events", metadata,
+    sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
+    sa.Column("tenant_id", sa.Integer,
+              sa.ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False),
+    sa.Column("kind", sa.Text, nullable=False),
+    sa.Column("field", sa.Text, nullable=False),   # profile section (progress.FIELDS)
+    sa.Column("key", sa.Text, nullable=False),     # claim identity within the field
+    sa.Column("payload", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
+    sa.Column("created_at", sa.DateTime(timezone=True),
+              nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(
+        "kind IN " + repr(PROFILE_EVENT_KINDS), name="known_profile_kind"),
+    sa.Index("ix_profile_events_tenant", "tenant_id"),
+)
+
 # ---------------------------------------------------------------------------
 # T2: classification, asserted at import
 # ---------------------------------------------------------------------------
 
-TENANT_SCOPED = frozenset({"progress_events"})
+TENANT_SCOPED = frozenset({"progress_events", "profile_events"})
 TENANT_LESS = frozenset({"tenants"})
 
 _all_tables = frozenset(metadata.tables)
@@ -171,6 +193,22 @@ class TenantScope:
         return sa.insert(progress_events).values(
             tenant_id=self.tenant_id, course=course, kind=kind,
             subject_id=subject_id, payload=payload,
+        )
+
+    def profile_select(self) -> sa.Select:
+        return (
+            sa.select(profile_events.c.id, profile_events.c.kind,
+                      profile_events.c.field, profile_events.c.key,
+                      profile_events.c.payload, profile_events.c.created_at)
+            .where(profile_events.c.tenant_id == self.tenant_id)
+            .order_by(profile_events.c.id)
+        )
+
+    def profile_insert(self, kind: str, field: str, key: str,
+                       payload: dict) -> sa.Insert:
+        return sa.insert(profile_events).values(
+            tenant_id=self.tenant_id, kind=kind, field=field,
+            key=key, payload=payload,
         )
 
 

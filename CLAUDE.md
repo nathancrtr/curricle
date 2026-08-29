@@ -56,6 +56,26 @@ python -m curricle compile <course_root> --sidecar courses/<id>.course.yaml --ou
 - Dev runbook: `export CURRICLE_DATABASE_URL=postgresql+psycopg:///curricle`,
   `alembic upgrade head`, `python -m curricle serve --course … --tenant nathan`.
 
+## The profile pipeline (Phase 2)
+
+- The learner profile is a fold over `profile_events` (`profile.py`), and
+  `~/.claude/skills/learner-profile/SKILL.md` is a **generated projection**
+  (`profilerender.render_skill_md`) — never edit that file by hand; assert
+  or propose evidence, then `python -m curricle profile render --tenant
+  nathan --out ~/.claude/skills/learner-profile/SKILL.md`. The pre-Phase-2
+  original is backed up beside it as `SKILL.md.pre-curricle`.
+- Evidence tiers come from provenance, never confidence: `attested` (the
+  learner said it), `demonstrated` (course activity proved it), `thin`
+  (claimed, uncorroborated). The agent proposes, the human publishes: only
+  `assert` (the learner's own voice) skips review; every `propose` waits on
+  /profile until accepted, and wire proposals must name a source.
+- Checkpoint results POSTed to the course events API automatically become
+  proposed `demonstrated` evidence, misses included.
+- Claim identity is (field, key) and keys are forever; the field vocabulary
+  is `profile.FIELDS` — grow it deliberately, renderers know the sections.
+- The personal seed lives in gitignored `local/`; tests use synthetic
+  fixtures only.
+
 ## What this repo is not (yet)
 
 No LLM calls, no auth, no multi-tenant serving (single tenant per app

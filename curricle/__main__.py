@@ -56,10 +56,30 @@ def main(argv: list[str] | None = None) -> int:
                           "resources:{inhand:{},notes:{}}} — values may also be "
                           "the raw localStorage strings")
 
+    p = sub.add_parser("profile", help="the learner-profile evidence ledger")
+    psub = p.add_subparsers(dest="profile_command", required=True)
+    ps = psub.add_parser("show", help="print the folded profile")
+    ps.add_argument("--tenant", required=True)
+    pr = psub.add_parser("render", help="render the SKILL.md projection")
+    pr.add_argument("--tenant", required=True)
+    pr.add_argument("--out", help="write here (default: stdout)")
+    pi = psub.add_parser("import-seed", help="assert claims from a seed YAML")
+    pi.add_argument("seed", help="YAML file: {claims: [{field, key, text, tier?, source?}]}")
+    pi.add_argument("--tenant", required=True)
+    pa = psub.add_parser("assert", help="assert one claim in the learner's voice")
+    pa.add_argument("--tenant", required=True)
+    pa.add_argument("--field", required=True)
+    pa.add_argument("--key", required=True)
+    pa.add_argument("--text", required=True)
+    pa.add_argument("--tier", default="attested")
+    pa.add_argument("--source")
+
     args = parser.parse_args(argv)
 
     if args.command == "tenant":
         return _tenant(args)
+    if args.command == "profile":
+        return _profile(args)
     if args.command == "serve":
         return _serve(args)
     if args.command == "import-progress":
@@ -115,6 +135,56 @@ def _tenant(args) -> int:
         tenant_id = db.create_tenant(conn, args.slug)
     print(f"tenant {args.slug!r} created (id {tenant_id})")
     return 0
+
+
+def _profile(args) -> int:
+    from . import db, profile
+
+    engine = db.make_engine()
+    with engine.begin() as conn:
+        scope = db.for_tenant(db.tenant_id_for(conn, args.tenant))
+
+        if args.profile_command == "import-seed":
+            with open(args.seed, encoding="utf-8") as f:
+                seed = yaml.safe_load(f)
+            n = profile.import_seed(conn, scope, seed["claims"])
+            print(f"asserted {n} claim(s) for tenant {args.tenant!r}")
+            return 0
+
+        if args.profile_command == "assert":
+            profile.append_profile_event(
+                conn, scope, "assert", args.field, args.key,
+                {"text": args.text, "tier": args.tier, "source": args.source})
+            print(f"asserted {args.field}/{args.key}")
+            return 0
+
+        state = profile.load_profile(conn, scope)
+
+    if args.profile_command == "show":
+        for field in profile.FIELDS:
+            claims = state.field_claims(field)
+            if not claims:
+                continue
+            print(f"\n[{field}]")
+            for c in claims:
+                src = f"  ({c.source})" if c.source else ""
+                print(f"  {c.key} [{c.tier}]{src}\n    {c.text[:100]}")
+        if state.pending:
+            print(f"\n{len(state.pending)} proposal(s) awaiting review "
+                  "(accept on /profile or via the API)")
+        return 0
+
+    if args.profile_command == "render":
+        from .profilerender import render_skill_md
+        text = render_skill_md(state)
+        if args.out:
+            with open(args.out, "w", encoding="utf-8") as f:
+                f.write(text)
+            print(f"wrote {args.out}")
+        else:
+            print(text)
+        return 0
+    return 1
 
 
 def _serve(args) -> int:

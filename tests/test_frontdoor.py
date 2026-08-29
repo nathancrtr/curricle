@@ -237,6 +237,64 @@ class WaypathAgreementTest(unittest.TestCase):
         self.assertIn("id === nextId", rule)
 
 
+def _rects(svg: str) -> list[dict[str, str]]:
+    """Every <rect> in an SVG, as attribute dicts, in document order."""
+    return [dict(re.findall(r'([a-z-]+)="([^"]*)"', attrs))
+            for attrs in re.findall(r"<rect ([^>]*?)/>", svg)]
+
+
+class WordmarkTest(unittest.TestCase):
+    """The mark is the waypath in miniature — so it is checked against it.
+
+    Not against a transcription of it: every number below is read out of
+    `theme.BASE_CSS`, because the failure this closes is the mark being left
+    behind when the path moves. It happened once — the lit stone kept
+    `--accent` through the contrast fix that lit every other waypath with
+    `--accent-strong` (#16) — and it is invisible from the wordmark's own
+    line, which spells a token that still exists and still looks coral.
+    """
+
+    def setUp(self):
+        self.lit, self.ring, self.unlit = _rects(webapp.WORDMARK)
+        self.stone = dict(re.findall(
+            r"([a-z-]+):([^;]+);",
+            re.search(r"\.wp-stone \{([^}]*)\}", theme.BASE_CSS).group(1)))
+
+    def test_the_lit_stone_takes_the_token_the_path_lights_with(self):
+        lit_rule = re.search(r"\.wp-stone\.lit \{([^}]*)\}", theme.BASE_CSS).group(1)
+        token = re.search(r"var\((--[a-z-]+)\)", lit_rule).group(1)
+        self.assertEqual(self.lit["fill"], f"var({token})")
+        self.assertEqual(self.unlit["fill"], self.stone["background"].strip())
+
+    def test_the_stones_are_the_path_s_lozenge_scaled(self):
+        # The chosen stone is a 2:1 lozenge with fully rounded ends. Circles
+        # were the rejected fork; a mark drawn in the rejected shape is a
+        # different drawing from the path it claims to miniaturize.
+        ratio = float(self.stone["width"].removesuffix("px")) / float(
+            self.stone["height"].removesuffix("px"))
+        for name, stone in (("lit", self.lit), ("unlit", self.unlit)):
+            with self.subTest(stone=name):
+                w, h = float(stone["width"]), float(stone["height"])
+                self.assertEqual(w / h, ratio)
+                self.assertEqual(float(stone["rx"]) * 2, h)
+
+    def test_the_ring_is_a_hollow_lit_stone(self):
+        # `.wp-stone.here` is an inset ring in the lit color: same footprint
+        # as a stone, drawn hollow. The SVG says it with a centered stroke,
+        # so the rect is inset by half the stroke on every side.
+        stroke = float(self.ring["stroke-width"])
+        self.assertEqual(self.ring["fill"], "none")
+        self.assertEqual(self.ring["stroke"], self.lit["fill"])
+        self.assertEqual(float(self.ring["width"]) + stroke, float(self.lit["width"]))
+        self.assertEqual(float(self.ring["height"]) + stroke, float(self.lit["height"]))
+
+    def test_the_mark_fits_its_viewbox(self):
+        w, h = re.search(r'viewBox="0 0 (\d+) (\d+)"', webapp.WORDMARK).groups()
+        right = float(self.unlit["x"]) + float(self.unlit["width"])
+        self.assertEqual(right, float(w))
+        self.assertEqual(float(self.lit["height"]), float(h))
+
+
 class InvariantL1Test(unittest.TestCase):
     def test_the_web_app_cannot_reach_the_model(self):
         # L1: no LLM on a request path, ever. The front door made this module

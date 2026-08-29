@@ -348,6 +348,51 @@ class TestBaseCss(unittest.TestCase):
         self.assertTrue(out.endswith("  .own { color:var(--ink); }"))
 
 
+def _decls(selector: str, css: str) -> dict[str, str]:
+    """The declarations of one rule, by property."""
+    for sel, body in _rules(css):
+        if sel == selector:
+            return {d.partition(":")[0].strip(): d.partition(":")[2].strip()
+                    for d in body.split(";") if d.strip()}
+    raise AssertionError(f"no rule `{selector}`")
+
+
+def _px(value: str) -> float:
+    return float(value.removesuffix("px"))
+
+
+class TestEyebrowRhythm(unittest.TestCase):
+    """The breadcrumb's spacing, which is three numbers that must agree.
+
+    The crumb link is padded so its hover pill has a hit area, and the
+    padding is then cancelled by negative margins so it never reaches the
+    rhythm — the crumbs are meant to sit on one even beat, the flex gap. That
+    held on the left only until #16: the uncompensated right padding stacked
+    onto the gap and every subpage's first separator sat 20px out instead of
+    8. Two numbers therefore have to track the gap, and neither is visible
+    from the other's line, which is why they are asserted together here.
+    """
+
+    def setUp(self):
+        self.eyebrow = _decls(".eyebrow", theme.BASE_CSS)
+        self.crumb = _decls(".eyebrow a", theme.BASE_CSS)
+
+    def test_the_padding_is_cancelled_on_both_sides(self):
+        pad = self.crumb["padding"].split()
+        self.assertEqual(len(pad), 2, "expected `padding:<v> <h>`")
+        for side in ("margin-left", "margin-right"):
+            self.assertEqual(_px(self.crumb[side]), -_px(pad[1]),
+                             f"{side} does not cancel the horizontal padding, "
+                             "so the crumb's text edge sits off the beat")
+
+    def test_the_hover_pill_stops_where_the_next_crumb_starts(self):
+        # Padding wider than the gap would put the pill under the separator
+        # dot; narrower would leave the pill's cap short of the crumb it is
+        # meant to fill the space beside. Equal is the one value that works.
+        self.assertEqual(_px(self.crumb["padding"].split()[1]),
+                         _px(self.eyebrow["gap"]))
+
+
 class TestContrast(unittest.TestCase):
     def test_helper_matches_known_wcag_values(self):
         # Black on white is the maximum; #767676 is the canonical "exactly

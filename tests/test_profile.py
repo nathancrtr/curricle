@@ -3,7 +3,7 @@
 import unittest
 
 from curricle import db, profile
-from curricle.profilerender import render_skill_md
+from curricle.profilerender import render_profile_page, render_skill_md
 
 from corpuspaths import HAVE_TF, TF_ROOT
 from pg import test_engine
@@ -90,6 +90,79 @@ class ProjectionTest(unittest.TestCase):
              {"text": "SECRET CLAIM", "tier": "thin", "source": "s"}),
         ])
         self.assertNotIn("SECRET CLAIM", render_skill_md(st))
+
+
+LISTY = ("This profile is subject-agnostic; the same principles apply:\n\n"
+         "- Lead with **implementation** and concrete examples\n"
+         "- Bridge from `engineering` intuition to formal concepts\n"
+         "- Don't assume mathematical background")
+
+
+class ReviewPageTest(unittest.TestCase):
+    """The web projection of the same ledger.
+
+    The claims are markdown and the long ones carry blocks; the page used to
+    run them through the inline renderer, which knows nothing about lines, so
+    a lede and five bullets arrived as one paragraph with " - " for a bullet
+    (#16). The profile's richest content was its least readable. What must
+    not move while fixing that is the tier: it is provenance, it is printed
+    in words, and no claim may come out of the renderer looking like a
+    different tier than it went in as.
+    """
+
+    def page(self, events):
+        return render_profile_page(profile.fold(events), "nathan")
+
+    def test_a_claim_s_bullets_render_as_a_list(self):
+        page = self.page([("assert", "subject_adapters", "agnostic",
+                           {"text": LISTY, "tier": "attested"})])
+        self.assertIn("<p>This profile is subject-agnostic; the same "
+                      "principles apply:</p>", page)
+        self.assertIn("<li>Lead with <b>implementation</b> and concrete "
+                      "examples</li>", page)
+        self.assertIn("<li>Bridge from <code>engineering</code> intuition to "
+                      "formal concepts</li>", page)
+        self.assertEqual(page.count("<li>"), 3)
+        # The defect itself: the bullets glued into the running text.
+        self.assertNotIn("apply: - Lead", page)
+        self.assertNotIn("\n- ", page)
+
+    def test_a_one_paragraph_claim_still_reads_as_one_line(self):
+        # The common case, and the look the page already had: the tier chip
+        # trails the sentence rather than dropping to a line of its own.
+        page = self.page([("assert", "pacing", "hours",
+                           {"text": "Works in evening blocks.",
+                            "tier": "attested"})])
+        self.assertIn('<p>Works in evening blocks.'
+                      '<span class="tier attested">attested</span></p>', page)
+
+    def test_every_tier_is_still_printed_in_words(self):
+        page = self.page([
+            ("assert", "pacing", "hours",
+             {"text": "Evening blocks.", "tier": "attested"}),
+            ("propose", "demonstrated", "tf--q1",
+             {"text": "tf — **Phase 1**: 9/10", "tier": "demonstrated",
+              "source": "tf/q-phase-1"}),
+            ("accept", "demonstrated", "tf--q1", {}),
+            ("propose", "style", "diagrams",
+             {"text": "Prefers diagrams:\n\n- so it is claimed",
+              "tier": "thin", "source": "a guess"}),
+        ])
+        for tier in ("attested", "demonstrated", "thin"):
+            self.assertIn(f'<span class="tier {tier}">{tier}</span>', page)
+        # …including on the claim whose body ends in a list, where the chip
+        # rides a line of its own rather than the last bullet.
+        self.assertIn('<p class="foot"><span class="tier thin">thin</span>', page)
+        self.assertNotIn("so it is claimed<span", page)
+
+    def test_a_pending_proposal_keeps_its_source_and_its_buttons(self):
+        page = self.page([("propose", "style", "diagrams",
+                           {"text": "Prefers diagrams.", "tier": "thin",
+                            "source": "a guess"})])
+        self.assertIn("Awaiting your review", page)
+        self.assertIn('<div class="src">a guess</div>', page)
+        self.assertIn("act('accept','style','diagrams')", page)
+        self.assertIn("act('reject','style','diagrams')", page)
 
 
 class LedgerTest(unittest.TestCase):

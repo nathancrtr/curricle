@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime
 import html
+import re
 
 from . import theme
 from .inlinemd import inline_html
@@ -127,6 +128,12 @@ _STYLE = theme.style("""\
   .claim { border-bottom:1px solid var(--line-soft); padding:14px 0; font-size:14.5px;
            line-height:1.6; }
   .claim:last-of-type { border-bottom:none; }
+  .claim p, .proposal .text p { margin:0 0 9px; }
+  .claim p:last-child, .proposal .text p:last-child { margin-bottom:0; }
+  .claim ul, .proposal .text ul { margin:0 0 9px; padding-left:19px; }
+  .claim li, .proposal .text li { margin:3px 0; }
+  .claim .foot, .proposal .text .foot { margin-top:-3px; }
+  .claim .foot .tier, .proposal .text .foot .tier { margin-left:0; }
   .tier { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.03em;
           border-radius:999px; padding:2px 9px; background:var(--chip);
           color:var(--muted); margin-left:8px; vertical-align:1px; white-space:nowrap; }
@@ -154,6 +161,62 @@ _STYLE = theme.style("""\
 """)
 
 
+_BULLET_RE = re.compile(r"^[-*]\s+")
+
+
+def _blocks(text: str) -> list[tuple[str, list[str]]]:
+    """A claim's markdown as ("p" | "ul", lines) blocks, in order.
+
+    Claim text is markdown, and the long claims carry real block structure: a
+    lede, a blank line, then a run of "- " bullets. The SKILL.md projection
+    emits that verbatim because markdown is what it is; the web page has to
+    build the blocks itself. Everything here is deliberately what the corpus
+    actually contains — paragraphs and one flat level of bullets. Anything
+    else (nesting, headings, fences) is prose to us, which is the same
+    refusal-to-guess the compiler makes: a claim is one person's sentences,
+    not a document.
+    """
+    out: list[tuple[str, list[str]]] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line:                          # blank line closes the block
+            out.append(("", []))
+            continue
+        kind, line = (("ul", _BULLET_RE.sub("", line)) if _BULLET_RE.match(line)
+                      else ("p", line))
+        if out and out[-1][0] == kind:
+            out[-1][1].append(line)           # soft-wrapped continuation
+        else:
+            out.append((kind, [line]))
+    return [b for b in out if b[0]]
+
+
+def _claim_body(text: str, trailer: str) -> str:
+    """A claim rendered as blocks, closed by `trailer` (the tier chip).
+
+    The tier word is part of the claim, not of a block inside it, so it rides
+    the final paragraph where there is one — which is every short claim, and
+    is exactly the single line the page rendered before this function existed.
+    A claim that ends in a list gets it on a line of its own instead: hung off
+    the last bullet it would read as the tier of that bullet, and the tier is
+    provenance for the whole claim.
+    """
+    blocks = _blocks(text)
+    if not blocks:                            # empty text: keep the chip
+        return f'<p>{trailer}</p>'
+    parts = []
+    for i, (kind, lines) in enumerate(blocks):
+        last = i == len(blocks) - 1
+        if kind == "ul":
+            items = "".join(f"<li>{inline_html(x)}</li>" for x in lines)
+            parts.append(f"<ul>{items}</ul>")
+        else:
+            tail = trailer if last else ""
+            parts.append(f"<p>{inline_html(' '.join(lines))}{tail}</p>")
+    if blocks[-1][0] == "ul":
+        parts.append(f'<p class="foot">{trailer}</p>')
+    return "".join(parts)
+
 def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
     e = html.escape
     parts: list[str] = []
@@ -163,10 +226,10 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
         for p in state.pending:
             note = " <span class=\"tier thin\">supersedes</span>" if p.supersedes else ""
             src = f'<div class="src">{e(p.source)}</div>' if p.source else ""
+            trailer = f'<span class="tier {e(p.tier)}">{e(p.tier)}</span>{note}'
             rows.append(
-                f'<div class="proposal"><span class="text">'
-                f'{inline_html(p.text)}'
-                f'<span class="tier {e(p.tier)}">{e(p.tier)}</span>{note}{src}</span>'
+                f'<div class="proposal"><div class="text">'
+                f'{_claim_body(p.text, trailer)}{src}</div>'
                 f'<button class="yes" onclick="act(\'accept\',\'{e(p.field)}\',\'{e(p.key)}\')">Accept</button>'
                 f'<button class="no" onclick="act(\'reject\',\'{e(p.field)}\',\'{e(p.key)}\')">Reject</button>'
                 "</div>")
@@ -183,8 +246,9 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
         items = []
         for c in claims:
             src = f'<div class="src">{e(c.source)}</div>' if c.source else ""
-            items.append(f'<div class="claim">{inline_html(c.text)}'
-                         f'<span class="tier {e(c.tier)}">{e(c.tier)}</span>{src}</div>')
+            trailer = f'<span class="tier {e(c.tier)}">{e(c.tier)}</span>'
+            items.append(f'<div class="claim">{_claim_body(c.text, trailer)}'
+                         f'{src}</div>')
         parts.append(f"<h2>{e(_FIELD_TITLES[field])}</h2>" + "".join(items))
 
     body = "\n".join(parts) or (

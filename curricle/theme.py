@@ -110,8 +110,18 @@ BASE_CSS = f"""\
   /* ---- the shared shell ---- */
   .eyebrow {{ display:flex; flex-wrap:wrap; align-items:center; gap:8px;
              font-size:13.5px; font-weight:500; color:var(--muted); }}
+  /* The crumb link is padded so its hover pill has a hit area, and the
+     padding is cancelled by negative margins on *both* sides so the padding
+     never enters the rhythm: the text edge aligns with the page on the left,
+     and on the right the crumb keeps the same 8px gap the separators do
+     (compensating only the left stacked 12px of padding onto the flex gap,
+     giving 20px there against 8px everywhere else). Horizontal padding is
+     the gap, 8px, and no more: at exactly that size the hover pill fills the
+     gap and stops where the next crumb begins, so hovering never reaches
+     under the separator dot. Changing the gap means changing both. */
   .eyebrow a {{ text-decoration:none; color:var(--accent-text);
-               padding:6px 12px; margin-left:-12px; border-radius:999px; }}
+               padding:6px 8px; margin-left:-8px; margin-right:-8px;
+               border-radius:999px; }}
   .eyebrow a:hover {{ background:var(--accent-soft); }}
   .eyebrow .sep {{ color:var(--faint); }}
 

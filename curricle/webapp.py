@@ -103,11 +103,22 @@ INDEX_STYLE = theme.style("""\
 
 # The wordmark is the waypath itself, in miniature: three stones — lit, ring,
 # unlit — because the mark and the product's promise are the same drawing.
-WORDMARK = ('<svg width="34" height="12" viewBox="0 0 34 12" aria-hidden="true">'
-            '<rect x="0" y="1" width="10" height="10" rx="5" fill="var(--accent)"/>'
-            '<rect x="13" y="2" width="8" height="8" rx="4" fill="none" '
+# Which is why both of its v1 departures from the path are gone. The lit
+# stone fills --accent-strong, the token the path's lit stones moved to when
+# the contrast exception was retired; drawing the mark in --accent left the
+# one place the gesture is stated on its own out of the decision that reached
+# every other waypath. And the stones are the 2:1 lozenge, not circles: the
+# lozenge is the chosen stone shape, and a mark whose stones are a different
+# shape from the path's stones is a different drawing, whatever it is
+# miniaturizing. Scaling is the honest miniaturization — the front door's
+# course cards already shrink the stone to 15x8 — so these are 16x8 with a
+# 4px gap, and the ring is a hollow lit stone inset 1 with a 2 stroke,
+# exactly as `.wp-stone.here` draws it.
+WORDMARK = ('<svg width="56" height="8" viewBox="0 0 56 8" aria-hidden="true">'
+            '<rect x="0" y="0" width="16" height="8" rx="4" fill="var(--accent-strong)"/>'
+            '<rect x="21" y="1" width="14" height="6" rx="3" fill="none" '
             'stroke="var(--accent-strong)" stroke-width="2"/>'
-            '<rect x="24" y="1" width="10" height="10" rx="5" fill="var(--stone)"/></svg>')
+            '<rect x="40" y="0" width="16" height="8" rx="4" fill="var(--stone)"/></svg>')
 
 
 def _program_ids(manifest: Manifest) -> tuple[str, ...]:

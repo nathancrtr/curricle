@@ -3,138 +3,222 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>textual-flow — the resources</title>
+<title>Textual criticism &amp; computational philology — the resources</title>
 <style>
-  :root { --bg:#faf8f4; --panel:#fff; --ink:#2b2620; --muted:#7a7268; --faint:#a29a8e;
-          --line:#e3ddd2; --line-soft:#eee9e0; --accent:#7c5cbf; --accent-ink:#fff;
-          --marker:rgba(124,92,191,.16); --good:#4a7a4e; --warn:#b3543a; --chip:#f3efe8; }
+  :root {
+  --bg:#FDF6EF; --panel:#FFFFFF; --ink:#3B2A1E; --muted:#6D5B4E; --faint:#8A7767;
+  --line:#EFDFD2; --line-soft:#F5EAE0;
+  --accent:#E06A4E; --accent-text:#B8432A; --accent-strong:#C6492E;
+  --accent-soft:#FBE9E2; --on-accent:#FFFFFF;
+  --good:#3D7A4A; --good-text:#2F6B3C; --good-soft:#E4F0E5;
+  --warn-text:#9C4A21; --warn-soft:#F9E9DC;
+  --chip:#F7EADF; --stone:#EBD9C8;
+  --shadow:0 1px 2px rgba(80,48,28,.05), 0 6px 18px rgba(80,48,28,.07);
+  --shadow-lift:0 2px 4px rgba(80,48,28,.06), 0 10px 28px rgba(80,48,28,.10);
+  color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+    }
+  }
+  :root[data-theme=dark] {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+  }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; }
+  [hidden] { display:none !important; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.6 Georgia, 'Times New Roman', serif; }
-  a { color:var(--accent); }
-  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
-  .wrap { max-width:820px; margin:0 auto; padding:0 24px 90px; }
-  .masthead { padding:56px 0 26px; }
-  .eyebrow { font:11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase;
-             color:var(--faint); margin:0 0 18px; }
-  .eyebrow a { color:var(--accent); text-decoration:none; }
-  h1 { font-weight:400; font-size:clamp(34px,6.5vw,50px); line-height:1.06;
-       letter-spacing:-.01em; margin:0; }
-  h1 em { font-style:italic; color:var(--muted); }
-  .standfirst { max-width:56ch; margin:18px 0 0; color:var(--muted); font-size:16px; }
-  .controls { display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px;
-              margin:28px 0 0; padding:14px 0;
-              border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .meter { display:flex; align-items:center; gap:12px; }
-  .ticks { display:flex; gap:4px; }
-  .tick { width:13px; height:5px; border-radius:1px; background:var(--line);
-          transition:background .35s ease; }
-  .tick.on { background:var(--accent); }
-  .count { font:11.5px ui-monospace,Menlo,monospace; letter-spacing:.05em;
-           color:var(--muted); white-space:nowrap; }
+         font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  a { color:var(--accent-text); }
+  :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
+                   border-radius:6px; }
+  button { font:inherit; color:inherit; background:none; border:none; padding:0;
+           cursor:pointer; }
+  code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
+         padding:1px 5px; border-radius:6px; }
+  h1, h2, h3, .display { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+
+  /* ---- the shared shell ---- */
+  .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+             font-size:13.5px; font-weight:500; color:var(--muted); }
+  .eyebrow a { text-decoration:none; color:var(--accent-text);
+               padding:6px 12px; margin-left:-12px; border-radius:999px; }
+  .eyebrow a:hover { background:var(--accent-soft); }
+  .eyebrow .sep { color:var(--faint); }
+
+  /* ---- cards & chips ---- */
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:18px; box-shadow:var(--shadow); }
+  .chip { display:inline-block; font-size:11.5px; font-weight:600;
+          letter-spacing:.02em; border-radius:999px; padding:2px 9px;
+          background:var(--chip); color:var(--muted); white-space:nowrap; }
+  .chip.acc { background:var(--accent-soft); color:var(--accent-text); }
+  .chip.good { background:var(--good-soft); color:var(--good-text); }
+  .chip.warn { background:var(--warn-soft); color:var(--warn-text); }
+
+  /* ---- pill controls (generous touch targets) ---- */
+  .pill { display:inline-flex; align-items:center; gap:7px; min-height:38px;
+          font-size:14px; font-weight:600; color:var(--muted);
+          border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
+          background:var(--panel); cursor:pointer;
+          transition:border-color .2s, color .2s, background .2s; }
+  .pill:hover { border-color:var(--accent); color:var(--ink); }
+  .pill[aria-pressed="true"] { background:var(--accent-strong);
+          border-color:var(--accent-strong); color:var(--on-accent); }
+  .pill.primary { background:var(--accent-strong); border-color:var(--accent-strong);
+          color:var(--on-accent); text-decoration:none; }
+  .pill.primary:hover { filter:brightness(1.06); }
+
+  /* ---- the waypath (the signature gesture) ---- */
+  .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);
+              transition:background .35s ease, box-shadow .35s ease; }
+  .wp-stone.lit { background:var(--accent-strong); }
+  .wp-stone.here { background:transparent;
+                   box-shadow:inset 0 0 0 2px var(--accent-strong); }
+  .wp-stone.pop { animation:wp-pop .45s ease; }
+  @keyframes wp-pop {
+    0% { transform:scale(1); } 45% { transform:scale(1.55); }
+    100% { transform:scale(1); }
+  }
+  .wp-count { font-size:14px; font-weight:600; color:var(--muted);
+              white-space:nowrap; }
+
+  /* ---- toast ---- */
+  .saving { position:fixed; bottom:18px; left:50%;
+            transform:translateX(-50%) translateY(12px);
+            font-size:13px; font-weight:600; background:var(--ink);
+            color:var(--bg); padding:8px 18px; border-radius:999px;
+            opacity:0; pointer-events:none; transition:.25s; }
+  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+           font-size:13.5px; color:var(--muted); }
+  @media (prefers-reduced-motion:reduce) {
+    * { transition-duration:.01ms !important; animation-duration:.01ms !important; }
+  }
+  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:40px 0 26px; }
+  h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
+       letter-spacing:-.01em; margin:14px 0 0; }
+  .standfirst { max-width:58ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .standfirst b { color:var(--ink); }
+  .controls { margin:26px 0 0; padding:16px 20px; }
+  .controls .waypath { margin:2px 0 14px; }
+  .meta-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px 22px; }
   .spacer { flex:1 1 auto; }
-  button { font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer; }
-  .filter { font:11px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
-            color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:6px 13px;
-            transition:.2s; }
-  .filter:hover { border-color:var(--accent); color:var(--ink); }
-  .filter[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
   .tier { margin:52px 0 0; }
-  .tier-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
-               padding-bottom:9px; border-bottom:2px solid var(--ink); }
-  .tier-tag { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase; }
-  .tier-name { font-size:19px; font-style:italic; color:var(--muted); }
-  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:64ch; }
-  .subhead { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.14em; text-transform:uppercase;
-             color:var(--faint); margin:26px 0 0; }
+  .tier-head { display:flex; align-items:flex-start; gap:12px; }
+  .tier-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
+              border-radius:12px; background:var(--accent-soft);
+              color:var(--accent-text); font:700 17px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .tier-name { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+               font-weight:700; margin:4px 0 0; }
+  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .subhead { font-size:12px; font-weight:700; letter-spacing:.06em;
+             text-transform:uppercase; color:var(--muted); margin:26px 0 0; }
   .entry { border-bottom:1px solid var(--line-soft); padding:18px 0 16px; }
   .entry.hidden { display:none; }
   .entry.compact { padding:12px 0 10px; }
-  .title { font-weight:400; font-size:19px; line-height:1.3; margin:0; }
-  .entry.compact .title { font-size:16px; }
-  .title a { text-decoration:none; }
-  .title a:hover { text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; }
-  .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:3px; margin-left:9px; }
-  .chip { font:500 9px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
-          border:1px solid var(--line); border-radius:999px; padding:1px 7px; color:var(--muted); }
-  .chip.free { color:var(--good); border-color:#bcd2bd; }
-  .chip.paid { color:var(--warn); border-color:#e4c4b8; }
-  .cite { font:11px ui-monospace,Menlo,monospace; color:var(--faint); margin:6px 0 0; line-height:1.5; }
-  .why { position:relative; margin:9px 0 0; font-size:14.5px; max-width:62ch; }
+  .title { font-weight:600; font-size:18px; line-height:1.35; margin:0; }
+  .entry.compact .title { font-size:15.5px; }
+  .title a { color:var(--ink); text-decoration:none; }
+  .title a:hover { color:var(--accent-text); text-decoration:underline;
+                   text-underline-offset:3px; }
+  .entry.inhand .title { color:var(--muted); }
+  .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:2px; margin-left:9px; }
+  .cite { font-size:12.5px; font-weight:500; color:var(--muted); margin:5px 0 0;
+          line-height:1.5; }
+  .why { position:relative; margin:9px 0 0; font-size:14.5px; line-height:1.55;
+         max-width:64ch; }
   .why-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
-              background:var(--marker); border-radius:.6em .2em .5em .3em;
+              background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
               transform:scaleX(0); transform-origin:0 50%;
               transition:transform .55s cubic-bezier(.2,.7,.3,1); }
   .why-text { position:relative; z-index:1; }
   .entry.inhand .why-mark { transform:scaleX(1); }
-  .access { margin:8px 0 0; font:13px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
+  .access { margin:8px 0 0; font-size:13.5px; color:var(--muted); }
   .access b { color:var(--ink); font-weight:600; }
-  .links { display:flex; flex-wrap:wrap; gap:6px 16px; margin:9px 0 0; }
-  .rlink { font:10.5px ui-monospace,Menlo,monospace; letter-spacing:.09em; text-transform:uppercase;
-           text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:2px;
-           transition:border-color .2s; }
-  .rlink:hover { border-color:var(--accent); }
-  .rlink .arr { color:var(--faint); margin-left:4px; }
-  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin:10px 0 0; }
-  .act { font:10.5px ui-monospace,Menlo,monospace; letter-spacing:.1em; text-transform:uppercase;
-         color:var(--muted); transition:color .2s; }
-  .act:hover { color:var(--ink); }
-  .mark { display:flex; align-items:center; gap:7px; }
-  .dot { width:9px; height:9px; border-radius:50%; border:1px solid var(--faint);
+  .links { display:flex; flex-wrap:wrap; gap:6px 8px; margin:10px 0 0; }
+  .rlink { display:inline-flex; align-items:center; gap:5px; min-height:30px;
+           font-size:12.5px; font-weight:600; text-decoration:none;
+           color:var(--accent-text); background:var(--accent-soft);
+           border-radius:999px; padding:2px 12px; transition:filter .2s; }
+  .rlink:hover { filter:brightness(.96); }
+  .rlink .arr { opacity:.7; }
+  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px; margin:8px 0 0; }
+  .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
+         font-size:13.5px; font-weight:600; color:var(--muted);
+         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         transition:color .2s, background .2s; }
+  .act:hover { color:var(--ink); background:var(--chip); }
+  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
          background:transparent; transition:.3s; }
-  .entry.inhand .dot { background:var(--accent); border-color:var(--accent); }
+  .entry.inhand .dot { background:var(--good); border-color:var(--good); }
+  .entry.inhand .mlabel { color:var(--good-text); }
   .notewrap { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
   .entry.noting .notewrap { grid-template-rows:1fr; }
   .notewrap > div { overflow:hidden; }
-  textarea { width:100%; max-width:62ch; min-height:52px; resize:vertical; margin-top:10px;
-             font:14px/1.55 ui-sans-serif,system-ui,sans-serif; color:var(--ink);
-             background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:9px 11px; }
-  textarea::placeholder { color:var(--faint); }
-  .entry.hasnote .nlabel { color:var(--accent); }
+  textarea { width:100%; max-width:64ch; min-height:52px; resize:vertical; margin-top:10px;
+             font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+             background:var(--panel); border:1.5px solid var(--line);
+             border-radius:12px; padding:9px 12px; }
+  textarea::placeholder { color:var(--muted); }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .entry.hasnote .nlabel { color:var(--accent-text); }
   .section { margin:56px 0 0; }
-  .section > h2 { font-size:22px; font-weight:400; margin:0 0 6px; padding-bottom:8px;
-                  border-bottom:2px solid var(--ink); }
+  .section > h2 { font-size:22px; font-weight:700; margin:0 0 10px; }
   .section ol { font-size:14.5px; padding-left:22px; }
-  .section li { margin:0 0 5px; }
-  .empty { display:none; padding:44px 0; text-align:center; font-style:italic;
-           font-size:18px; color:var(--muted); }
+  .section li { margin:0 0 6px; }
+  .tier-intro { margin:6px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .empty { display:none; padding:44px 0; text-align:center;
+           font-size:17px; color:var(--muted); }
   .empty.show { display:block; }
-  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
-           font:12.5px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
-  .saving { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px);
-            font:10px ui-monospace,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase;
-            background:var(--ink); color:var(--bg); padding:7px 14px; border-radius:3px;
-            opacity:0; pointer-events:none; transition:.25s; }
-  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
-  code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--chip);
-         padding:0 4px; border-radius:4px; }
-  @media (prefers-reduced-motion:reduce) { * { transition-duration:.01ms !important; } }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a> &nbsp;·&nbsp; the resources ·
-    4 tiers</p>
-    <h1>The shelf,<br><em>tiered by role</em></h1>
+    <p class="eyebrow"><a href="index.html">← course hub</a>
+    <span class="sep">·</span> the resources
+    <span class="sep">·</span> 4 tiers </p>
+    <h1>Your resources</h1>
     <p class="standfirst"><b>Tier 1</b> is the core path — worked through substantially, in curriculum order. <b>Tier 2</b> deepens and fills gaps on demand. <b>Tier 3</b> is data, tools, and reference — looked up in, not read. <b>Tier 4</b> is video &amp; audio. Each entry says <i>why this one</i> and what access costs; mark a resource "in hand" once your copy or access is sorted, and keep loan dates or purchase notes on the entry itself. The unavoidable paid core is <b>≈ $120</b> (Wasserman &amp; Gurry + the Mink volume + Decker) — everything else has a free path or a library workaround.</p>
-    <div class="controls">
-      <div class="meter">
-        <div class="ticks" id="ticks" aria-hidden="true"></div>
-        <span class="count" id="count"></span>
-      </div>
+    <div class="controls panel">
+      <div class="waypath" id="ticks" aria-hidden="true"></div>
+      <div class="meta-row">
+      <span class="wp-count" id="count"></span>
       <span class="spacer"></span>
-      <button class="filter" id="f-free" aria-pressed="false">Free only</button>
-      <button class="filter" id="f-need" aria-pressed="false">Not in hand</button>
+      <button class="pill" id="f-free" aria-pressed="false">Free only</button>
+      <button class="pill" id="f-need" aria-pressed="false">Not in hand</button>
+      </div>
     </div>
   </header>
 
   <main id="list"></main>
   <p class="empty" id="empty">Nothing matches this filter.</p>
 
-  <section class="section"><h2>Suggested reading order</h2><p class="tier-role">The curriculum formalizes this; here it is at a glance.</p><ol><li>Wasserman &amp; Gurry (fast skim, then chapter-by-chapter through Phase 1)</li><li>Parker, selectively (alongside Unit 1)</li><li>Mink, pass 1 (Unit 3) — with the Genealogical Queries guide + live tool</li><li>Gurry's <i>Critical Examination</i> + Mink pass 2 + the Carlson/Mink exchange (Phase 2)</li><li>Handbook of Stemmatology ch. 5 + the Camps papers (Phases 2–3)</li><li>Taming the BEAST + McCollum &amp; Turnbull (+ McElreath as needed) (Phase 4)</li><li>Royse + Metzger's <i>Commentary</i> + Willker (Phase 6)</li><li>Greek: Decker continuously from week 0; STEP Bible from Phase 3; Wallace from Phase 5</li></ol></section>
+  <section class="section"><h2>Suggested reading order</h2><p class="tier-intro">The curriculum formalizes this; here it is at a glance.</p><ol><li>Wasserman &amp; Gurry (fast skim, then chapter-by-chapter through Phase 1)</li><li>Parker, selectively (alongside Unit 1)</li><li>Mink, pass 1 (Unit 3) — with the Genealogical Queries guide + live tool</li><li>Gurry's <i>Critical Examination</i> + Mink pass 2 + the Carlson/Mink exchange (Phase 2)</li><li>Handbook of Stemmatology ch. 5 + the Camps papers (Phases 2–3)</li><li>Taming the BEAST + McCollum &amp; Turnbull (+ McElreath as needed) (Phase 4)</li><li>Royse + Metzger's <i>Commentary</i> + Willker (Phase 6)</li><li>Greek: Decker continuously from week 0; STEP Bible from Phase 3; Wallace from Phase 5</li></ol></section>
 
   <footer>
     Rendered by curricle from the course manifest — canonical text:
@@ -146,10 +230,26 @@
 </div>
 <div class="saving" id="toast">Saved</div>
 <script>
+function waypath(el, ids, done, nextId) {
+  const had = el._wp || null;
+  el._wp = {};
+  ids.forEach((id, i) => {
+    let s = el.children[i];
+    if (!s) { s = document.createElement("span"); el.appendChild(s); }
+    const lit = !!done(id);
+    s.className = "wp-stone" + (lit ? " lit" : "") + (id === nextId ? " here" : "");
+    if (had && had[id] === false && lit) {
+      s.classList.add("pop");
+      s.addEventListener("animationend", () => s.classList.remove("pop"), { once: true });
+    }
+    el._wp[id] = lit;
+  });
+  while (el.children.length > ids.length) el.lastChild.remove();
+}
 const KEY = "tf-resources";
 const API = null;          // null: localStorage mode; else: POST events here
 const INITIAL = null;  // {inhand, notes} server-folded, or null
-const TIERS = [{"tag": "tier 1", "name": "The core path", "role": "Worked through substantially, in curriculum order. These ten are the course's spine — the meter above tracks them.", "compact": false, "groups": [{"sub": "Textual criticism & the CBGM", "entries": [{"id": "wg", "title": "A New Approach to Textual Criticism: An Introduction to the CBGM", "cite": "Wasserman &amp; Gurry · SBL Press · 2017", "chips": [["text", ""], ["paid ~$20", "paid"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/060399P"]], "why": "The standard gentle on-ramp to the CBGM, written by a sympathetic critic (Gurry) and a practitioner (Wasserman) — ~100 pages, readable in two sittings, and the only book-length introduction that exists. The whole of Phases 0–1 hangs off it.", "access": "<b>Buy it</b> — cheap enough to purchase without thinking; used copies are common."}, {"id": "mink", "title": "“Contamination, Coherence, and Coincidence in Textual Transmission”", "cite": "Gerd Mink · in Wachtel &amp; Holmes (eds.), The Textual History of the Greek New Testament, pp. 141–216 · SBL Text-Critical Studies 8 · 2011", "chips": [["text", ""], ["paid $37 pbk", "paid"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/067008P"]], "why": "The primary source — the method from its inventor, in its fullest methodological statement. Dense; the curriculum schedules three passes (definitions → worked examples → adversarial).", "access": "<b>Not open access</b> — only the front matter is free. The $37 paperback buys the rest of the volume's status-quaestionis essays too."}, {"id": "gurry", "title": "A Critical Examination of the CBGM", "cite": "Peter Gurry · Brill, NTTSD 55 · 2017", "chips": [["text", ""], ["paid — expensive", "paid"]], "free": false, "links": [["Brill", "https://brill.com/display/title/35755"], ["Free summary article (PDF)", "https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf"]], "why": "The deepest critical treatment — sympathetic but unsparing on editor-dependence, the initial-text concept, and contamination handling; also the source of the “what did the CBGM actually change” counts your write-ups will cite.", "access": "<b>Brill pricing is hostile</b> — interlibrary loan is the move, or lean on the free summary article (also listed in Tier 2) if the price wall wins."}, {"id": "carlson", "title": "“A Bias at the Heart of the CBGM” + Mink's reply", "cite": "Stephen Carlson · JBL 139.2 (2020): 319–340 — with Gerd Mink&#x27;s guest-post response · INTF blog · 2020", "chips": [["paper", ""], ["free", "free"]], "free": true, "links": [["Open copy (ACU repository)", "https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm"], ["Mink's reply (INTF blog)", "https://ntvmr.uni-muenster.de/intfblog/-/blogs/remarks-on-carlson-a-bias-at-the-heart-of-the-cbgm-guest-post-by-gerd-mink-"]], "why": "The dispute your simulation study adjudicates, in both principals' own words. Unit 6 reproduces the paper's counterexample in code; read both slowly, together.", "access": "<b>Free</b> — the JBL article via ACU's repository, the reply on the INTF blog."}, {"id": "parker", "title": "An Introduction to the New Testament Manuscripts and Their Texts", "cite": "D.C. Parker · Cambridge UP · 2008", "chips": [["text", ""], ["paid ~$40–50 pbk", "paid"]], "free": false, "links": [["Cambridge", "https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898"]], "why": "The material-culture grounding the CBGM literature assumes — what manuscripts physically are, how editions get made, how the discipline thinks. Read selectively (Parts I–II) in Phase 1; return whenever the data feels abstract.", "access": "<b>Paperback or library</b> — read selectively, so a loan works fine."}]}, {"sub": "Stemmatology & simulation", "entries": [{"id": "handbook", "title": "Handbook of Stemmatology", "cite": "ed. Roelli · De Gruyter · 2020", "chips": [["text", ""], ["free — open access", "free"]], "free": true, "links": [["Open access (CC BY)", "https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html"]], "why": "The field's canonical reference, free — ch. 5 (computational methods) and the evaluation/artificial-traditions material are Phases 2–3's theoretical backbone. Treat the rest as encyclopedia.", "access": "<b>Free, CC BY.</b> Host moved: De Gruyter → degruyterbrill.com (the link is current)."}, {"id": "camps", "title": "“Lost Manuscripts and Extinct Texts” + “On the Transmission of Texts”", "cite": "Camps &amp; Randon-Furling · arXiv · 2022 / 2025", "chips": [["paper", ""], ["free", "free"]], "free": true, "links": [["arXiv:2210.16577", "https://arxiv.org/abs/2210.16577"], ["arXiv:2505.19246", "https://arxiv.org/abs/2505.19246"]], "why": "The published template for your Unit-8 generator — birth–death copying with loss, calibrated to real traditions. The nearest thing to a spec for <code>simulate/</code>.", "access": "<b>Free</b> — both on arXiv."}]}, {"sub": "Greek — the continuous track", "entries": [{"id": "decker", "title": "Reading Koine Greek: An Introduction and Integrated Workbook", "cite": "Rodney Decker · Baker Academic · 2014", "chips": [["text", ""], ["paid ~$55–65", "paid"]], "free": false, "links": [["Baker eSources (free audio, flashcards)", "https://bakeracademic.com/pages/decker-reading-koine-greek-esources"]], "why": "The most linguistically literate of the standard grammars — verbal aspect handled the way a linguistics BA wants it handled, reading-focused, LXX + NT examples from the start, exercises integrated. 33 chapters ≈ the first 8–9 months of the track at one/week.", "access": "<b>Buy it</b> — this is the daily companion for most of a year. The eSources page (audio, flashcards) is free."}, {"id": "step", "title": "STEP Bible", "cite": "Tyndale House", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["stepbible.org", "https://www.stepbible.org/"]], "why": "Tagged Greek text with instant morphology/gloss on click — the reading scaffold that makes 1 John attackable at Decker-ch.-20 Greek. Your daily reading tool from Phase 3 on.", "access": "<b>Free</b>, in the browser."}, {"id": "metzger", "title": "A Textual Commentary on the Greek New Testament", "cite": "Bruce Metzger · 2nd ed., 1994 · current printing Deutsche Bibelgesellschaft · ISBN 9783438060105", "chips": [["text", ""], ["paid ~$40–60", "paid"]], "free": false, "links": [], "why": "The committee's variant-by-variant reasoning — Phase 6's worked-example set for transcriptional judgment. You'll adjudicate first, then read Metzger, every time.", "access": "<b>No stable URL</b> — find by ISBN at the German Bible Society, Amazon, or Logos. Not needed until Phase 6, so no rush."}]}]}, {"tag": "tier 2", "name": "Supplementary & deepening", "role": "Pulled in on demand — when a write-up needs a citation anchor, a concept needs a second angle, or the price of a Tier-1 item wins.", "compact": false, "groups": [{"sub": "", "entries": [{"id": "royse", "title": "Scribal Habits in Early Greek New Testament Papyri", "cite": "James Royse · SBL paperback reprint", "chips": [["text", ""], ["paid $92 — ouch", "paid"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/069551P"]], "why": "The empirical demolition of <i>lectio brevior</i> and the deepest study of what scribes actually do; Phase 6's spine.", "access": "<b>Library first</b> — the summary chapter + one papyrus chapter suffice if the price stings."}, {"id": "myths", "title": "Myths and Mistakes in New Testament Textual Criticism", "cite": "Hixson &amp; Gurry (eds.) · IVP Academic · 2019", "chips": [["text", ""], ["paid ~$25–40", "paid"]], "free": false, "links": [["IVP", "https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism"]], "why": "Calibration on effect sizes and popular overclaims, from the field's younger generation; fast, honest, useful for write-up framing.", "access": "<b>Affordable</b> — used copies common."}, {"id": "hmf", "title": "“Comparative computational textual criticism of the Gospel of Mark” + McCollum & Turnbull's BEAST worked example", "cite": "Hyytiäinen, McCollum &amp; Finney · DSH 41.2 · 2026 — and McCollum &amp; Turnbull · DSH 39.1 · 2024", "chips": [["paper", ""], ["paid — check green oa", "paid"]], "free": false, "links": [["DSH 2026", "https://academic.oup.com/dsh/article/41/2/759/8540381"], ["DSH 2024 (McCollum & Turnbull)", "https://academic.oup.com/dsh/article/39/1/258/7477852"]], "why": "The state of the art on <i>real</i> data, and (explicitly) what it lacks: ground truth — your Unit-13 foil. The 2024 paper is the worked example of BEAST-on-collation you'll follow.", "access": "<b>Paywalled at OUP</b> — check the authors' pages for green OA copies before paying."}, {"id": "mcelreath", "title": "Statistical Rethinking", "cite": "Richard McElreath · 2nd ed.", "chips": [["text", ""], ["book paid ~$70–90 · lectures free", "free"]], "free": true, "links": [["Book + course site", "https://xcelab.net/rm/statistical-rethinking/"], ["2023 lectures (complete playlist)", "https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus"]], "why": "Simulation-first Bayesian statistics for exactly your kind of mind; chs. 1–2 + lectures before Unit 13 if posteriors feel like folklore. His style is your Phase 3 instinct applied to statistics.", "access": "<b>Lectures are free</b> (2023 playlist is complete; a 2026 series tracks the 3rd-edition drafts); the book is optional at this course's depth."}, {"id": "willker", "title": "An Online Textual Commentary on the Greek Gospels", "cite": "Wieland Willker · 10th ed.", "chips": [["text", ""], ["free", "free"]], "free": true, "links": [["willker.de", "http://www.willker.de/wie/TCG/index.html"]], "why": "~2,600 pages of free variant-by-variant commentary; Phase 6 second opinions beyond Metzger.", "access": "<b>Free.</b> Host moved: now on willker.de (the link is current)."}, {"id": "gurrysum", "title": "Gurry's summary article on the CBGM", "cite": "Peter Gurry · article-length distillation of the monograph", "chips": [["paper", ""], ["free", "free"]], "free": true, "links": [["PDF", "https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf"]], "why": "The monograph's core argument in article form — the fallback if Brill's price wall wins in Tier 1.", "access": "<b>Free PDF.</b>"}, {"id": "wallace", "title": "Greek Grammar Beyond the Basics", "cite": "Daniel Wallace · Zondervan · 1996", "chips": [["text", ""], ["paid ~$55–65", "paid"]], "free": false, "links": [["Zondervan", "https://zondervanacademic.com/products/greek-grammar-beyond-the-basics"]], "why": "The intermediate reference grammar; shelf item from Phase 5.", "access": "<b>Not needed until Phase 5</b> — buy used when you get there."}, {"id": "funk", "title": "A Beginning-Intermediate Grammar of Hellenistic Greek", "cite": "Robert Funk · free online edition", "chips": [["text", ""], ["free", "free"]], "free": true, "links": [["ibiblio", "https://www.ibiblio.org/bgreek/project/funk-grammar/pre-alpha/"]], "why": "Free second angle when Decker's presentation of something doesn't land.", "access": "<b>Free.</b> The site is bot-shielded; it loads fine in a normal browser."}, {"id": "ehrman", "title": "The New Testament: A Historical Introduction", "cite": "Ehrman &amp; Méndez · 8th ed. · OUP · 2023", "chips": [["text", ""], ["paid ~$80–100 new", "paid"]], "free": false, "links": [["OUP", "https://global.oup.com/ushe/product/the-new-testament-9780197754023"]], "why": "The standard critical NT introduction; background reading, not on the critical path.", "access": "<b>Any recent edition serves — buy used</b>; older editions are cheap and fine."}, {"id": "metzger-ehrman", "title": "The Text of the New Testament", "cite": "Metzger &amp; Ehrman · 4th ed. · OUP · 2005", "chips": [["text", ""], ["paid ~$45–55", "paid"]], "free": false, "links": [["OUP", "https://global.oup.com/academic/product/the-text-of-the-new-testament-9780195161229"]], "why": "The classic survey; where Parker is material-first, this is history-first. Optional but orienting.", "access": "<b>Optional</b> — used copies everywhere."}, {"id": "holmes", "title": "The Text of the NT in Contemporary Research", "cite": "Ehrman &amp; Holmes (eds.) · 2nd ed. · Brill · 2013", "chips": [["text", ""], ["paid ~$76 pbk", "paid"]], "free": false, "links": [["Brill", "https://brill.com/edcollbook/title/22127"]], "why": "Status-quaestionis essays; mine per-topic (versions, patristics) when a write-up needs a citation anchor.", "access": "<b>Library / per-chapter</b> — you'll want individual essays, not the volume."}, {"id": "roos", "title": "“Evaluating methods for computer-assisted stemmatology”", "cite": "Roos &amp; Heikkilä · Literary and Linguistic Computing 24 · 2009", "chips": [["paper", ""], ["paid — paywalled", "paid"]], "free": false, "links": [["Link", "https://doi.org/10.1093/llc/fqp002"]], "why": "The artificial-tradition benchmark precedent behind Unit 7's design reading.", "access": "<b>Paywalled with no good open copy</b> — the abstract plus the Handbook's coverage of the same material suffice; don't pay for this one."}, {"id": "exploration", "title": "This repo's own exploration/", "cite": "field map · five candidate prior-art reviews · convergence record", "chips": [["text", ""], ["free", "free"]], "free": true, "links": [["exploration/", "../exploration/"], ["candidate 04", "../exploration/candidates/04-local-genealogy.md"], ["candidate 05", "../exploration/candidates/05-cbgm-sensitivity.md"]], "why": "Candidates 04 and 05 are effectively this program's related-work sections pre-written; the field map's §4 (reception discipline) governs every outward-facing artifact.", "access": "<b>Already yours.</b>"}]}]}, {"tag": "tier 3", "name": "Data, tools & reference", "role": "Looked up in, not read. Licenses noted — they matter to what the program may publish.", "compact": true, "groups": [{"sub": "", "entries": [{"id": "opencbgm", "title": "open-cbgm + standalone CLI", "cite": "Joey McCollum · C++ · MIT", "chips": [["code", ""], ["free", "free"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/open-cbgm"]], "why": "Reference CBGM implementation; ships the ECM 3 John TEI <b>with local stemmata</b> — the program's home dataset.", "access": ""}, {"id": "teiphy", "title": "teiphy", "cite": "Joey McCollum · Python · MIT", "chips": [["code", ""], ["free", "free"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/teiphy"]], "why": "TEI collation → NEXUS/BEAST/PHYLIP; the Unit-13 bridge.", "access": ""}, {"id": "vmr2tei", "title": "vmr2tei", "cite": "Joey McCollum", "chips": [["code", ""], ["free", "free"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/vmr2tei"]], "why": "NTVMR apparatus → TEI; the door to more books.", "access": ""}, {"id": "gq", "title": "Genealogical Queries (tool · guide · code)", "cite": "INTF, Münster", "chips": [["data", ""], ["free to use", "free"]], "free": true, "links": [["Live tool", "https://ntg.uni-muenster.de/"], ["Guide", "https://intf.uni-muenster.de/cbgm2/guide_en.html"], ["Code", "https://github.com/SCDH/intf-cbgm"]], "why": "INTF's live CBGM databases (Acts, Mark, Revelation, Catholic Letters); the guide is the best module-by-module walkthrough. <b>DB content license unstated — that's the Phase-2 INTF email.</b>", "access": ""}, {"id": "ntvmr", "title": "NTVMR", "cite": "INTF, Münster", "chips": [["data", ""], ["cc by-sa", "free"]], "free": true, "links": [["ntvmr.uni-muenster.de", "https://ntvmr.uni-muenster.de/"]], "why": "Manuscript images + TEI transcriptions (CC BY-SA); also hosts the Amsterdam conjectures DB (CC BY-NC-ND — evaluation only).", "access": ""}, {"id": "sblgnt", "title": "SBLGNT + MorphGNT", "cite": "Logos / SBL", "chips": [["data", ""], ["cc by", "free"]], "free": true, "links": [["sblgnt.com", "https://sblgnt.com/"], ["Text on GitHub", "https://github.com/LogosBible/SBLGNT"], ["MorphGNT", "https://github.com/morphgnt/sblgnt"]], "why": "Open critical text with morphological tagging.", "access": ""}, {"id": "macula", "title": "MACULA Greek", "cite": "Clear Bible", "chips": [["data", ""], ["cc by", "free"]], "free": true, "links": [["GitHub", "https://github.com/Clear-Bible/macula-greek"]], "why": "Syntax trees + semantic annotations.", "access": ""}, {"id": "na28", "title": "NA28 online", "cite": "German Bible Society", "chips": [["data", ""], ["free text", "free"]], "free": true, "links": [["die-bibel.de", "https://www.die-bibel.de/en/bible/NA28/MAT.1"]], "why": "Free NA28 text (no apparatus online). Host moved: academic-bible.com → die-bibel.de (link is current).", "access": ""}, {"id": "csntm", "title": "CSNTM", "cite": "Center for the Study of NT Manuscripts", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["csntm.org", "https://www.csntm.org/"], ["Collections", "https://collections.csntm.org/"]], "why": "Free high-res manuscript images — for when you want to <i>see</i> a witness.", "access": ""}, {"id": "beast", "title": "BEAST 2", "cite": "v2.7.8", "chips": [["code", ""], ["free", "free"]], "free": true, "links": [["beast2.org", "https://www.beast2.org/"]], "why": "Bayesian phylogenetics engine for Unit 13.", "access": ""}, {"id": "stemma", "title": "Carlson's stemma", "cite": "Stephen Carlson", "chips": [["code", ""], ["no license file", "free"]], "free": true, "links": [["GitHub", "https://github.com/stemmatic/stemma"]], "why": "His cladistic software. <b>No license file — use, don't redistribute.</b>", "access": ""}, {"id": "tc", "title": "TC: A Journal of Biblical Textual Criticism", "cite": "open-access venue", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["jbtc.org", "https://jbtc.org/"]], "why": "Publishes computational TC; a target for paper #1, and an archive to mine.", "access": ""}, {"id": "etc", "title": "Evangelical Textual Criticism blog", "cite": "the field&#x27;s news hub", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["Blog", "http://evangelicaltextualcriticism.blogspot.com/"]], "why": "Read monthly; guest-post when paper #1 lands.", "access": ""}, {"id": "teimodule", "title": "TEI Critical Apparatus module", "cite": "TEI P5 Guidelines", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["tei-c.org", "https://tei-c.org/release/doc/tei-p5-doc/en/html/TC.html"]], "why": "The schema your parser and exporter speak.", "access": ""}, {"id": "anki", "title": "Anki decks (Decker vocab · Mounce w/ audio)", "cite": "shared decks", "chips": [["data", ""], ["free", "free"]], "free": true, "links": [["Decker deck", "https://ankiweb.net/shared/info/1986594201"], ["Mounce deck", "https://ankiweb.net/shared/info/53361124"]], "why": "Shared decks occasionally get purged — <b>re-download early</b> and keep a local copy.", "access": ""}, {"id": "sidequest", "title": "Side-quest data (SQ1–3)", "cite": "Cooper Smith criteria · WLC/MACULA Hebrew · T&#x27;OMIM", "chips": [["data", ""], ["open — cc by / pd", "free"]], "free": true, "links": [["Cooper Smith (JHS)", "https://jhsonline.org/index.php/jhs/article/view/29632"], ["MACULA Hebrew", "https://github.com/Clear-Bible/macula-hebrew"], ["T'OMIM (Zenodo)", "https://doi.org/10.5281/zenodo.19135731"]], "why": "All open; see <a href=\"../exploration/candidates/03-allusion-benchmark.md\">candidate 03</a> for how each slots into SQ1–3.", "access": ""}]}]}, {"tag": "tier 4", "name": "Video & audio", "role": "Where video genuinely helps — language habit-forming and statistics lectures.", "compact": false, "groups": [{"sub": "", "entries": [{"id": "ddg", "title": "Daily Dose of Greek", "cite": "weekday verse walkthroughs", "chips": [["video", ""], ["free", "free"]], "free": true, "links": [["dailydoseofgreek.com", "https://dailydoseofgreek.com/"]], "why": "Two-minute weekday verse walkthroughs; the lowest-friction way to keep the Greek habit daily. The archive covers 1–3 John.", "access": "<b>Free</b> — subscribe by email from week 0."}, {"id": "mounce", "title": "Bill Mounce's free BBG course", "cite": "chapter-by-chapter lectures, vocab audio, quizzes", "chips": [["video", ""], ["free", "free"]], "free": true, "links": [["Lectures", "https://www.billmounce.com/basicsofbiblicalgreek/grammar"], ["Free dictionary", "https://www.billmounce.com/greek-dictionary"]], "why": "The video supplement when a Decker chapter needs a second voice — chapter order differs, so map by topic.", "access": "<b>Free.</b>"}, {"id": "srvideo", "title": "Statistical Rethinking lectures", "cite": "McElreath · 2023 complete · 2026 in progress", "chips": [["video", ""], ["free", "free"]], "free": true, "links": [["2023 playlist (complete)", "https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus"]], "why": "Pair with Unit 13. The 2026 series (playlist PLDcUM9US4XdNOlqSyhe38US8mFgmqzI14) tracks the 3rd-edition drafts.", "access": "<b>Free on YouTube.</b>"}, {"id": "ttb", "title": "Taming the BEAST", "cite": "the BEAST 2 tutorial collection", "chips": [["text", ""], ["video", ""], ["free", "free"]], "free": true, "links": [["taming-the-beast.org", "https://taming-the-beast.org/"]], "why": "Actively maintained tutorials; do the introductory one before touching your own data in Unit 13.", "access": "<b>Free.</b>"}]}]}];
+const TIERS = [{"num": "1", "name": "The core path", "role": "Worked through substantially, in curriculum order. These ten are the course's spine — the meter above tracks them.", "compact": false, "groups": [{"sub": "Textual criticism & the CBGM", "entries": [{"id": "wg", "title": "A New Approach to Textual Criticism: An Introduction to the CBGM", "cite": "Wasserman &amp; Gurry · SBL Press · 2017", "chips": [["text", ""], ["paid ~$20", "warn"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/060399P"]], "why": "The standard gentle on-ramp to the CBGM, written by a sympathetic critic (Gurry) and a practitioner (Wasserman) — ~100 pages, readable in two sittings, and the only book-length introduction that exists. The whole of Phases 0–1 hangs off it.", "access": "<b>Buy it</b> — cheap enough to purchase without thinking; used copies are common."}, {"id": "mink", "title": "“Contamination, Coherence, and Coincidence in Textual Transmission”", "cite": "Gerd Mink · in Wachtel &amp; Holmes (eds.), The Textual History of the Greek New Testament, pp. 141–216 · SBL Text-Critical Studies 8 · 2011", "chips": [["text", ""], ["paid $37 pbk", "warn"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/067008P"]], "why": "The primary source — the method from its inventor, in its fullest methodological statement. Dense; the curriculum schedules three passes (definitions → worked examples → adversarial).", "access": "<b>Not open access</b> — only the front matter is free. The $37 paperback buys the rest of the volume's status-quaestionis essays too."}, {"id": "gurry", "title": "A Critical Examination of the CBGM", "cite": "Peter Gurry · Brill, NTTSD 55 · 2017", "chips": [["text", ""], ["paid — expensive", "warn"]], "free": false, "links": [["Brill", "https://brill.com/display/title/35755"], ["Free summary article (PDF)", "https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf"]], "why": "The deepest critical treatment — sympathetic but unsparing on editor-dependence, the initial-text concept, and contamination handling; also the source of the “what did the CBGM actually change” counts your write-ups will cite.", "access": "<b>Brill pricing is hostile</b> — interlibrary loan is the move, or lean on the free summary article (also listed in Tier 2) if the price wall wins."}, {"id": "carlson", "title": "“A Bias at the Heart of the CBGM” + Mink's reply", "cite": "Stephen Carlson · JBL 139.2 (2020): 319–340 — with Gerd Mink&#x27;s guest-post response · INTF blog · 2020", "chips": [["paper", ""], ["free", "good"]], "free": true, "links": [["Open copy (ACU repository)", "https://acuresearchbank.acu.edu.au/item/8wx32/a-bias-at-the-heart-of-the-cbgm"], ["Mink's reply (INTF blog)", "https://ntvmr.uni-muenster.de/intfblog/-/blogs/remarks-on-carlson-a-bias-at-the-heart-of-the-cbgm-guest-post-by-gerd-mink-"]], "why": "The dispute your simulation study adjudicates, in both principals' own words. Unit 6 reproduces the paper's counterexample in code; read both slowly, together.", "access": "<b>Free</b> — the JBL article via ACU's repository, the reply on the INTF blog."}, {"id": "parker", "title": "An Introduction to the New Testament Manuscripts and Their Texts", "cite": "D.C. Parker · Cambridge UP · 2008", "chips": [["text", ""], ["paid ~$40–50 pbk", "warn"]], "free": false, "links": [["Cambridge", "https://www.cambridge.org/core/books/an-introduction-to-the-new-testament-manuscripts-and-their-texts/68450BA1F41A6C2C4023E9BDF52D8898"]], "why": "The material-culture grounding the CBGM literature assumes — what manuscripts physically are, how editions get made, how the discipline thinks. Read selectively (Parts I–II) in Phase 1; return whenever the data feels abstract.", "access": "<b>Paperback or library</b> — read selectively, so a loan works fine."}]}, {"sub": "Stemmatology & simulation", "entries": [{"id": "handbook", "title": "Handbook of Stemmatology", "cite": "ed. Roelli · De Gruyter · 2020", "chips": [["text", ""], ["free — open access", "good"]], "free": true, "links": [["Open access (CC BY)", "https://www.degruyterbrill.com/document/doi/10.1515/9783110684384/html"]], "why": "The field's canonical reference, free — ch. 5 (computational methods) and the evaluation/artificial-traditions material are Phases 2–3's theoretical backbone. Treat the rest as encyclopedia.", "access": "<b>Free, CC BY.</b> Host moved: De Gruyter → degruyterbrill.com (the link is current)."}, {"id": "camps", "title": "“Lost Manuscripts and Extinct Texts” + “On the Transmission of Texts”", "cite": "Camps &amp; Randon-Furling · arXiv · 2022 / 2025", "chips": [["paper", ""], ["free", "good"]], "free": true, "links": [["arXiv:2210.16577", "https://arxiv.org/abs/2210.16577"], ["arXiv:2505.19246", "https://arxiv.org/abs/2505.19246"]], "why": "The published template for your Unit-8 generator — birth–death copying with loss, calibrated to real traditions. The nearest thing to a spec for <code>simulate/</code>.", "access": "<b>Free</b> — both on arXiv."}]}, {"sub": "Greek — the continuous track", "entries": [{"id": "decker", "title": "Reading Koine Greek: An Introduction and Integrated Workbook", "cite": "Rodney Decker · Baker Academic · 2014", "chips": [["text", ""], ["paid ~$55–65", "warn"]], "free": false, "links": [["Baker eSources (free audio, flashcards)", "https://bakeracademic.com/pages/decker-reading-koine-greek-esources"]], "why": "The most linguistically literate of the standard grammars — verbal aspect handled the way a linguistics BA wants it handled, reading-focused, LXX + NT examples from the start, exercises integrated. 33 chapters ≈ the first 8–9 months of the track at one/week.", "access": "<b>Buy it</b> — this is the daily companion for most of a year. The eSources page (audio, flashcards) is free."}, {"id": "step", "title": "STEP Bible", "cite": "Tyndale House", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["stepbible.org", "https://www.stepbible.org/"]], "why": "Tagged Greek text with instant morphology/gloss on click — the reading scaffold that makes 1 John attackable at Decker-ch.-20 Greek. Your daily reading tool from Phase 3 on.", "access": "<b>Free</b>, in the browser."}, {"id": "metzger", "title": "A Textual Commentary on the Greek New Testament", "cite": "Bruce Metzger · 2nd ed., 1994 · current printing Deutsche Bibelgesellschaft · ISBN 9783438060105", "chips": [["text", ""], ["paid ~$40–60", "warn"]], "free": false, "links": [], "why": "The committee's variant-by-variant reasoning — Phase 6's worked-example set for transcriptional judgment. You'll adjudicate first, then read Metzger, every time.", "access": "<b>No stable URL</b> — find by ISBN at the German Bible Society, Amazon, or Logos. Not needed until Phase 6, so no rush."}]}]}, {"num": "2", "name": "Supplementary & deepening", "role": "Pulled in on demand — when a write-up needs a citation anchor, a concept needs a second angle, or the price of a Tier-1 item wins.", "compact": false, "groups": [{"sub": "", "entries": [{"id": "royse", "title": "Scribal Habits in Early Greek New Testament Papyri", "cite": "James Royse · SBL paperback reprint", "chips": [["text", ""], ["paid $92 — ouch", "warn"]], "free": false, "links": [["SBL Press", "https://cart.sbl-site.org/books/069551P"]], "why": "The empirical demolition of <i>lectio brevior</i> and the deepest study of what scribes actually do; Phase 6's spine.", "access": "<b>Library first</b> — the summary chapter + one papyrus chapter suffice if the price stings."}, {"id": "myths", "title": "Myths and Mistakes in New Testament Textual Criticism", "cite": "Hixson &amp; Gurry (eds.) · IVP Academic · 2019", "chips": [["text", ""], ["paid ~$25–40", "warn"]], "free": false, "links": [["IVP", "https://www.ivpress.com/myths-and-mistakes-in-new-testament-textual-criticism"]], "why": "Calibration on effect sizes and popular overclaims, from the field's younger generation; fast, honest, useful for write-up framing.", "access": "<b>Affordable</b> — used copies common."}, {"id": "hmf", "title": "“Comparative computational textual criticism of the Gospel of Mark” + McCollum & Turnbull's BEAST worked example", "cite": "Hyytiäinen, McCollum &amp; Finney · DSH 41.2 · 2026 — and McCollum &amp; Turnbull · DSH 39.1 · 2024", "chips": [["paper", ""], ["paid — check green oa", "warn"]], "free": false, "links": [["DSH 2026", "https://academic.oup.com/dsh/article/41/2/759/8540381"], ["DSH 2024 (McCollum & Turnbull)", "https://academic.oup.com/dsh/article/39/1/258/7477852"]], "why": "The state of the art on <i>real</i> data, and (explicitly) what it lacks: ground truth — your Unit-13 foil. The 2024 paper is the worked example of BEAST-on-collation you'll follow.", "access": "<b>Paywalled at OUP</b> — check the authors' pages for green OA copies before paying."}, {"id": "mcelreath", "title": "Statistical Rethinking", "cite": "Richard McElreath · 2nd ed.", "chips": [["text", ""], ["book paid ~$70–90 · lectures free", "good"]], "free": true, "links": [["Book + course site", "https://xcelab.net/rm/statistical-rethinking/"], ["2023 lectures (complete playlist)", "https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus"]], "why": "Simulation-first Bayesian statistics for exactly your kind of mind; chs. 1–2 + lectures before Unit 13 if posteriors feel like folklore. His style is your Phase 3 instinct applied to statistics.", "access": "<b>Lectures are free</b> (2023 playlist is complete; a 2026 series tracks the 3rd-edition drafts); the book is optional at this course's depth."}, {"id": "willker", "title": "An Online Textual Commentary on the Greek Gospels", "cite": "Wieland Willker · 10th ed.", "chips": [["text", ""], ["free", "good"]], "free": true, "links": [["willker.de", "http://www.willker.de/wie/TCG/index.html"]], "why": "~2,600 pages of free variant-by-variant commentary; Phase 6 second opinions beyond Metzger.", "access": "<b>Free.</b> Host moved: now on willker.de (the link is current)."}, {"id": "gurrysum", "title": "Gurry's summary article on the CBGM", "cite": "Peter Gurry · article-length distillation of the monograph", "chips": [["paper", ""], ["free", "good"]], "free": true, "links": [["PDF", "https://www.wisluthsem.org/rmdevser_wls/wp-content/uploads/2024/11/Gurry_Article-1.pdf"]], "why": "The monograph's core argument in article form — the fallback if Brill's price wall wins in Tier 1.", "access": "<b>Free PDF.</b>"}, {"id": "wallace", "title": "Greek Grammar Beyond the Basics", "cite": "Daniel Wallace · Zondervan · 1996", "chips": [["text", ""], ["paid ~$55–65", "warn"]], "free": false, "links": [["Zondervan", "https://zondervanacademic.com/products/greek-grammar-beyond-the-basics"]], "why": "The intermediate reference grammar; shelf item from Phase 5.", "access": "<b>Not needed until Phase 5</b> — buy used when you get there."}, {"id": "funk", "title": "A Beginning-Intermediate Grammar of Hellenistic Greek", "cite": "Robert Funk · free online edition", "chips": [["text", ""], ["free", "good"]], "free": true, "links": [["ibiblio", "https://www.ibiblio.org/bgreek/project/funk-grammar/pre-alpha/"]], "why": "Free second angle when Decker's presentation of something doesn't land.", "access": "<b>Free.</b> The site is bot-shielded; it loads fine in a normal browser."}, {"id": "ehrman", "title": "The New Testament: A Historical Introduction", "cite": "Ehrman &amp; Méndez · 8th ed. · OUP · 2023", "chips": [["text", ""], ["paid ~$80–100 new", "warn"]], "free": false, "links": [["OUP", "https://global.oup.com/ushe/product/the-new-testament-9780197754023"]], "why": "The standard critical NT introduction; background reading, not on the critical path.", "access": "<b>Any recent edition serves — buy used</b>; older editions are cheap and fine."}, {"id": "metzger-ehrman", "title": "The Text of the New Testament", "cite": "Metzger &amp; Ehrman · 4th ed. · OUP · 2005", "chips": [["text", ""], ["paid ~$45–55", "warn"]], "free": false, "links": [["OUP", "https://global.oup.com/academic/product/the-text-of-the-new-testament-9780195161229"]], "why": "The classic survey; where Parker is material-first, this is history-first. Optional but orienting.", "access": "<b>Optional</b> — used copies everywhere."}, {"id": "holmes", "title": "The Text of the NT in Contemporary Research", "cite": "Ehrman &amp; Holmes (eds.) · 2nd ed. · Brill · 2013", "chips": [["text", ""], ["paid ~$76 pbk", "warn"]], "free": false, "links": [["Brill", "https://brill.com/edcollbook/title/22127"]], "why": "Status-quaestionis essays; mine per-topic (versions, patristics) when a write-up needs a citation anchor.", "access": "<b>Library / per-chapter</b> — you'll want individual essays, not the volume."}, {"id": "roos", "title": "“Evaluating methods for computer-assisted stemmatology”", "cite": "Roos &amp; Heikkilä · Literary and Linguistic Computing 24 · 2009", "chips": [["paper", ""], ["paid — paywalled", "warn"]], "free": false, "links": [["Link", "https://doi.org/10.1093/llc/fqp002"]], "why": "The artificial-tradition benchmark precedent behind Unit 7's design reading.", "access": "<b>Paywalled with no good open copy</b> — the abstract plus the Handbook's coverage of the same material suffice; don't pay for this one."}, {"id": "exploration", "title": "This repo's own exploration/", "cite": "field map · five candidate prior-art reviews · convergence record", "chips": [["text", ""], ["free", "good"]], "free": true, "links": [["exploration/", "../exploration/"], ["candidate 04", "../exploration/candidates/04-local-genealogy.md"], ["candidate 05", "../exploration/candidates/05-cbgm-sensitivity.md"]], "why": "Candidates 04 and 05 are effectively this program's related-work sections pre-written; the field map's §4 (reception discipline) governs every outward-facing artifact.", "access": "<b>Already yours.</b>"}]}]}, {"num": "3", "name": "Data, tools & reference", "role": "Looked up in, not read. Licenses noted — they matter to what the program may publish.", "compact": true, "groups": [{"sub": "", "entries": [{"id": "opencbgm", "title": "open-cbgm + standalone CLI", "cite": "Joey McCollum · C++ · MIT", "chips": [["code", ""], ["free", "good"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/open-cbgm"]], "why": "Reference CBGM implementation; ships the ECM 3 John TEI <b>with local stemmata</b> — the program's home dataset.", "access": ""}, {"id": "teiphy", "title": "teiphy", "cite": "Joey McCollum · Python · MIT", "chips": [["code", ""], ["free", "good"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/teiphy"]], "why": "TEI collation → NEXUS/BEAST/PHYLIP; the Unit-13 bridge.", "access": ""}, {"id": "vmr2tei", "title": "vmr2tei", "cite": "Joey McCollum", "chips": [["code", ""], ["free", "good"]], "free": true, "links": [["GitHub", "https://github.com/jjmccollum/vmr2tei"]], "why": "NTVMR apparatus → TEI; the door to more books.", "access": ""}, {"id": "gq", "title": "Genealogical Queries (tool · guide · code)", "cite": "INTF, Münster", "chips": [["data", ""], ["free to use", "good"]], "free": true, "links": [["Live tool", "https://ntg.uni-muenster.de/"], ["Guide", "https://intf.uni-muenster.de/cbgm2/guide_en.html"], ["Code", "https://github.com/SCDH/intf-cbgm"]], "why": "INTF's live CBGM databases (Acts, Mark, Revelation, Catholic Letters); the guide is the best module-by-module walkthrough. <b>DB content license unstated — that's the Phase-2 INTF email.</b>", "access": ""}, {"id": "ntvmr", "title": "NTVMR", "cite": "INTF, Münster", "chips": [["data", ""], ["cc by-sa", "good"]], "free": true, "links": [["ntvmr.uni-muenster.de", "https://ntvmr.uni-muenster.de/"]], "why": "Manuscript images + TEI transcriptions (CC BY-SA); also hosts the Amsterdam conjectures DB (CC BY-NC-ND — evaluation only).", "access": ""}, {"id": "sblgnt", "title": "SBLGNT + MorphGNT", "cite": "Logos / SBL", "chips": [["data", ""], ["cc by", "good"]], "free": true, "links": [["sblgnt.com", "https://sblgnt.com/"], ["Text on GitHub", "https://github.com/LogosBible/SBLGNT"], ["MorphGNT", "https://github.com/morphgnt/sblgnt"]], "why": "Open critical text with morphological tagging.", "access": ""}, {"id": "macula", "title": "MACULA Greek", "cite": "Clear Bible", "chips": [["data", ""], ["cc by", "good"]], "free": true, "links": [["GitHub", "https://github.com/Clear-Bible/macula-greek"]], "why": "Syntax trees + semantic annotations.", "access": ""}, {"id": "na28", "title": "NA28 online", "cite": "German Bible Society", "chips": [["data", ""], ["free text", "good"]], "free": true, "links": [["die-bibel.de", "https://www.die-bibel.de/en/bible/NA28/MAT.1"]], "why": "Free NA28 text (no apparatus online). Host moved: academic-bible.com → die-bibel.de (link is current).", "access": ""}, {"id": "csntm", "title": "CSNTM", "cite": "Center for the Study of NT Manuscripts", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["csntm.org", "https://www.csntm.org/"], ["Collections", "https://collections.csntm.org/"]], "why": "Free high-res manuscript images — for when you want to <i>see</i> a witness.", "access": ""}, {"id": "beast", "title": "BEAST 2", "cite": "v2.7.8", "chips": [["code", ""], ["free", "good"]], "free": true, "links": [["beast2.org", "https://www.beast2.org/"]], "why": "Bayesian phylogenetics engine for Unit 13.", "access": ""}, {"id": "stemma", "title": "Carlson's stemma", "cite": "Stephen Carlson", "chips": [["code", ""], ["no license file", "good"]], "free": true, "links": [["GitHub", "https://github.com/stemmatic/stemma"]], "why": "His cladistic software. <b>No license file — use, don't redistribute.</b>", "access": ""}, {"id": "tc", "title": "TC: A Journal of Biblical Textual Criticism", "cite": "open-access venue", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["jbtc.org", "https://jbtc.org/"]], "why": "Publishes computational TC; a target for paper #1, and an archive to mine.", "access": ""}, {"id": "etc", "title": "Evangelical Textual Criticism blog", "cite": "the field&#x27;s news hub", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["Blog", "http://evangelicaltextualcriticism.blogspot.com/"]], "why": "Read monthly; guest-post when paper #1 lands.", "access": ""}, {"id": "teimodule", "title": "TEI Critical Apparatus module", "cite": "TEI P5 Guidelines", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["tei-c.org", "https://tei-c.org/release/doc/tei-p5-doc/en/html/TC.html"]], "why": "The schema your parser and exporter speak.", "access": ""}, {"id": "anki", "title": "Anki decks (Decker vocab · Mounce w/ audio)", "cite": "shared decks", "chips": [["data", ""], ["free", "good"]], "free": true, "links": [["Decker deck", "https://ankiweb.net/shared/info/1986594201"], ["Mounce deck", "https://ankiweb.net/shared/info/53361124"]], "why": "Shared decks occasionally get purged — <b>re-download early</b> and keep a local copy.", "access": ""}, {"id": "sidequest", "title": "Side-quest data (SQ1–3)", "cite": "Cooper Smith criteria · WLC/MACULA Hebrew · T&#x27;OMIM", "chips": [["data", ""], ["open — cc by / pd", "good"]], "free": true, "links": [["Cooper Smith (JHS)", "https://jhsonline.org/index.php/jhs/article/view/29632"], ["MACULA Hebrew", "https://github.com/Clear-Bible/macula-hebrew"], ["T'OMIM (Zenodo)", "https://doi.org/10.5281/zenodo.19135731"]], "why": "All open; see <a href=\"../exploration/candidates/03-allusion-benchmark.md\">candidate 03</a> for how each slots into SQ1–3.", "access": ""}]}]}, {"num": "4", "name": "Video & audio", "role": "Where video genuinely helps — language habit-forming and statistics lectures.", "compact": false, "groups": [{"sub": "", "entries": [{"id": "ddg", "title": "Daily Dose of Greek", "cite": "weekday verse walkthroughs", "chips": [["video", ""], ["free", "good"]], "free": true, "links": [["dailydoseofgreek.com", "https://dailydoseofgreek.com/"]], "why": "Two-minute weekday verse walkthroughs; the lowest-friction way to keep the Greek habit daily. The archive covers 1–3 John.", "access": "<b>Free</b> — subscribe by email from week 0."}, {"id": "mounce", "title": "Bill Mounce's free BBG course", "cite": "chapter-by-chapter lectures, vocab audio, quizzes", "chips": [["video", ""], ["free", "good"]], "free": true, "links": [["Lectures", "https://www.billmounce.com/basicsofbiblicalgreek/grammar"], ["Free dictionary", "https://www.billmounce.com/greek-dictionary"]], "why": "The video supplement when a Decker chapter needs a second voice — chapter order differs, so map by topic.", "access": "<b>Free.</b>"}, {"id": "srvideo", "title": "Statistical Rethinking lectures", "cite": "McElreath · 2023 complete · 2026 in progress", "chips": [["video", ""], ["free", "good"]], "free": true, "links": [["2023 playlist (complete)", "https://www.youtube.com/playlist?list=PLDcUM9US4XdPz-KxHM4XHt7uUVGWWVSus"]], "why": "Pair with Unit 13. The 2026 series (playlist PLDcUM9US4XdNOlqSyhe38US8mFgmqzI14) tracks the 3rd-edition drafts.", "access": "<b>Free on YouTube.</b>"}, {"id": "ttb", "title": "Taming the BEAST", "cite": "the BEAST 2 tutorial collection", "chips": [["text", ""], ["video", ""], ["free", "good"]], "free": true, "links": [["taming-the-beast.org", "https://taming-the-beast.org/"]], "why": "Actively maintained tutorials; do the introductory one before touching your own data in Unit 13.", "access": "<b>Free.</b>"}]}]}];
 
 let state = Object.assign({ inhand: {}, notes: {} }, INITIAL || {});
 if (!API) {
@@ -182,8 +282,8 @@ function render() {
   $("list").innerHTML = TIERS.map(tier => `
     <section class="tier">
       <div class="tier-head">
-        <span class="tier-tag">${tier.tag}</span>
-        <span class="tier-name">${tier.name}</span>
+        <span class="tier-num">${tier.num}</span>
+        <h2 class="tier-name">${tier.name}</h2>
       </div>
       <p class="tier-role">${tier.role}</p>
       ${tier.groups.map(g => `
@@ -208,7 +308,6 @@ function render() {
             </div></div>
           </article>`).join("")}`).join("")}
     </section>`).join("");
-  $("ticks").innerHTML = TIER1_IDS.map(() => `<span class="tick"></span>`).join("");
   wire();
   updateMeter();
   applyFilter();
@@ -216,8 +315,9 @@ function render() {
 
 function updateMeter() {
   const n = TIER1_IDS.filter(i => state.inhand[i]).length;
+  const nextId = TIER1_IDS.find(i => !state.inhand[i]) || null;
   $("count").textContent = `core path: ${n} of ${TIER1_IDS.length} in hand`;
-  document.querySelectorAll(".tick").forEach((t, i) => t.classList.toggle("on", !!state.inhand[TIER1_IDS[i]]));
+  waypath($("ticks"), TIER1_IDS, i => !!state.inhand[i], nextId);
 }
 
 function wire() {

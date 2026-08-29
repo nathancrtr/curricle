@@ -14,11 +14,8 @@ from decimal import Decimal
 from curricle import db, factory, profile
 from curricle.llm import BudgetExceeded, Runner, load_models_config, load_role
 
+from corpuspaths import HAVE_ML, ML_ROOT
 from pg import test_engine
-
-HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-REPOS = os.path.dirname(HERE)
-ML_ROOT = os.path.join(REPOS, "learning", "ml-ai")
 
 
 GOOD_QUIZ = json.dumps([
@@ -152,7 +149,7 @@ class RunnerTest(unittest.TestCase):
             runner.run_role("widget-builder", "p")
 
 
-@unittest.skipUnless(os.path.isdir(ML_ROOT), "ml-ai course not present")
+@unittest.skipUnless(HAVE_ML, "ml-ai course not present")
 class BuildPhaseTest(unittest.TestCase):
     """End-to-end build against the real ml-ai manifest, fake transport."""
 

@@ -56,6 +56,10 @@ STYLE = theme.style("""\
   .head:hover .title { color:var(--accent-text); }
   .num { font:600 13px """ + theme.FONT_DISPLAY + """; color:var(--muted);
          padding-top:7px; }
+  /* A milestone's gutter carries the flag instead of a number, in the green
+     that means done/checkpoint everywhere else — the same glyph in the same
+     tint the hub gives the same row. */
+  .num .flag { color:var(--good-text); vertical-align:-1px; }
   .body-col { min-width:0; }
   .title { font-weight:600; font-size:19px; line-height:1.3; margin:0; }
   .title .chip { vertical-align:3px; margin-left:8px; }
@@ -174,6 +178,9 @@ function toast(msg) {
 
 const ALL = PHASES.flatMap(p => p.entries);
 const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+// [shut, open] for the expand control. A milestone is not a unit, and what
+// its detail holds is the note box and nothing else, so it says so.
+const TOGGLE = e => e.ms ? ["Note", "Hide note"] : ["Full unit", "Hide unit"];
 function render() {
   $("list").innerHTML = PHASES.map(p => `
     <section class="phase">
@@ -194,7 +201,7 @@ function render() {
             </span>
           </button>
           <div class="actions">
-            <button class="act toggle"><span class="chev">›</span><span class="tlabel">Full unit</span></button>
+            <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
@@ -230,7 +237,8 @@ function openEntry(entry, want) {
   const on = want !== undefined ? want : !entry.classList.contains("open");
   entry.classList.toggle("open", on);
   entry.querySelector(".head").setAttribute("aria-expanded", String(on));
-  entry.querySelector(".tlabel").textContent = on ? "Hide unit" : "Full unit";
+  const e = ALL.find(x => x.id === entry.dataset.id);
+  entry.querySelector(".tlabel").textContent = TOGGLE(e)[on ? 1 : 0];
 }
 
 function syncEntry(entry, e) {
@@ -365,10 +373,16 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
             else:
                 m = milestones_by_id[entry_id]
                 entries.append({
-                    "id": m.id, "num": "·",
+                    # The number gutter holds a number for a unit and the
+                    # product's one drawn glyph for a milestone — the same
+                    # flag the hub gives the same row. It used to hold "·",
+                    # which reads as a stray period beside the label.
+                    "id": m.id, "num": theme.FLAG_SVG,
                     "title": theme.strip_leading_pictograph(m.label),
                     "gloss": inline_html(m.detail) if m.detail else "",
                     "tags": [m.kind], "rows": [], "check": None, "steps": None,
+                    # Not a unit: the expand control says so (TOGGLE).
+                    "ms": True,
                 })
         checkpoint = None
         if p.checkpoint:
@@ -406,6 +420,13 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
     n_units = sum(1 for u in mf.units)
     standfirst = (f'<p class="standfirst">{e(c.description)}</p>'
                   if c.description else "")
+
+    # Where the marks actually go: the tenant's ledger when served, this
+    # browser only when the page is a standalone file. See hubrender — the
+    # two pages share the storage key and must not disagree about what it
+    # means.
+    kept = ("are kept for you on the server" if api
+            else "live in this browser's localStorage")
 
     script = SCRIPT % {
         "key": json.dumps(c.progress_storage_key),
@@ -452,8 +473,8 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
   <footer>
     Rendered by curricle from the course manifest — canonical text:
     <a href="curriculum.md">curriculum.md</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
-    progress marks are shared with <a href="index.html">the hub</a> and live in this
-    browser's localStorage · <a href="index.html">← back to the hub</a>
+    progress marks are shared with <a href="index.html">the hub</a> and
+    {kept} · <a href="index.html">← back to the hub</a>
   </footer>
 </div>
 <div class="saving" id="toast">Saved</div>

@@ -306,9 +306,12 @@ def _no_shelf(mf: Manifest, api: str | None) -> str:
         root = posixpath.dirname(c.docs.curriculum_doc or "learning/curriculum.md")
         href = posixpath.relpath(c.docs.resources_doc, root)
         if not (api and href.startswith("../")):
+            name = href
+            if api and href.endswith(".md"):
+                href = "read/" + href     # served markdown goes through the reader
             doc_para = (
                 "\n      <p>The course repo does keep a written shelf — "
-                f'<a href="{html.escape(href)}">{html.escape(href)}</a> — '
+                f'<a href="{html.escape(href)}">{html.escape(name)}</a> — '
                 "it simply has not been brought into curricle yet.</p>")
     body = f"""
   <header class="masthead">
@@ -391,6 +394,20 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     kept = ("are kept for you on the server" if api
             else "live in this browser's localStorage")
 
+    # The canonical-text pointer is derived, not assumed: the old footer
+    # hard-coded "learning-resources.md" whatever the manifest said, and
+    # claimed a canonical text even for a shelf that has none. Served, the
+    # link goes through the themed reader; the raw file stays at its path.
+    canonical = "."
+    if c.docs.resources_doc:
+        doc_root = posixpath.dirname(c.docs.curriculum_doc
+                                     or "learning/curriculum.md")
+        name = posixpath.relpath(c.docs.resources_doc, doc_root)
+        if not (api and name.startswith("../")):
+            href = f"read/{name}" if api else name
+            canonical = (f' — canonical text:\n    <a href="{e(href)}">'
+                         f"{e(name)}</a>.")
+
     script = SCRIPT % {
         "key": json.dumps(c.resources_storage_key),
         "api": json.dumps(api),
@@ -421,8 +438,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
   {reading}
 
   <footer>
-    Rendered by curricle from the course manifest — canonical text:
-    <a href="learning-resources.md">learning-resources.md</a>. In-hand marks and notes
+    Rendered by curricle from the course manifest{canonical} In-hand marks and notes
     {kept} ·
     <a href="curriculum.html">the curriculum</a> ·
     <a href="index.html">← back to the hub</a>

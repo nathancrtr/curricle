@@ -353,6 +353,7 @@ function render() {
           <div class="actions">
             <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
+            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
             ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `

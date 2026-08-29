@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import html
 import json
+import posixpath
 
 from . import theme
 from .inlinemd import inline_html
@@ -203,6 +204,7 @@ function render() {
           <div class="actions">
             <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
+            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
             ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `
@@ -341,7 +343,8 @@ def _weeks_label(weeks: tuple[int, int | None] | None) -> str:
 
 
 def render_curriculum(mf: Manifest, *, api: str | None = None,
-                      initial: dict | None = None) -> str:
+                      initial: dict | None = None,
+                      unit_pages: bool = False) -> str:
     c = mf.course
     e = html.escape
     units_by_id = {u.id: u for u in mf.units}
@@ -369,6 +372,10 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                                "ans": inline_html(u.check.ans)} if u.check else None),
                     "steps": ([[s.id, s.label] for s in u.steps] or None
                               if u.steps else None),
+                    # SPIKE (one-stop-shop): units link to their served page.
+                    # Only the app has unit pages — the standalone render
+                    # carries no href key and the template renders nothing.
+                    **({"href": f"unit/{u.id}.html"} if unit_pages else {}),
                 })
             else:
                 m = milestones_by_id[entry_id]
@@ -428,6 +435,13 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
     kept = ("are kept for you on the server" if api
             else "live in this browser's localStorage")
 
+    # Canonical-text pointer: the name comes from the manifest, and served
+    # it opens in the themed reader instead of as text/plain (the raw file
+    # stays reachable at its own path).
+    cur_name = posixpath.basename(c.docs.curriculum_doc
+                                  or "learning/curriculum.md")
+    cur_href = f"read/{cur_name}" if api else cur_name
+
     script = SCRIPT % {
         "key": json.dumps(c.progress_storage_key),
         "notes_key": json.dumps(c.notes_storage_key),
@@ -472,7 +486,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
 
   <footer>
     Rendered by curricle from the course manifest — canonical text:
-    <a href="curriculum.md">curriculum.md</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
+    <a href="{e(cur_href)}">{e(cur_name)}</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
     progress marks are shared with <a href="index.html">the hub</a> and
     {kept} · <a href="index.html">← back to the hub</a>
   </footer>

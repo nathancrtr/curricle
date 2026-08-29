@@ -201,8 +201,12 @@ class TestTheDocumentsPanel(unittest.TestCase):
         cls.standalone = cls.ITEM.findall(render_hub(cls.mf))
 
     def test_served_drops_everything_above_the_content_root(self):
+        # Served markdown routes through the themed reader (read/), so the
+        # click lands on a rendered page, not a text/plain dump; the raw
+        # files stay reachable at their own paths.
         self.assertEqual([href for href, _ in self.served],
-                         ["curriculum.md", "learning-resources.md", "README.md"])
+                         ["read/curriculum.md", "read/learning-resources.md",
+                          "read/README.md"])
 
     def test_standalone_keeps_them_all(self):
         self.assertEqual([href for href, _ in self.standalone],
@@ -215,8 +219,8 @@ class TestTheDocumentsPanel(unittest.TestCase):
         mf = make_manifest(docs=Docs(curriculum_doc="course/curriculum.md",
                                      readme="course/HOWTO.md"))
         self.assertEqual(self.ITEM.findall(render_hub(mf, api="api/events")),
-                         [("curriculum.md", "curriculum.md"),
-                          ("HOWTO.md", "HOWTO.md")])
+                         [("read/curriculum.md", "curriculum.md"),
+                          ("read/HOWTO.md", "HOWTO.md")])
 
     def test_link_text_is_a_name_not_a_path(self):
         # The manifest carries no titles for documents (schema.Docs is five

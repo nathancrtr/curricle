@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import html
 import json
+import posixpath
 
 from . import theme
 from .inlinemd import inline_html
@@ -434,6 +435,13 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
     kept = ("are kept for you on the server" if api
             else "live in this browser's localStorage")
 
+    # Canonical-text pointer: the name comes from the manifest, and served
+    # it opens in the themed reader instead of as text/plain (the raw file
+    # stays reachable at its own path).
+    cur_name = posixpath.basename(c.docs.curriculum_doc
+                                  or "learning/curriculum.md")
+    cur_href = f"read/{cur_name}" if api else cur_name
+
     script = SCRIPT % {
         "key": json.dumps(c.progress_storage_key),
         "notes_key": json.dumps(c.notes_storage_key),
@@ -478,7 +486,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
 
   <footer>
     Rendered by curricle from the course manifest — canonical text:
-    <a href="curriculum.md">curriculum.md</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
+    <a href="{e(cur_href)}">{e(cur_name)}</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
     progress marks are shared with <a href="index.html">the hub</a> and
     {kept} · <a href="index.html">← back to the hub</a>
   </footer>

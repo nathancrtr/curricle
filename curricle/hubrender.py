@@ -387,6 +387,12 @@ def render_hub(mf: Manifest, *, api: str | None = None,
             href += "/"                       # a directory keeps its slash
         if api and href.startswith("../"):
             return                            # outside the content root: unservable
+        if api and href.endswith(".md"):
+            # Served, a markdown document goes through the themed reader
+            # rather than arriving as text/plain; the raw file stays at its
+            # own path. Standalone renders keep the raw link — read/ only
+            # exists on the app.
+            href = "read/" + href
         name = posixpath.basename(path.rstrip("/")) + ("/" if path.endswith("/") else "")
         doc_items.append(f'<li><a href="{e(href)}">{e(name)}</a> — {gloss}</li>')
 

@@ -178,6 +178,13 @@
                 scroll-margin-top:24vh; }
   .unit label { cursor:pointer; min-width:0; }
   .unit label .chip { margin-left:7px; vertical-align:1px; }
+  /* A row's title navigates to its unit page (served); it reads as the row
+     until hovered, so the spine stays a list, not a wall of links. The
+     done-strike is drawn by the label and runs through the anchor. */
+  .unit label .ulink { color:inherit; text-decoration:none; }
+  .unit label .ulink:hover { color:var(--accent-text);
+                             text-decoration:underline;
+                             text-underline-offset:2px; }
   .unit label .next-flag { display:none; margin:0 8px 0 0; }
   .unit.done label { color:var(--muted); text-decoration:line-through;
                      text-decoration-color:var(--faint); }
@@ -235,6 +242,7 @@
                       color:var(--good-text); }
   .track .step.done::before { content:"✓"; margin-right:6px; font-weight:700; }
   .track .arrow { color:var(--muted); }
+  .track-tools { margin:10px 0 0; font-size:14px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -296,6 +304,7 @@ const API = null;          // null: localStorage mode; else: POST events here
 const INITIAL = null;  // server-folded state, or null
 const PHASES = [{"num": "0", "name": "Orientation", "goal": "Know what you're building and why, and get the foundation running.", "units": [["u0", "Unit 0 · Orientation", []]]}, {"num": "1", "name": "The phonetic foundation already in the repo", "goal": "Master the concepts the existing modules encode, by reading and extending them. By the end you understand every line of <code>phonetics.py</code>, <code>models.py</code>, <code>syllabify.py</code>, and <code>features.py</code>, and you've made each one yours by extending it.", "units": [["u1", "Unit 1 · Phonemes, ARPAbet & the lexicon", ["lesson"]], ["u2", "Unit 2 · The IPA vowel space & articulatory features (vowels)", ["lesson", "widget"]], ["u3", "Unit 3 · Consonants: place, manner, voicing, sonority", ["lesson", "widget"]], ["u4", "Unit 4 · Syllables & phonotactics: the Maximal Onset Principle", ["lesson", "widget", "quiz"]]]}, {"num": "2", "name": "The rhyme kernel", "goal": "Build <code>rhyme_score(a, b) -&gt; float</code>, the piece the README calls \"next up.\" Start from the perceptual definition of rhyme, ship the perfect-rhyme special case first, then loosen to graded slant rhyme, then handle unequal lengths with sequence alignment.", "units": [["u5", "Unit 5 · The vowel skeleton & the rhyme-bearing tail", ["lesson", "tests"]], ["u6", "Unit 6 · Perfect rhyme first", ["lesson"]], ["u7", "Unit 7 · Graded slant rhyme & weighting", ["lesson", "widget"]], ["u8", "Unit 8 · Unequal lengths: sequence alignment", ["lesson", "widget", "tests", "quiz"]]]}, {"num": "3", "name": "From pair-scores to a rhyme scheme", "goal": "Move from \"do these two rhyme?\" to \"find and group all the rhymes in a verse.\"", "units": [["u9", "Unit 9 · Multi-word spans & pronunciation variants", ["lesson", "widget"]], ["u10", "Unit 10 · Grouping rhymes: similarity graphs & components", ["lesson", "widget", "tests"]], ["u11", "Unit 11 · Internal & multisyllabic rhyme: scanning a verse", ["lesson", "quiz"]]]}, {"num": "4", "name": "Visualization, OOV/G2P, and evaluation", "goal": "Make it visible, make it robust to unknown words, and find out whether it's any good.", "units": [["u12", "Unit 12 · Visualizing the scheme", ["lesson"]], ["u13", "Unit 13 · Out-of-vocabulary words & grapheme-to-phoneme", ["lesson", "tests"]], ["u14", "Unit 14 · Evaluation: is it any good?", ["widget", "quiz"]]]}, {"num": "5", "name": "Capstone & frontiers", "goal": "", "units": [["u15", "Unit 15 · Capstone: the finished tool + the written understanding", []]]}];
 const TRACKS = [];
+const HREFS = {};      // row id -> its unit page; {} standalone
 
 let saved = INITIAL || {};
 if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
@@ -370,7 +379,16 @@ for (const p of PHASES) {
     const nf = document.createElement("span");
     nf.className = "chip acc next-flag"; nf.textContent = "next";
     lb.appendChild(nf);
-    lb.appendChild(document.createTextNode(label));
+    if (HREFS[id]) {
+      // The title navigates to the unit's page; the checkbox stays the
+      // marking control. An anchor inside the label does not activate the
+      // checkbox — interactive descendants opt out of label forwarding.
+      const a = document.createElement("a");
+      a.className = "ulink"; a.href = HREFS[id]; a.textContent = label;
+      lb.appendChild(a);
+    } else {
+      lb.appendChild(document.createTextNode(label));
+    }
     for (const t of (tags || [])) {
       const s = document.createElement("span");
       s.className = "chip" + (t === "widget" ? " acc" : ""); s.textContent = t;

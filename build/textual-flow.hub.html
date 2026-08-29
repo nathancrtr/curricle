@@ -178,6 +178,13 @@
                 scroll-margin-top:24vh; }
   .unit label { cursor:pointer; min-width:0; }
   .unit label .chip { margin-left:7px; vertical-align:1px; }
+  /* A row's title navigates to its unit page (served); it reads as the row
+     until hovered, so the spine stays a list, not a wall of links. The
+     done-strike is drawn by the label and runs through the anchor. */
+  .unit label .ulink { color:inherit; text-decoration:none; }
+  .unit label .ulink:hover { color:var(--accent-text);
+                             text-decoration:underline;
+                             text-underline-offset:2px; }
   .unit label .next-flag { display:none; margin:0 8px 0 0; }
   .unit.done label { color:var(--muted); text-decoration:line-through;
                      text-decoration-color:var(--faint); }
@@ -235,6 +242,7 @@
                       color:var(--good-text); }
   .track .step.done::before { content:"✓"; margin-right:6px; font-weight:700; }
   .track .arrow { color:var(--muted); }
+  .track-tools { margin:10px 0 0; font-size:14px; color:var(--muted); }
 </style>
 </head>
 <body>
@@ -305,6 +313,7 @@ const API = null;          // null: localStorage mode; else: POST events here
 const INITIAL = null;  // server-folded state, or null
 const PHASES = [{"num": "0", "name": "Orientation", "goal": "Know what you're building and why; get the existing tooling running; start Greek.", "units": [["p0-run", "open-cbgm built & run on 3 John, every output eyeballed", []], ["p0-read", "W&G front matter + fast skim; README + REVIEW read", []], ["p0-para", "Milestone paragraph: in, out, where the humans sit", ["quiz"]]]}, {"num": "1", "name": "The CBGM from the inside", "goal": "Understand the method by reimplementing its core, cross-validated against open-cbgm at every step. By the end you have a working mini-CBGM in Python and there is nothing mystical left in the acronym.", "units": [["u1", "Unit 1 · Witnesses, variants, and the shape of the data", ["lesson", "tests"]], ["u2", "Unit 2 · Pregenealogical coherence", ["lesson", "widget", "tests"]], ["u3", "Unit 3 · Local stemmata and genealogical coherence", ["lesson"]], ["u4", "Unit 4 · Textual flow, connectivity, and the initial text", ["lesson", "widget", "quiz"]]]}, {"num": "2", "name": "The critics and the dispute", "goal": "Master the methodological debate your program adjudicates, and reproduce its central artifact. This phase is reading-heavier than the others — the write-ups in Phases 4–6 draw their related-work sections directly from it.", "units": [["u5", "Unit 5 · The case for and against", []], ["u6", "Unit 6 · Carlson's bias argument, reproduced", ["lesson"]], ["u7", "Unit 7 · Stemmatology beyond the NT", []], ["p2-mail", "Contact milestone: INTF + McCollum emails sent", [], "m"]]}, {"num": "3", "name": "Building the simulator", "goal": "A synthetic-tradition pipeline, end-to-end into open-cbgm: generate a tradition with known history → export TEI → run the CBGM on it → score the answers against truth. This is capstone infrastructure; build it like production code.", "units": [["u8", "Unit 8 · Transmission as a generative process", ["lesson", "widget", "tests"]], ["u9", "Unit 9 · Mutation, readings, and the oracle editor", []], ["u10", "Unit 10 · TEI export and the validation loop", []], ["u11", "Unit 11 · Contamination", []]]}, {"num": "4", "name": "The simulation study", "goal": "Run the experiments, measure the Carlson effect honestly, compare rival methods on identical synthetic data, and publish deliverable #1.", "units": [["u12", "Unit 12 · The Carlson experiment at scale", []], ["u13", "Unit 13 · Rivals on the same ground truth", []], ["u14", "Unit 14 · Write-up #1", []]]}, {"num": "5", "name": "The sensitivity study", "goal": "Turn the perturbation machinery on the <i>real</i> ECM 3 John (and whatever the INTF licensing conversation opened up), and publish deliverable #2: how robust is a published critical text to its editors?", "units": [["u15", "Unit 15 · The perturbation harness", []], ["u16", "Unit 16 · Wobble metrics and the headline table", []], ["u17", "Unit 17 · Scale and scope (conditional)", []], ["u18", "Unit 18 · Write-up #2", []]]}, {"num": "6", "name": "The philology apprenticeship → the LLM study", "goal": "Become competent enough at transcriptional reasoning to evaluate an LLM doing it; then run the local-stemma experiment — deliverable #3 and the capstone.", "units": [["u19", "Unit 19 · Transcriptional probability, by hand", ["lesson"]], ["u20", "Unit 20 · The task, the data, the traps", []], ["u21", "Unit 21 · The experiment", []], ["u22", "Unit 22 · Write-up #3 and the capstone close-out", []]]}];
 const TRACKS = [{"id": "greek", "stages": [["g-alpha", "alphabet"], ["g-nouns", "nouns & articles"], ["g-verbs", "verbs arrive"], ["g-1john", "reading 1 John"], ["g-app", "apparatus literate"], ["g-mark", "Mark with helps"]]}];
+const HREFS = {};      // row id -> its unit page; {} standalone
 
 let saved = INITIAL || {};
 if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
@@ -379,7 +388,16 @@ for (const p of PHASES) {
     const nf = document.createElement("span");
     nf.className = "chip acc next-flag"; nf.textContent = "next";
     lb.appendChild(nf);
-    lb.appendChild(document.createTextNode(label));
+    if (HREFS[id]) {
+      // The title navigates to the unit's page; the checkbox stays the
+      // marking control. An anchor inside the label does not activate the
+      // checkbox — interactive descendants opt out of label forwarding.
+      const a = document.createElement("a");
+      a.className = "ulink"; a.href = HREFS[id]; a.textContent = label;
+      lb.appendChild(a);
+    } else {
+      lb.appendChild(document.createTextNode(label));
+    }
     for (const t of (tags || [])) {
       const s = document.createElement("span");
       s.className = "chip" + (t === "widget" ? " acc" : ""); s.textContent = t;

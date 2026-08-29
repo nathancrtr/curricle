@@ -82,6 +82,13 @@ STYLE = theme.style("""\
                 scroll-margin-top:24vh; }
   .unit label { cursor:pointer; min-width:0; }
   .unit label .chip { margin-left:7px; vertical-align:1px; }
+  /* A row's title navigates to its unit page (served); it reads as the row
+     until hovered, so the spine stays a list, not a wall of links. The
+     done-strike is drawn by the label and runs through the anchor. */
+  .unit label .ulink { color:inherit; text-decoration:none; }
+  .unit label .ulink:hover { color:var(--accent-text);
+                             text-decoration:underline;
+                             text-underline-offset:2px; }
   .unit label .next-flag { display:none; margin:0 8px 0 0; }
   .unit.done label { color:var(--muted); text-decoration:line-through;
                      text-decoration-color:var(--faint); }
@@ -139,6 +146,7 @@ STYLE = theme.style("""\
                       color:var(--good-text); }
   .track .step.done::before { content:"✓"; margin-right:6px; font-weight:700; }
   .track .arrow { color:var(--muted); }
+  .track-tools { margin:10px 0 0; font-size:14px; color:var(--muted); }
 """)
 
 SCRIPT = theme.WAYPATH_JS + """\
@@ -147,6 +155,7 @@ const API = %(api)s;          // null: localStorage mode; else: POST events here
 const INITIAL = %(initial)s;  // server-folded state, or null
 const PHASES = %(phases)s;
 const TRACKS = %(tracks)s;
+const HREFS = %(hrefs)s;      // row id -> its unit page; {} standalone
 
 let saved = INITIAL || {};
 if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
@@ -221,7 +230,16 @@ for (const p of PHASES) {
     const nf = document.createElement("span");
     nf.className = "chip acc next-flag"; nf.textContent = "next";
     lb.appendChild(nf);
-    lb.appendChild(document.createTextNode(label));
+    if (HREFS[id]) {
+      // The title navigates to the unit's page; the checkbox stays the
+      // marking control. An anchor inside the label does not activate the
+      // checkbox — interactive descendants opt out of label forwarding.
+      const a = document.createElement("a");
+      a.className = "ulink"; a.href = HREFS[id]; a.textContent = label;
+      lb.appendChild(a);
+    } else {
+      lb.appendChild(document.createTextNode(label));
+    }
     for (const t of (tags || [])) {
       const s = document.createElement("span");
       s.className = "chip" + (t === "widget" ? " acc" : ""); s.textContent = t;
@@ -291,6 +309,17 @@ def render_hub(mf: Manifest, *, api: str | None = None,
     tracks_js = [{"id": t.id, "stages": [[s.id, s.label] for s in t.stages]}
                  for t in mf.tracks]
 
+    # Row id -> unit page, served only (the app is the only place unit pages
+    # exist). A separate map, not a fifth row element: TestHubParity pins the
+    # row arrays' exact shapes to protect stored progress ids, and the rows
+    # carry ids, never navigation. A step navigates to the unit that owns it;
+    # a milestone owns no page and stays plain text.
+    hrefs_js: dict[str, str] = {}
+    if api:
+        for u in mf.units:
+            for rid in ([s.id for s in u.steps] or [u.id]):
+                hrefs_js[rid] = f"unit/{u.id}.html"
+
     # --- sections -----------------------------------------------------------
     parts: list[str] = []
     if api:
@@ -321,15 +350,39 @@ def render_hub(mf: Manifest, *, api: str | None = None,
     parts.append("<h2>The program track</h2>\n"
                  '<div class="spine" id="phases"></div>')
 
+    def material_href(m) -> str:
+        # Served markdown reads in the themed reader; everything else opens
+        # at its own path. Standalone has no reader and keeps raw links.
+        return ("read/" + m.path if api and m.path.endswith(".md")
+                else m.path)
+
     for t in mf.tracks:
         cadence = f' <span class="sub" style="font-size:14px">({e(t.cadence)})</span>' \
             if t.cadence else ""
         parts.append(f"<h2>The {e(t.name)} track{cadence}</h2>\n"
                      f'<div class="panel track" id="track-{e(t.id)}"></div>')
+        # A track's own materials live with the track, not in a grid of
+        # everyone's: the trainers are Greek-track furniture, so they sit
+        # under the Greek track's stepper. Served only — standalone keeps
+        # the card grid below instead.
+        tools = [m for m in mf.materials if m.track == t.id]
+        if api and tools:
+            links = " · ".join(
+                f'<a href="{e(material_href(m))}">{e(m.title)}</a>'
+                for m in tools)
+            parts.append(f'<p class="track-tools">Its tools, in the '
+                         f"browser: {links}</p>")
 
+    # The card grids were the pre-unit-page way to reach materials, and on
+    # the served app they were a junk drawer: every widget and quiz of the
+    # whole course, unordered, beside a spine that already walks the course
+    # in order. Served, unit-owned materials live on their unit pages, a
+    # track's on its track, the unowned in the documents panel — so the
+    # grids render only standalone, where no unit pages exist and the cards
+    # are the only browser access a course-repo reader has.
     cards = [m for m in mf.materials
              if m.kind in ("widget", "trainer", "quiz") ]
-    if cards:
+    if cards and not api:
         parts.append("<h2>Widgets &amp; quizzes "
                      '<span class="sub">(self-contained — '
                      "they open right here in the browser)</span></h2>")
@@ -351,7 +404,7 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         parts.append("</div>")
 
     exercises = [m for m in mf.materials if m.kind == "exercise"]
-    if exercises:
+    if exercises and not api:   # served: an exercise's brief is on its unit page
         parts.append("<h2>Exercises "
                      '<span class="sub">(stub + failing tests; '
                      "green bar = done — run in a terminal)</span></h2>")
@@ -407,6 +460,15 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         add_doc(d.review, "research positioning")
     if d.exploration:
         add_doc(d.exploration, "how this program was chosen")
+    # Materials nothing owns — no unit, no phase, no track (the question
+    # bank) — are course-wide reference, which is what this panel holds.
+    # Served only: standalone they are already on the card grid above.
+    if api:
+        for m in mf.materials:
+            if not (m.unit or m.phase or m.track):
+                gloss = e(m.blurb) if m.blurb else m.kind.replace("-", " ")
+                doc_items.append(f'<li><a href="{e(material_href(m))}">'
+                                 f"{e(m.title)}</a> — {gloss}</li>")
     if doc_items:
         parts.append("<h2>The documents</h2>\n<div class=\"panel docs-panel\">"
                      "<ul class=\"docs\">" + "\n".join(doc_items) + "</ul></div>")
@@ -428,6 +490,7 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         "initial": json.dumps(initial, ensure_ascii=False),
         "phases": json.dumps(phases_js, ensure_ascii=False),
         "tracks": json.dumps(tracks_js, ensure_ascii=False),
+        "hrefs": json.dumps(hrefs_js),
         "flag": json.dumps(theme.FLAG_SVG),
     }
     body = "\n".join(parts)

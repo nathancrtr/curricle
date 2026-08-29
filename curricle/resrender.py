@@ -6,8 +6,12 @@ free-only / not-in-hand filters. State lives in its own localStorage key
 (resource acquisition is not course progress — the corpus's rule, kept),
 taken from the manifest so the legacy tf-resources key survives.
 
-Design and interaction ported from textual-flow's hand-built page; data is
-a pure function of the manifest's resources + resource_tiers.
+Interaction ported from textual-flow's hand-built page; data is a pure
+function of the manifest's resources + resource_tiers.
+
+Design: the *companion* system (see theme.py). The core-path meter is the
+waypath over tier 1; free/paid chips keep their text labels — the green and
+warm tints are reinforcement, the words carry the meaning.
 """
 
 from __future__ import annotations
@@ -15,118 +19,91 @@ from __future__ import annotations
 import html
 import json
 
+from . import theme
 from .inlinemd import inline_html
 from .schema import Manifest, Resource
 
-STYLE = """\
-  :root { --bg:#faf8f4; --panel:#fff; --ink:#2b2620; --muted:#7a7268; --faint:#a29a8e;
-          --line:#e3ddd2; --line-soft:#eee9e0; --accent:#7c5cbf; --accent-ink:#fff;
-          --marker:rgba(124,92,191,.16); --good:#4a7a4e; --warn:#b3543a; --chip:#f3efe8; }
-  * { box-sizing:border-box; }
-  html { -webkit-text-size-adjust:100%; }
-  body { margin:0; background:var(--bg); color:var(--ink);
-         font:15px/1.6 Georgia, 'Times New Roman', serif; }
-  a { color:var(--accent); }
-  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:2px; }
-  .wrap { max-width:820px; margin:0 auto; padding:0 24px 90px; }
-  .masthead { padding:56px 0 26px; }
-  .eyebrow { font:11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase;
-             color:var(--faint); margin:0 0 18px; }
-  .eyebrow a { color:var(--accent); text-decoration:none; }
-  h1 { font-weight:400; font-size:clamp(34px,6.5vw,50px); line-height:1.06;
-       letter-spacing:-.01em; margin:0; }
-  h1 em { font-style:italic; color:var(--muted); }
-  .standfirst { max-width:56ch; margin:18px 0 0; color:var(--muted); font-size:16px; }
-  .controls { display:flex; flex-wrap:wrap; align-items:center; gap:14px 22px;
-              margin:28px 0 0; padding:14px 0;
-              border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
-  .meter { display:flex; align-items:center; gap:12px; }
-  .ticks { display:flex; gap:4px; }
-  .tick { width:13px; height:5px; border-radius:1px; background:var(--line);
-          transition:background .35s ease; }
-  .tick.on { background:var(--accent); }
-  .count { font:11.5px ui-monospace,Menlo,monospace; letter-spacing:.05em;
-           color:var(--muted); white-space:nowrap; }
+STYLE = theme.style("""\
+  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:40px 0 26px; }
+  h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
+       letter-spacing:-.01em; margin:14px 0 0; }
+  .standfirst { max-width:58ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .standfirst b { color:var(--ink); }
+  .controls { margin:26px 0 0; padding:16px 20px; }
+  .controls .waypath { margin:2px 0 14px; }
+  .meta-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px 22px; }
   .spacer { flex:1 1 auto; }
-  button { font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer; }
-  .filter { font:11px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
-            color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:6px 13px;
-            transition:.2s; }
-  .filter:hover { border-color:var(--accent); color:var(--ink); }
-  .filter[aria-pressed="true"] { background:var(--accent); border-color:var(--accent); color:var(--accent-ink); }
   .tier { margin:52px 0 0; }
-  .tier-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px;
-               padding-bottom:9px; border-bottom:2px solid var(--ink); }
-  .tier-tag { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.15em; text-transform:uppercase; }
-  .tier-name { font-size:19px; font-style:italic; color:var(--muted); }
-  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:64ch; }
-  .subhead { font:500 11px ui-monospace,Menlo,monospace; letter-spacing:.14em; text-transform:uppercase;
-             color:var(--faint); margin:26px 0 0; }
+  .tier-head { display:flex; align-items:flex-start; gap:12px; }
+  .tier-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
+              border-radius:12px; background:var(--accent-soft);
+              color:var(--accent-text); font:700 17px """ + theme.FONT_DISPLAY + """; }
+  .tier-name { font-family:""" + theme.FONT_DISPLAY + """; font-size:21px;
+               font-weight:700; margin:4px 0 0; }
+  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .subhead { font-size:12px; font-weight:700; letter-spacing:.06em;
+             text-transform:uppercase; color:var(--muted); margin:26px 0 0; }
   .entry { border-bottom:1px solid var(--line-soft); padding:18px 0 16px; }
   .entry.hidden { display:none; }
   .entry.compact { padding:12px 0 10px; }
-  .title { font-weight:400; font-size:19px; line-height:1.3; margin:0; }
-  .entry.compact .title { font-size:16px; }
-  .title a { text-decoration:none; }
-  .title a:hover { text-decoration:underline; text-decoration-color:var(--line); text-underline-offset:4px; }
-  .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:3px; margin-left:9px; }
-  .chip { font:500 9px ui-monospace,Menlo,monospace; letter-spacing:.11em; text-transform:uppercase;
-          border:1px solid var(--line); border-radius:999px; padding:1px 7px; color:var(--muted); }
-  .chip.free { color:var(--good); border-color:#bcd2bd; }
-  .chip.paid { color:var(--warn); border-color:#e4c4b8; }
-  .cite { font:11px ui-monospace,Menlo,monospace; color:var(--faint); margin:6px 0 0; line-height:1.5; }
-  .why { position:relative; margin:9px 0 0; font-size:14.5px; max-width:62ch; }
+  .title { font-weight:600; font-size:18px; line-height:1.35; margin:0; }
+  .entry.compact .title { font-size:15.5px; }
+  .title a { color:var(--ink); text-decoration:none; }
+  .title a:hover { color:var(--accent-text); text-decoration:underline;
+                   text-underline-offset:3px; }
+  .entry.inhand .title { color:var(--muted); }
+  .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:2px; margin-left:9px; }
+  .cite { font-size:12.5px; font-weight:500; color:var(--muted); margin:5px 0 0;
+          line-height:1.5; }
+  .why { position:relative; margin:9px 0 0; font-size:14.5px; line-height:1.55;
+         max-width:64ch; }
   .why-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
-              background:var(--marker); border-radius:.6em .2em .5em .3em;
+              background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
               transform:scaleX(0); transform-origin:0 50%;
               transition:transform .55s cubic-bezier(.2,.7,.3,1); }
   .why-text { position:relative; z-index:1; }
   .entry.inhand .why-mark { transform:scaleX(1); }
-  .access { margin:8px 0 0; font:13px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
+  .access { margin:8px 0 0; font-size:13.5px; color:var(--muted); }
   .access b { color:var(--ink); font-weight:600; }
-  .links { display:flex; flex-wrap:wrap; gap:6px 16px; margin:9px 0 0; }
-  .rlink { font:10.5px ui-monospace,Menlo,monospace; letter-spacing:.09em; text-transform:uppercase;
-           text-decoration:none; border-bottom:1px solid var(--line); padding-bottom:2px;
-           transition:border-color .2s; }
-  .rlink:hover { border-color:var(--accent); }
-  .rlink .arr { color:var(--faint); margin-left:4px; }
-  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 18px; margin:10px 0 0; }
-  .act { font:10.5px ui-monospace,Menlo,monospace; letter-spacing:.1em; text-transform:uppercase;
-         color:var(--muted); transition:color .2s; }
-  .act:hover { color:var(--ink); }
-  .mark { display:flex; align-items:center; gap:7px; }
-  .dot { width:9px; height:9px; border-radius:50%; border:1px solid var(--faint);
+  .links { display:flex; flex-wrap:wrap; gap:6px 8px; margin:10px 0 0; }
+  .rlink { display:inline-flex; align-items:center; gap:5px; min-height:30px;
+           font-size:12.5px; font-weight:600; text-decoration:none;
+           color:var(--accent-text); background:var(--accent-soft);
+           border-radius:999px; padding:2px 12px; transition:filter .2s; }
+  .rlink:hover { filter:brightness(.96); }
+  .rlink .arr { opacity:.7; }
+  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px; margin:8px 0 0; }
+  .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
+         font-size:13.5px; font-weight:600; color:var(--muted);
+         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         transition:color .2s, background .2s; }
+  .act:hover { color:var(--ink); background:var(--chip); }
+  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
          background:transparent; transition:.3s; }
-  .entry.inhand .dot { background:var(--accent); border-color:var(--accent); }
+  .entry.inhand .dot { background:var(--good); border-color:var(--good); }
+  .entry.inhand .mlabel { color:var(--good-text); }
   .notewrap { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
   .entry.noting .notewrap { grid-template-rows:1fr; }
   .notewrap > div { overflow:hidden; }
-  textarea { width:100%; max-width:62ch; min-height:52px; resize:vertical; margin-top:10px;
-             font:14px/1.55 ui-sans-serif,system-ui,sans-serif; color:var(--ink);
-             background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:9px 11px; }
-  textarea::placeholder { color:var(--faint); }
-  .entry.hasnote .nlabel { color:var(--accent); }
+  textarea { width:100%; max-width:64ch; min-height:52px; resize:vertical; margin-top:10px;
+             font:14px/1.55 """ + theme.FONT_BODY + """; color:var(--ink);
+             background:var(--panel); border:1.5px solid var(--line);
+             border-radius:12px; padding:9px 12px; }
+  textarea::placeholder { color:var(--muted); }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .entry.hasnote .nlabel { color:var(--accent-text); }
   .section { margin:56px 0 0; }
-  .section > h2 { font-size:22px; font-weight:400; margin:0 0 6px; padding-bottom:8px;
-                  border-bottom:2px solid var(--ink); }
+  .section > h2 { font-size:22px; font-weight:700; margin:0 0 10px; }
   .section ol { font-size:14.5px; padding-left:22px; }
-  .section li { margin:0 0 5px; }
-  .empty { display:none; padding:44px 0; text-align:center; font-style:italic;
-           font-size:18px; color:var(--muted); }
+  .section li { margin:0 0 6px; }
+  .tier-intro { margin:6px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .empty { display:none; padding:44px 0; text-align:center;
+           font-size:17px; color:var(--muted); }
   .empty.show { display:block; }
-  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
-           font:12.5px ui-sans-serif,system-ui,sans-serif; color:var(--muted); }
-  .saving { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px);
-            font:10px ui-monospace,Menlo,monospace; letter-spacing:.12em; text-transform:uppercase;
-            background:var(--ink); color:var(--bg); padding:7px 14px; border-radius:3px;
-            opacity:0; pointer-events:none; transition:.25s; }
-  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
-  code { font-family:ui-monospace,Menlo,monospace; font-size:.92em; background:var(--chip);
-         padding:0 4px; border-radius:4px; }
-  @media (prefers-reduced-motion:reduce) { * { transition-duration:.01ms !important; } }
-"""
+""")
 
-SCRIPT = """\
+SCRIPT = theme.WAYPATH_JS + """\
 const KEY = %(key)s;
 const API = %(api)s;          // null: localStorage mode; else: POST events here
 const INITIAL = %(initial)s;  // {inhand, notes} server-folded, or null
@@ -163,8 +140,8 @@ function render() {
   $("list").innerHTML = TIERS.map(tier => `
     <section class="tier">
       <div class="tier-head">
-        <span class="tier-tag">${tier.tag}</span>
-        <span class="tier-name">${tier.name}</span>
+        <span class="tier-num">${tier.num}</span>
+        <h2 class="tier-name">${tier.name}</h2>
       </div>
       <p class="tier-role">${tier.role}</p>
       ${tier.groups.map(g => `
@@ -189,7 +166,6 @@ function render() {
             </div></div>
           </article>`).join("")}`).join("")}
     </section>`).join("");
-  $("ticks").innerHTML = TIER1_IDS.map(() => `<span class="tick"></span>`).join("");
   wire();
   updateMeter();
   applyFilter();
@@ -197,8 +173,9 @@ function render() {
 
 function updateMeter() {
   const n = TIER1_IDS.filter(i => state.inhand[i]).length;
+  const nextId = TIER1_IDS.find(i => !state.inhand[i]) || null;
   $("count").textContent = `core path: ${n} of ${TIER1_IDS.length} in hand`;
-  document.querySelectorAll(".tick").forEach((t, i) => t.classList.toggle("on", !!state.inhand[TIER1_IDS[i]]));
+  waypath($("ticks"), TIER1_IDS, i => !!state.inhand[i], nextId);
 }
 
 function wire() {
@@ -269,9 +246,9 @@ render();
 def _chips(r: Resource) -> list[list[str]]:
     chips: list[list[str]] = [[f.lower(), ""] for f in r.formats]
     if r.cost:
-        chips.append([r.cost, "free" if r.free else "paid"])
+        chips.append([r.cost, "good" if r.free else "warn"])
     elif r.free:
-        chips.append(["free", "free"])
+        chips.append(["free", "good"])
     return chips
 
 
@@ -304,7 +281,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
                 "access": inline_html(r.access_note) if r.access_note else "",
             })
         tiers_js.append({
-            "tag": f"tier {tier.num}", "name": tier.name,
+            "num": str(tier.num), "name": tier.name,
             "role": inline_html(tier.role), "compact": tier.compact,
             "groups": groups,
         })
@@ -315,10 +292,11 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     if c.reading_order:
         items = "".join(f"<li>{inline_html(x)}</li>" for x in c.reading_order)
         reading = ('<section class="section"><h2>Suggested reading order</h2>'
-                   '<p class="tier-role">The curriculum formalizes this; here it is '
+                   '<p class="tier-intro">The curriculum formalizes this; here it is '
                    f"at a glance.</p><ol>{items}</ol></section>")
     verified = next((r.verified_at for r in mf.resources if r.verified_at), None)
-    verified_line = f" · every url verified {e(verified)}" if verified else ""
+    verified_line = (f'<span class="sep">·</span> every url verified {e(verified)}'
+                     if verified else "")
 
     script = SCRIPT % {
         "key": json.dumps(c.resources_storage_key),
@@ -331,7 +309,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{e(c.id)} — the resources</title>
+<title>{e(c.title)} — the resources</title>
 <style>
 {STYLE}</style>
 </head>
@@ -339,18 +317,19 @@ def render_resources(mf: Manifest, *, api: str | None = None,
 <div class="wrap">
 
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a> &nbsp;·&nbsp; the resources ·
-    {len(mf.resource_tiers)} tiers{verified_line}</p>
-    <h1>The shelf,<br><em>tiered by role</em></h1>
+    <p class="eyebrow"><a href="index.html">← course hub</a>
+    <span class="sep">·</span> the resources
+    <span class="sep">·</span> {len(mf.resource_tiers)} tiers {verified_line}</p>
+    <h1>Your resources</h1>
     {standfirst}
-    <div class="controls">
-      <div class="meter">
-        <div class="ticks" id="ticks" aria-hidden="true"></div>
-        <span class="count" id="count"></span>
-      </div>
+    <div class="controls panel">
+      <div class="waypath" id="ticks" aria-hidden="true"></div>
+      <div class="meta-row">
+      <span class="wp-count" id="count"></span>
       <span class="spacer"></span>
-      <button class="filter" id="f-free" aria-pressed="false">Free only</button>
-      <button class="filter" id="f-need" aria-pressed="false">Not in hand</button>
+      <button class="pill" id="f-free" aria-pressed="false">Free only</button>
+      <button class="pill" id="f-need" aria-pressed="false">Not in hand</button>
+      </div>
     </div>
   </header>
 

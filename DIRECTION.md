@@ -1,19 +1,21 @@
 # Direction: companion — learning as a relationship you keep
 
-> **Status — this describes the target, not `main`.** The direction is
-> landing as an eight-PR stack, and the prose below is written in the present
-> tense of the finished system. PR 1 adds `curricle/theme.py` and this
-> document and nothing else: no renderer imports the module, the four
-> independent style blobs (`hubrender`, `currender`, `resrender`,
-> `profilerender`) are all still in place, and `build/` is byte-for-byte
-> unchanged. So every claim here about renderers, layout, screenshots, or
-> "a palette change is now one edit" — the token-system section, the judgment
-> calls, the composed round — reads as the specification the later PRs are
-> held to, not as a description of the tree you are standing in. Editing a
-> token in `theme.py` today changes nothing visible; it will once the
-> renderer PRs land. The one section that is true of `main` now is the
-> contrast table: those numbers are computed from the values in `theme.py`
-> and are asserted by `tests/test_theme.py`.
+> **Status — this now describes `main`.** The direction landed as an
+> eight-PR stack, all of it merged. `curricle/theme.py` is the single source
+> of tokens; `hubrender`, `currender`, `resrender`, `profilerender` and the
+> front door all compose `theme.style(own_css)` and none defines a palette.
+> The prose below is written in the present tense and, as of the stack
+> completing, that tense is accurate: a palette edit in `theme.py` really is
+> one edit. The contrast table is asserted by `tests/test_theme.py`, which
+> also guards every stylesheet for undefined tokens and for `--faint` on
+> copy, so the numbers here cannot drift from the code without the suite
+> saying so.
+>
+> Two things below are *not* on `main` and are marked where they appear: the
+> screenshots referenced in the composed round lived on the design branch and
+> were deliberately not committed, and the "left undone" items are still
+> undone. Known defects found while landing this are tracked as issues, not
+> hidden here.
 
 ## Thesis
 

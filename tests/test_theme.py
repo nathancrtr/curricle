@@ -81,6 +81,9 @@ CONTRAST_PAIRS = [
     ("--accent", "--panel", 3.0),
     ("--accent-strong", "--stone", 3.0),
     ("--accent-strong", "--bg", 3.0),
+    # the hub's hot row when it is also a milestone: the ring sits on the
+    # green fill, not on --panel, so it is its own pairing
+    ("--accent-strong", "--good-soft", 3.0),
     ("--faint", "--bg", 3.0),
 ]
 
@@ -114,12 +117,7 @@ class Sheet(NamedTuple):
 
 
 SHEETS = [
-    # hubrender is still on its pre-theme stylesheet (its own :root, the old
-    # purple accent, Georgia); the conversion is a separate PR. It is guarded
-    # anyway — it already spends only theme token *names*, so the checks hold
-    # today, and when style() finally wraps it, `themed` flips and the
-    # composition test says so rather than quietly widening the slice.
-    Sheet("curricle.hubrender", "STYLE", "#fill", themed=False),
+    Sheet("curricle.hubrender", "STYLE", ".spine", themed=True),
     Sheet("curricle.currender", "STYLE", ".gloss-mark", themed=True),
     Sheet("curricle.resrender", "STYLE", ".why-mark", themed=True),
     Sheet("curricle.profilerender", "_STYLE", ".pendingbox", themed=True),
@@ -202,6 +200,7 @@ FAINT_DECORATIVE_USES = {
     ("theme.BASE_CSS", ".eyebrow .sep", "color"),            # the "·" between crumbs
     ("curricle.currender", ".dot", "border"),                # hollow ring: step to do
     ("curricle.currender", ".step-row.done label", "text-decoration-color"),
+    ("curricle.hubrender", ".unit.done label", "text-decoration-color"),
     ("curricle.resrender", ".dot", "border"),                # same ring: unread
 }
 

@@ -121,6 +121,10 @@ SHEETS = [
     Sheet("curricle.currender", "STYLE", ".gloss-mark", themed=True),
     Sheet("curricle.resrender", "STYLE", ".why-mark", themed=True),
     Sheet("curricle.profilerender", "_STYLE", ".pendingbox", themed=True),
+    # Not a renderer: the web app draws the front door itself, and that page
+    # spends tokens like any other surface, so its sheet is guarded like any
+    # other sheet.
+    Sheet("curricle.webapp", "INDEX_STYLE", ".wordmark", themed=True),
 ]
 
 SHARED_PREFIX = theme.TOKENS_CSS + theme.BASE_CSS

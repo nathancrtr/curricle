@@ -150,6 +150,7 @@ against its floor. A token edit that breaks a floor fails the suite.
 | accent fill vs panel (non-text) | **3.31** | **5.45** | 3.0 |
 | lit stone (accent-strong) vs unlit stone (v2) | **3.48** | **3.81** | 3.0 |
 | lit stone (accent-strong) vs bg (v2) | **4.46** | **6.01** | 3.0 |
+| hot ring (accent-strong) vs milestone fill (good-soft) | **4.07** | **4.35** | 3.0 |
 | faint on bg (decorative only) | 3.99 | 5.60 | — |
 
 Two audit-driven fixes: every small-text use of `--faint` (eyebrow labels,

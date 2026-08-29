@@ -59,7 +59,7 @@ CURRICULUM = textwrap.dedent("""\
 MILESTONE_LABEL = "\U0001F4EE Contact milestone: say hi"
 
 
-def make_manifest():
+def make_manifest(*, extra_materials=(), extra_files=()):
     root = tempfile.mkdtemp()
     learning = os.path.join(root, "learning")
     os.makedirs(os.path.join(learning, "interactive", "quizzes"))
@@ -67,6 +67,11 @@ def make_manifest():
         f.write(CURRICULUM)
     with open(os.path.join(learning, "interactive", "quizzes", "p0.html"), "w") as f:
         f.write("<!doctype html>")
+    for rel in extra_files:
+        path = os.path.join(learning, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write("stub")
     sidecar = Sidecar(
         course=SidecarCourse(
             id="test-course", title="A title that is not the slug",
@@ -87,7 +92,7 @@ def make_manifest():
                                      label=MILESTONE_LABEL, after_unit="u1"),),
         materials=(SidecarMaterial(id="q-p0", kind="quiz", title="Phase 0 quiz",
                                    path="interactive/quizzes/p0.html",
-                                   phase_num=0),),
+                                   phase_num=0),) + tuple(extra_materials),
         # A one-entry shelf, so that this course has one at all: the hub
         # offers its resources pill only to a course whose manifest carries
         # resources, because that page is otherwise an empty room (#14).
@@ -297,6 +302,82 @@ class TestPageChrome(unittest.TestCase):
         # order. `.cols` was the masonry container that got overruled.
         self.assertIn('<div class="spine" id="phases"></div>', self.page)
         self.assertNotIn('class="cols"', self.page)
+
+
+class TestUnitRowLinks(unittest.TestCase):
+    """Served, a row's title navigates to its unit page; standalone has no
+    unit pages, so no row carries an href at all. The map travels beside the
+    rows, never inside them — the row arrays' shapes are pinned by
+    TestHubParity to protect stored progress ids."""
+
+    def hrefs(self, page):
+        m = re.search(r"const HREFS = (\{.*?\});", page, re.S)
+        assert m, "no HREFS payload in the page"
+        return json.loads(m.group(1))
+
+    def test_served_units_and_steps_link_to_their_unit_page(self):
+        hrefs = self.hrefs(render_hub(make_manifest(), api="api/events"))
+        self.assertEqual(hrefs["u1"], "unit/u1.html")
+        # a step navigates to the unit that owns it
+        self.assertEqual(hrefs["u0-a"], "unit/u0.html")
+        self.assertEqual(hrefs["u0-b"], "unit/u0.html")
+        # a milestone owns no page
+        self.assertNotIn("m1", hrefs)
+
+    def test_standalone_rows_link_nowhere(self):
+        self.assertEqual(self.hrefs(render_hub(make_manifest())), {})
+
+
+class TestMaterialsIncorporation(unittest.TestCase):
+    """The served hub keeps no card grids: unit-owned materials live on
+    their unit pages, a track's with its track, the unowned in the
+    documents panel. Standalone — where none of those pages exist — keeps
+    the grids as its only browser access to materials."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mf = make_manifest(
+            extra_materials=(
+                SidecarMaterial(id="t-drill", kind="trainer",
+                                title="Side Drill",
+                                path="interactive/quizzes/drill.html",
+                                track="side"),
+                SidecarMaterial(id="b-bank", kind="question-bank",
+                                title="Question Bank",
+                                path="interactive/quizzes/bank.md"),
+            ),
+            extra_files=("interactive/quizzes/drill.html",
+                         "interactive/quizzes/bank.md"))
+        cls.served = render_hub(cls.mf, api="api/events")
+        cls.standalone = render_hub(cls.mf)
+
+    def test_served_page_has_no_card_grids(self):
+        self.assertNotIn("Widgets &amp; quizzes", self.served)
+        self.assertNotIn("<h2>Exercises", self.served)
+
+    def test_standalone_keeps_the_grids(self):
+        self.assertIn("Widgets &amp; quizzes", self.standalone)
+        self.assertIn('href="interactive/quizzes/drill.html"', self.standalone)
+
+    def test_a_tracks_materials_sit_with_the_track_when_served(self):
+        self.assertIn('class="track-tools"', self.served)
+        self.assertIn('href="interactive/quizzes/drill.html">Side Drill</a>',
+                      self.served)
+        # the stylesheet carries the rule in both modes; the element only
+        # exists served
+        self.assertNotIn('<p class="track-tools"', self.standalone)
+
+    def test_unowned_materials_join_the_documents_panel_when_served(self):
+        # markdown goes through the reader; the gloss is the kind when the
+        # material carries no blurb
+        self.assertIn('href="read/interactive/quizzes/bank.md">Question '
+                      "Bank</a> — question bank", self.served)
+        self.assertNotIn('read/interactive/quizzes/bank.md', self.standalone)
+
+    def test_phase_owned_materials_are_nobodys_furniture(self):
+        # the phase quiz reaches the learner through the curriculum's and
+        # unit pages' checkpoint blocks, not as hub furniture
+        self.assertNotIn('href="interactive/quizzes/p0.html"', self.served)
 
 
 if __name__ == "__main__":

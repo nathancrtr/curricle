@@ -34,6 +34,16 @@ python -m curricle serve --course ~/repos/textual-flow \
 #     curriculum_notes: localStorage.getItem("tf-curriculum-notes"),
 #     resources: localStorage.getItem("tf-resources")}))
 python -m curricle import-progress ~/repos/textual-flow --tenant nathan --json '<paste>'
+
+# The profile pipeline (Phase 2): evidence ledger -> generated skill file
+python -m curricle profile show --tenant nathan
+python -m curricle profile render --tenant nathan --out ~/.claude/skills/learner-profile/SKILL.md
+
+# The course factory (Phase 3): build a phase's interactive layer
+# (key in ANTHROPIC_API_KEY or gitignored local/anthropic-key)
+python -m curricle factory build-phase ~/repos/learning/ml-ai --phase 2 \
+    --tenant nathan --lesson u4 --widget u3 --exercise u3 [--dry-run]
+python -m curricle factory promote ~/repos/learning/ml-ai --phase 2
 ```
 
 ## Layout

@@ -269,6 +269,32 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
     os.makedirs(draft, exist_ok=True)
     report = BuildReport(draft_dir=draft)
 
+    # A run may die mid-build (network, credits, validator). The manifest is
+    # checkpointed after every artifact so nothing finished is ever orphaned,
+    # and a resumed run (re-invoke with only the missing artifacts' flags)
+    # merges into the same draft.
+    bank_target = next((m.path for m in manifest.materials
+                        if m.kind == "question-bank"), None)
+    manifest_path = os.path.join(draft, "manifest.json")
+    prior_artifacts: list[dict] = []
+    prior_costs: dict[str, str] = {}
+    if os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as f:
+            prior = json.load(f)
+        prior_artifacts = prior.get("artifacts", [])
+        prior_costs = prior.get("costs", {})
+
+    def checkpoint() -> None:
+        fresh = [{"rel_path": a.rel_path, "material": a.material,
+                  "note": a.note} for a in report.artifacts]
+        fresh_keys = {(a["rel_path"], a["note"]) for a in fresh}
+        kept = [a for a in prior_artifacts
+                if (a["rel_path"], a.get("note", "")) not in fresh_keys]
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump({"phase_num": phase.num, "bank_target": bank_target,
+                       "artifacts": kept + fresh,
+                       "costs": {**prior_costs, **report.costs}}, f, indent=2)
+
     def run(role: str, sections: list[tuple[str, str]], max_tokens: int = 32000):
         result = runner.run_role(role, _prompt(profile_md, sections), max_tokens)
         report.costs[role] = f"${result.cost_usd:.4f} ({result.model}, " \
@@ -299,6 +325,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": f"l-u{unit.num:02d}", "kind": "lesson",
                       "title": f"{unit.title} (Socratic)",
                       "path": f"interactive/{rel}", "unit": unit.id}))
+        checkpoint()
 
     if spec.widget_unit:
         unit = units[spec.widget_unit]
@@ -310,7 +337,9 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             ("concept", concept),
             ("exemplar_widget", exemplar),
         ], max_tokens=64000))
-        slug = re.sub(r"[^a-z0-9]+", "-", concept.lower()).strip("-")[:32]
+        slug = re.sub(r"[^a-z0-9]+", "-", concept.lower()).strip("-")
+        if len(slug) > 28:
+            slug = slug[:28].rsplit("-", 1)[0]
         rel = f"widgets/{slug}.html"
         save(rel, text)
         report.artifacts.append(Artifact(
@@ -318,6 +347,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": f"w-{slug[:16].rstrip('-')}", "kind": "widget",
                       "title": concept, "path": f"interactive/{rel}",
                       "unit": unit.id}))
+        checkpoint()
 
     if spec.exercise_unit:
         unit = units[spec.exercise_unit]
@@ -339,6 +369,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
                       "unit": unit.id,
                       "grader": {"type": "unit-test", "runner": "python-unittest",
                                  "command": f"python {data['test_name']}"}}))
+        checkpoint()
 
     if spec.quiz:
         shell = read_exemplar(content_root, manifest, "quiz", max_bytes=200_000)
@@ -360,6 +391,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": f"q-phase-{phase.num}", "kind": "quiz",
                       "title": f"Phase {phase.num} checkpoint",
                       "path": f"interactive/{rel}", "phase_num": phase.num}))
+        checkpoint()
 
     if spec.bank:
         bank_material = next((m for m in manifest.materials
@@ -380,6 +412,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             role="bank-author", rel_path="", content=text,
             material={},
             note=f"append to {bank_material.path if bank_material else 'question bank'}"))
+        checkpoint()
 
     return report
 
@@ -459,17 +492,3 @@ def promote(course_root: str, content_root: str, sidecar_path: str,
             "\n".join(str(i) for i in issues if i.level == "error"))
     shutil.rmtree(draft)
     return moved
-
-
-def write_build_manifest(report: BuildReport, phase_num: int,
-                         bank_target: str | None) -> None:
-    data = {
-        "phase_num": phase_num,
-        "bank_target": bank_target,
-        "artifacts": [{"rel_path": a.rel_path, "material": a.material,
-                       "note": a.note} for a in report.artifacts],
-        "costs": report.costs,
-    }
-    with open(os.path.join(report.draft_dir, "manifest.json"), "w",
-              encoding="utf-8") as f:
-        json.dump(data, f, indent=2)

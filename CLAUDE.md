@@ -76,8 +76,29 @@ python -m curricle compile <course_root> --sidecar courses/<id>.course.yaml --ou
 - The personal seed lives in gitignored `local/`; tests use synthetic
   fixtures only.
 
+## The course factory (Phase 3)
+
+- Every LLM call goes through `llm.Runner.run_role` — streams, carries a
+  stage label (the role name), writes `token_ledger`, refuses past the
+  stage's budget. There is no other path to the model; the web app never
+  calls it (invariant L1: no LLM on a request path, ever).
+- `models.yaml` is the only file naming a model or a price. Roles and code
+  say cheap/frontier/premium. A price change is a YAML edit.
+- Role contracts live in `roles/*.md` (frontmatter + system prompt). The
+  factory prompt = derived learner profile + manifest phase context +
+  exemplars from the course's own earlier phases. Calibration is the point.
+- Outputs are refused, not reviewed: see the validators in `factory.py`.
+  Generated exercise tests are executed against their stub — if they pass,
+  the build fails. Drafts land in `interactive/.draft-pN/`; only
+  `factory promote` touches the course, and it aborts unless the compile
+  stays clean.
+- The API key comes from `ANTHROPIC_API_KEY` or gitignored
+  `local/anthropic-key`. Never commit, print, or read the key's value.
+- Two curriculum dialects exist: `bullets` (textual-flow, rhyme-schemer)
+  and `headings` (ml-ai) — sidecar `dialect:` field selects.
+
 ## What this repo is not (yet)
 
-No LLM calls, no auth, no multi-tenant serving (single tenant per app
-instance, resolved at startup). Those are later phases (platform-design.md
-§9); resist pulling them forward into this layer.
+No auth, no multi-tenant serving (single tenant per app instance, resolved
+at startup), no background job queue (factory runs are CLI-invoked; the
+queue arrives with multi-tenancy). Later phases per platform-design.md §9.

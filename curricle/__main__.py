@@ -270,10 +270,6 @@ def _factory(args) -> int:
 
     runner = Runner(engine, scope, config)
     report = factory.build_phase(runner, manifest, prof, content_root, spec)
-    factory.write_build_manifest(
-        report, args.phase,
-        next((m.path for m in manifest.materials
-              if m.kind == "question-bank"), None))
     print(f"draft written to {report.draft_dir}")
     for a in report.artifacts:
         print(f"  {a.role:16s} -> {a.rel_path or a.note}")

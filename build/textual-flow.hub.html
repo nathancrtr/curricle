@@ -95,12 +95,19 @@
 </div>
 <script>
 const KEY = "tf-progress";
+const API = null;          // null: localStorage mode; else: POST events here
+const INITIAL = null;  // server-folded state, or null
 const PHASES = [{"name": "Phase 0 — Orientation", "goal": "Know what you're building and why; get the existing tooling running; start Greek.", "units": [["p0-run", "open-cbgm built & run on 3 John, every output eyeballed", []], ["p0-read", "W&G front matter + fast skim; README + REVIEW read", []], ["p0-para", "Milestone paragraph: in, out, where the humans sit", ["quiz"]]]}, {"name": "Phase 1 — The CBGM from the inside", "goal": "Understand the method by reimplementing its core, cross-validated against open-cbgm at every step. By the end you have a working mini-CBGM in Python and there is nothing mystical left in the acronym.", "units": [["u1", "Unit 1 · Witnesses, variants, and the shape of the data", ["lesson", "tests"]], ["u2", "Unit 2 · Pregenealogical coherence", ["lesson", "widget", "tests"]], ["u3", "Unit 3 · Local stemmata and genealogical coherence", ["lesson"]], ["u4", "Unit 4 · Textual flow, connectivity, and the initial text", ["lesson", "widget", "quiz"]]]}, {"name": "Phase 2 — The critics and the dispute", "goal": "Master the methodological debate your program adjudicates, and reproduce its central artifact. This phase is reading-heavier than the others — the write-ups in Phases 4–6 draw their related-work sections directly from it.", "units": [["u5", "Unit 5 · The case for and against", []], ["u6", "Unit 6 · Carlson's bias argument, reproduced", ["lesson"]], ["u7", "Unit 7 · Stemmatology beyond the NT", []], ["p2-mail", "📮 Contact milestone: INTF + McCollum emails sent", []]]}, {"name": "Phase 3 — Building the simulator", "goal": "A synthetic-tradition pipeline, end-to-end into open-cbgm: generate a tradition with known history → export TEI → run the CBGM on it → score the answers against truth. This is capstone infrastructure; build it like production code.", "units": [["u8", "Unit 8 · Transmission as a generative process", ["lesson", "widget", "tests"]], ["u9", "Unit 9 · Mutation, readings, and the oracle editor", []], ["u10", "Unit 10 · TEI export and the validation loop", []], ["u11", "Unit 11 · Contamination", []]]}, {"name": "Phase 4 — The simulation study", "goal": "Run the experiments, measure the Carlson effect honestly, compare rival methods on identical synthetic data, and publish deliverable #1.", "units": [["u12", "Unit 12 · The Carlson experiment at scale", []], ["u13", "Unit 13 · Rivals on the same ground truth", []], ["u14", "Unit 14 · Write-up #1", []]]}, {"name": "Phase 5 — The sensitivity study", "goal": "Turn the perturbation machinery on the <i>real</i> ECM 3 John (and whatever the INTF licensing conversation opened up), and publish deliverable #2: how robust is a published critical text to its editors?", "units": [["u15", "Unit 15 · The perturbation harness", []], ["u16", "Unit 16 · Wobble metrics and the headline table", []], ["u17", "Unit 17 · Scale and scope (conditional)", []], ["u18", "Unit 18 · Write-up #2", []]]}, {"name": "Phase 6 — The philology apprenticeship → the LLM study", "goal": "Become competent enough at transcriptional reasoning to evaluate an LLM doing it; then run the local-stemma experiment — deliverable #3 and the capstone.", "units": [["u19", "Unit 19 · Transcriptional probability, by hand", ["lesson"]], ["u20", "Unit 20 · The task, the data, the traps", []], ["u21", "Unit 21 · The experiment", []], ["u22", "Unit 22 · Write-up #3 and the capstone close-out", []]]}];
 const TRACKS = [{"id": "greek", "stages": [["g-alpha", "alphabet"], ["g-nouns", "nouns & articles"], ["g-verbs", "verbs arrive"], ["g-1john", "reading 1 John"], ["g-app", "apparatus literate"], ["g-mark", "Mark with helps"]]}];
 
-let saved = {};
-try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
+let saved = INITIAL || {};
+if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
+function put(id, v) {
+  saved[id] = v;
+  if (API) fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "mark", subject_id: id, payload: { done: v } }) }).catch(() => {});
+  else try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+}
 
 const allUnits = PHASES.flatMap(p => p.units.map(u => u[0]));
 function refresh() {
@@ -127,7 +134,7 @@ for (const p of PHASES) {
     row.className = "unit" + (saved[id] ? " done" : "");
     const cb = document.createElement("input");
     cb.type = "checkbox"; cb.id = id; cb.checked = !!saved[id];
-    cb.onchange = () => { saved[id] = cb.checked; persist(); row.classList.toggle("done", cb.checked); refresh(); };
+    cb.onchange = () => { put(id, cb.checked); row.classList.toggle("done", cb.checked); refresh(); };
     const lb = document.createElement("label");
     lb.htmlFor = id; lb.textContent = label;
     row.appendChild(cb); row.appendChild(lb);
@@ -148,7 +155,7 @@ for (const track of TRACKS) {
     const b = document.createElement("span");
     b.className = "step" + (saved[id] ? " done" : "");
     b.textContent = label;
-    b.onclick = () => { saved[id] = !saved[id]; persist(); b.classList.toggle("done", saved[id]); };
+    b.onclick = () => { put(id, !saved[id]); b.classList.toggle("done", saved[id]); };
     el.appendChild(b);
   });
 }

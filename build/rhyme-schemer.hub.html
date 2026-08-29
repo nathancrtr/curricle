@@ -86,12 +86,19 @@
 </div>
 <script>
 const KEY = "rhyme-schemer-progress";
+const API = null;          // null: localStorage mode; else: POST events here
+const INITIAL = null;  // server-folded state, or null
 const PHASES = [{"name": "Phase 0 — Orientation", "goal": "Know what you're building and why, and get the foundation running.", "units": [["u0", "Unit 0 · Orientation", []]]}, {"name": "Phase 1 — The phonetic foundation already in the repo", "goal": "Master the concepts the existing modules encode, by reading and extending them. By the end you understand every line of <code>phonetics.py</code>, <code>models.py</code>, <code>syllabify.py</code>, and <code>features.py</code>, and you've made each one yours by extending it.", "units": [["u1", "Unit 1 · Phonemes, ARPAbet & the lexicon", ["lesson"]], ["u2", "Unit 2 · The IPA vowel space & articulatory features (vowels)", ["lesson", "widget"]], ["u3", "Unit 3 · Consonants: place, manner, voicing, sonority", ["lesson", "widget"]], ["u4", "Unit 4 · Syllables & phonotactics: the Maximal Onset Principle", ["lesson", "widget", "quiz"]]]}, {"name": "Phase 2 — The rhyme kernel", "goal": "Build <code>rhyme_score(a, b) -&gt; float</code>, the piece the README calls \"next up.\" Start from the perceptual definition of rhyme, ship the perfect-rhyme special case first, then loosen to graded slant rhyme, then handle unequal lengths with sequence alignment.", "units": [["u5", "Unit 5 · The vowel skeleton & the rhyme-bearing tail", ["lesson", "tests"]], ["u6", "Unit 6 · Perfect rhyme first", ["lesson"]], ["u7", "Unit 7 · Graded slant rhyme & weighting", ["lesson", "widget"]], ["u8", "Unit 8 · Unequal lengths: sequence alignment", ["lesson", "widget", "tests", "quiz"]]]}, {"name": "Phase 3 — From pair-scores to a rhyme scheme", "goal": "Move from \"do these two rhyme?\" to \"find and group all the rhymes in a verse.\"", "units": [["u9", "Unit 9 · Multi-word spans & pronunciation variants", ["lesson", "widget"]], ["u10", "Unit 10 · Grouping rhymes: similarity graphs & components", ["lesson", "widget", "tests"]], ["u11", "Unit 11 · Internal & multisyllabic rhyme: scanning a verse", ["lesson", "quiz"]]]}, {"name": "Phase 4 — Visualization, OOV/G2P, and evaluation", "goal": "Make it visible, make it robust to unknown words, and find out whether it's any good.", "units": [["u12", "Unit 12 · Visualizing the scheme", ["lesson"]], ["u13", "Unit 13 · Out-of-vocabulary words & grapheme-to-phoneme", ["lesson", "tests"]], ["u14", "Unit 14 · Evaluation: is it any good?", ["widget", "quiz"]]]}, {"name": "Phase 5 — Capstone & frontiers", "goal": "", "units": [["u15", "Unit 15 · Capstone: the finished tool + the written understanding", []]]}];
 const TRACKS = [];
 
-let saved = {};
-try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
-function persist() { try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} }
+let saved = INITIAL || {};
+if (!API) { try { saved = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {} }
+function put(id, v) {
+  saved[id] = v;
+  if (API) fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "mark", subject_id: id, payload: { done: v } }) }).catch(() => {});
+  else try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+}
 
 const allUnits = PHASES.flatMap(p => p.units.map(u => u[0]));
 function refresh() {
@@ -118,7 +125,7 @@ for (const p of PHASES) {
     row.className = "unit" + (saved[id] ? " done" : "");
     const cb = document.createElement("input");
     cb.type = "checkbox"; cb.id = id; cb.checked = !!saved[id];
-    cb.onchange = () => { saved[id] = cb.checked; persist(); row.classList.toggle("done", cb.checked); refresh(); };
+    cb.onchange = () => { put(id, cb.checked); row.classList.toggle("done", cb.checked); refresh(); };
     const lb = document.createElement("label");
     lb.htmlFor = id; lb.textContent = label;
     row.appendChild(cb); row.appendChild(lb);
@@ -139,7 +146,7 @@ for (const track of TRACKS) {
     const b = document.createElement("span");
     b.className = "step" + (saved[id] ? " done" : "");
     b.textContent = label;
-    b.onclick = () => { saved[id] = !saved[id]; persist(); b.classList.toggle("done", saved[id]); };
+    b.onclick = () => { put(id, !saved[id]); b.classList.toggle("done", saved[id]); };
     el.appendChild(b);
   });
 }

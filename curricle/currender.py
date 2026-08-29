@@ -203,6 +203,7 @@ function render() {
           <div class="actions">
             <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
+            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
             ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `
@@ -341,7 +342,8 @@ def _weeks_label(weeks: tuple[int, int | None] | None) -> str:
 
 
 def render_curriculum(mf: Manifest, *, api: str | None = None,
-                      initial: dict | None = None) -> str:
+                      initial: dict | None = None,
+                      unit_pages: bool = False) -> str:
     c = mf.course
     e = html.escape
     units_by_id = {u.id: u for u in mf.units}
@@ -369,6 +371,10 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                                "ans": inline_html(u.check.ans)} if u.check else None),
                     "steps": ([[s.id, s.label] for s in u.steps] or None
                               if u.steps else None),
+                    # SPIKE (one-stop-shop): units link to their served page.
+                    # Only the app has unit pages — the standalone render
+                    # carries no href key and the template renders nothing.
+                    **({"href": f"unit/{u.id}.html"} if unit_pages else {}),
                 })
             else:
                 m = milestones_by_id[entry_id]

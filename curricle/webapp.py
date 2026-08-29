@@ -31,6 +31,8 @@ from dataclasses import dataclass
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
+import posixpath
+
 from . import db, profile, progress, theme
 from .compiler import compile_course
 from .currender import render_curriculum
@@ -39,6 +41,7 @@ from .profilerender import render_profile_page
 from .resrender import render_resources
 from .schema import Manifest
 from .sidecar import load_sidecar
+from .unitrender import render_reader, render_unit
 
 
 @dataclass(frozen=True)
@@ -153,6 +156,32 @@ def _entry_labels(manifest: Manifest) -> dict[str, str]:
     for m in manifest.milestones:
         labels[m.id] = theme.strip_leading_pictograph(m.label)
     return labels
+
+
+# The whole client contract for a native material, served as one file. A
+# material links it and calls `curricle.checkpoint("<its material id>",
+# {score, total, misses})` once, when the learner finishes; the server
+# validates the id against the manifest and the payload against the event
+# rules, so a typo here is a 422, not silent data. The base URL is derived
+# from the page's own path — materials never hard-code where they are
+# mounted. Kept `%`-free and f-string-free on principle (see theme.py's
+# formatting hazard note).
+MATERIAL_JS = """\
+(() => {
+  const m = location.pathname.match(/^(.*\\/c\\/[^/]+\\/)/);
+  const base = m ? m[1] : "./";
+  function post(kind, subject_id, payload) {
+    return fetch(base + "api/events", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, subject_id, payload }),
+    });
+  }
+  window.curricle = {
+    post,
+    checkpoint: (id, result) => post("checkpoint_result", id, result),
+  };
+})();
+"""
 
 
 def create_app(course_roots: list[str], tenant_slug: str,
@@ -300,7 +329,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
         h = handle(slug)
         st = _state(h)
         return render_curriculum(
-            h.manifest, api="api/events",
+            h.manifest, api="api/events", unit_pages=True,
             initial={"progress": st["progress"], "notes": st["curriculum_notes"]})
 
     @app.get("/c/{slug}/learning-resources.html", response_class=HTMLResponse)
@@ -308,6 +337,53 @@ def create_app(course_roots: list[str], tenant_slug: str,
         h = handle(slug)
         return render_resources(h.manifest, api="api/events",
                                 initial=_state(h)["resources"])
+
+    # SPIKE (one-stop-shop): the shared assets a native material links —
+    # the theme as a stylesheet, and the one line of reporting machinery.
+    # Serving them beside the content is the decision that materials are
+    # served-app citizens, not standalone files (DIRECTION: server-required
+    # is accepted; the static export bundles these alongside).
+    @app.get("/c/{slug}/theme.css")
+    def theme_css(slug: str) -> Response:
+        handle(slug)
+        return Response(theme.style(""),
+                        media_type="text/css; charset=utf-8")
+
+    @app.get("/c/{slug}/material.js")
+    def material_js(slug: str) -> Response:
+        handle(slug)
+        return Response(MATERIAL_JS,
+                        media_type="text/javascript; charset=utf-8")
+
+    @app.get("/c/{slug}/unit/{unit_id}.html", response_class=HTMLResponse)
+    def unit_page(slug: str, unit_id: str) -> str:
+        h = handle(slug)
+        if not any(u.id == unit_id for u in h.manifest.units):
+            raise HTTPException(404)
+        return render_unit(h.manifest, unit_id, api="../api/events",
+                           initial=_state(h)["progress"])
+
+    # A markdown material, rendered inside the theme instead of arriving as
+    # text/plain. The raw file stays reachable at its own path — this route
+    # is a view of it, not a replacement.
+    @app.get("/c/{slug}/read/{path:path}", response_class=HTMLResponse)
+    def read_doc(slug: str, path: str) -> str:
+        h = handle(slug)
+        target = os.path.realpath(os.path.join(h.content_root, path))
+        if not target.startswith(os.path.realpath(h.content_root) + os.sep):
+            raise HTTPException(404)
+        if not target.endswith(".md") or not os.path.isfile(target):
+            raise HTTPException(404)
+        material = next(
+            (m for m in h.manifest.materials
+             if m.path == path
+             or (m.kind == "exercise"
+                 and posixpath.join(m.path, "task.md") == path)), None)
+        title = material.title if material else posixpath.basename(path)
+        with open(target, encoding="utf-8") as f:
+            text = f.read()
+        return render_reader(h.manifest, text, doc_title=title,
+                             material=material)
 
     @app.post("/c/{slug}/api/events")
     async def post_event(slug: str, request: Request) -> JSONResponse:

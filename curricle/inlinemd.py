@@ -14,7 +14,7 @@ import re
 
 CODE_RE = re.compile(r"`([^`]+)`")
 LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)\s]+)\)")
-BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 ITALIC_RE = re.compile(r"\*([^*]+)\*")
 
 

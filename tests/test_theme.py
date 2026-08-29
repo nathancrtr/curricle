@@ -125,6 +125,8 @@ SHEETS = [
     # spends tokens like any other surface, so its sheet is guarded like any
     # other sheet.
     Sheet("curricle.webapp", "INDEX_STYLE", ".wordmark", themed=True),
+    # SPIKE (one-stop-shop): the unit page and the markdown reader.
+    Sheet("curricle.unitrender", "STYLE", ".doc blockquote", themed=True),
 ]
 
 SHARED_PREFIX = theme.TOKENS_CSS + theme.BASE_CSS
@@ -206,6 +208,9 @@ FAINT_DECORATIVE_USES = {
     ("curricle.currender", ".step-row.done label", "text-decoration-color"),
     ("curricle.hubrender", ".unit.done label", "text-decoration-color"),
     ("curricle.resrender", ".dot", "border"),                # same ring: unread
+    # The unit page reuses the curriculum's done-step strikethrough, mark
+    # for mark: the line through finished copy, never the copy itself.
+    ("curricle.unitrender", ".step-row.done label", "text-decoration-color"),
 }
 
 

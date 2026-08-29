@@ -319,6 +319,48 @@ skips).
    structural logic, and companion already carries position via the waypath
    and numbered badges.
 
+## The material contract (materials go native)
+
+Decided during the one-stop-shop spike and applied in the productionization
+pass; the factory's material roles inherit it for everything generated next.
+
+A served material — widget, quiz, trainer — is a curricle surface, not a
+guest. The contract is three visible lines, never injected machinery:
+
+1. **`<link rel="stylesheet" href="../../theme.css">`** (path-relative to
+   the course root) and **no local chrome palette**: the material's own
+   `<style>` holds layout and mechanics only, spelled in theme tokens. Both
+   themes arrive free; a material defining its own `--bg` is the same bug
+   hubrender's `:root` was in Phase 4.
+2. **The eyebrow crumb** replaces any bespoke nav or toolbar: back to the
+   course hub, then the nearest home (its unit page, or the curriculum).
+   Course-local theme toggles go too — one platform, one theming rule
+   (system preference, `data-theme` to pin); rhyme-schemer's toolbar toggle
+   was the case that decided this.
+3. **One report, at the one completion moment**, for anything that *has*
+   one: `<script src="../../material.js">` and a single
+   `curricle.checkpoint("<material id>", {score, total, misses})` when the
+   last question locks. The id is written in the file, visibly; the server
+   validates it against the manifest, so a typo is a 422, not silent loss.
+   **Endless drills do not report** — a streak trainer has no result, only
+   a running feedback loop, and a ledger row per drill round would flood
+   the profile's proposal queue with noise the learner must then triage.
+   (greek-alphabet-trainer is the canonical non-reporter.)
+
+**Data ink stays local.** A material's content colors — reading tints, a
+vowel-space's category hues — are what the material is *about*, not chrome.
+They live in the material as its own token pairs (light + dark blocks,
+same shape as theme.py's), and legacy names the drawing code references
+(`--warn`, `--accent-ink`) are aliased onto theme tokens rather than
+renamed, keeping migrations stylesheet-sized. The theme deliberately does
+not grow tokens for one widget's data.
+
+Materials are **server-required** by decision: they may assume theme.css
+and material.js exist beside the course. Opened as bare files they still
+function (the shim guard is `window.curricle &&`), they just render
+unthemed and tell no one. The static export, when it arrives, bundles both
+files rather than reopening this.
+
 ## Left undone / notes
 
 - **Narrow screenshots** (design-branch artifacts; they were review evidence

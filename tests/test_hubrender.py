@@ -19,7 +19,7 @@ import unittest
 from curricle import hubrender
 from curricle.compiler import compile_course
 from curricle.hubrender import render_hub
-from curricle.schema import Stage, Step, Track
+from curricle.schema import Resource, ResourceTier, Stage, Step, Track
 from curricle.sidecar import (
     Sidecar, SidecarCourse, SidecarMaterial, SidecarMilestone, SidecarUnit,
 )
@@ -88,6 +88,15 @@ def make_manifest():
         materials=(SidecarMaterial(id="q-p0", kind="quiz", title="Phase 0 quiz",
                                    path="interactive/quizzes/p0.html",
                                    phase_num=0),),
+        # A one-entry shelf, so that this course has one at all: the hub
+        # offers its resources pill only to a course whose manifest carries
+        # resources, because that page is otherwise an empty room (#14).
+        # The empty branch is tests/test_honesty.py's subject; here the
+        # pill's business is the server/standalone fork below.
+        resources=(Resource(key="r1", title="A book",
+                            url="https://example.org/book", tier=1),),
+        resource_tiers=(ResourceTier(num=1, name="The core path",
+                                     role="Read substantially."),),
     )
     mf, issues = compile_course(root, sidecar)
     assert mf is not None, [str(i) for i in issues]

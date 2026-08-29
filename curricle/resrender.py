@@ -12,16 +12,22 @@ function of the manifest's resources + resource_tiers.
 Design: the *companion* system (see theme.py). The core-path meter is the
 waypath over tier 1; free/paid chips keep their text labels — the green and
 warm tints are reinforcement, the words carry the meaning.
+
+A course whose manifest carries no resource entries gets a different page
+entirely (see `_no_shelf`), because the shelf's furniture all lies when it is
+empty: a "0 tiers" crumb, a meter over nothing, and a filter-empty notice
+blaming a filter nobody touched.
 """
 
 from __future__ import annotations
 
 import html
 import json
+import posixpath
 
 from . import theme
 from .inlinemd import inline_html
-from .schema import Manifest, Resource
+from .schema import Course, Manifest, Resource
 
 STYLE = theme.style("""\
   .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
@@ -101,6 +107,11 @@ STYLE = theme.style("""\
   .empty { display:none; padding:44px 0; text-align:center;
            font-size:17px; color:var(--muted); }
   .empty.show { display:block; }
+  .no-shelf { margin:34px 0 0; padding:24px 26px; font-size:15.5px;
+              line-height:1.65; max-width:64ch; }
+  .no-shelf p { margin:0 0 12px; }
+  .no-shelf p:last-child { margin-bottom:0; }
+  .no-shelf b { font-family:""" + theme.FONT_DISPLAY + """; }
 """)
 
 SCRIPT = theme.WAYPATH_JS + """\
@@ -252,10 +263,85 @@ def _chips(r: Resource) -> list[list[str]]:
     return chips
 
 
+def _shell(c: Course, body: str, tail: str = "") -> str:
+    """The page frame both renders share, and whatever trails the wrap."""
+    e = html.escape
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{e(c.title)} — the resources</title>
+<style>
+{STYLE}</style>
+</head>
+<body>
+<div class="wrap">
+{body}</div>
+{tail}</body>
+</html>
+"""
+
+
+def _no_shelf(mf: Manifest, api: str | None) -> str:
+    """The page for a course whose manifest carries no resources.
+
+    Every piece of the shelf's furniture states something false when there is
+    nothing on it: the crumb counts "0 tiers", the meter reads "core path: 0
+    of 0 in hand" over a waypath with no stones, and the filter-empty notice
+    blames a filter the reader never touched. So none of it renders. There is
+    no waypath either — the gesture means "where you are on a path", and a
+    course with no shelf has no path here to be anywhere on (DIRECTION.md).
+
+    The hub stops offering the pill in the same commit; this page is what a
+    bookmark or a typed URL still reaches, and it tells the truth instead.
+    """
+    c = mf.course
+    # The written shelf is worth pointing at when the course keeps one, but
+    # only where the link resolves: served, content comes from the curriculum
+    # doc's directory and anything above it 404s (the same rule hubrender
+    # applies to the documents panel).
+    doc_para = ""
+    if c.docs.resources_doc:
+        root = posixpath.dirname(c.docs.curriculum_doc or "learning/curriculum.md")
+        href = posixpath.relpath(c.docs.resources_doc, root)
+        if not (api and href.startswith("../")):
+            doc_para = (
+                "\n      <p>The course repo does keep a written shelf — "
+                f'<a href="{html.escape(href)}">{html.escape(href)}</a> — '
+                "it simply has not been brought into curricle yet.</p>")
+    body = f"""
+  <header class="masthead">
+    <p class="eyebrow"><a href="index.html">← course hub</a>
+    <span class="sep">·</span> the resources</p>
+    <h1>Your resources</h1>
+  </header>
+
+  <main>
+    <div class="no-shelf panel">
+      <p><b>No shelf yet.</b> This course's manifest names no resources, so
+      there is nothing here to tier, nothing to mark in hand, and nothing to
+      keep track of. When the course names what it reads, the shelf arrives
+      here — tiered by role, with a core path to work through.</p>{doc_para}
+    </div>
+  </main>
+
+  <footer>
+    Rendered by curricle from the course manifest ·
+    <a href="curriculum.html">the curriculum</a> ·
+    <a href="index.html">← back to the hub</a>
+  </footer>
+"""
+    return _shell(c, body)
+
+
 def render_resources(mf: Manifest, *, api: str | None = None,
                      initial: dict | None = None) -> str:
     c = mf.course
     e = html.escape
+
+    if not mf.resources:
+        return _no_shelf(mf, api)
 
     tiers_js = []
     for tier in sorted(mf.resource_tiers, key=lambda t: t.num):
@@ -298,24 +384,20 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     verified_line = (f'<span class="sep">·</span> every url verified {e(verified)}'
                      if verified else "")
 
+    # Where the marks actually go. Served, they are rows in the tenant's
+    # ledger and survive a cleared browser; standalone, localStorage really
+    # is the whole of it. Saying "localStorage" on a served page tells the
+    # learner their record is as durable as a cache.
+    kept = ("are kept for you on the server" if api
+            else "live in this browser's localStorage")
+
     script = SCRIPT % {
         "key": json.dumps(c.resources_storage_key),
         "api": json.dumps(api),
         "initial": json.dumps(initial, ensure_ascii=False),
         "tiers": json.dumps(tiers_js, ensure_ascii=False),
     }
-    return f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{e(c.title)} — the resources</title>
-<style>
-{STYLE}</style>
-</head>
-<body>
-<div class="wrap">
-
+    body = f"""
   <header class="masthead">
     <p class="eyebrow"><a href="index.html">← course hub</a>
     <span class="sep">·</span> the resources
@@ -341,14 +423,12 @@ def render_resources(mf: Manifest, *, api: str | None = None,
   <footer>
     Rendered by curricle from the course manifest — canonical text:
     <a href="learning-resources.md">learning-resources.md</a>. In-hand marks and notes
-    live in this browser's localStorage ·
+    {kept} ·
     <a href="curriculum.html">the curriculum</a> ·
     <a href="index.html">← back to the hub</a>
   </footer>
-</div>
-<div class="saving" id="toast">Saved</div>
+"""
+    return _shell(c, body, tail=f"""<div class="saving" id="toast">Saved</div>
 <script>
 {script}</script>
-</body>
-</html>
-"""
+""")

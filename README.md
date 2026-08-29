@@ -62,11 +62,17 @@ python -m curricle factory promote ~/repos/learning/ml-ai --phase 2
   path to scoped rows, purge/export derived from the classification.
 - `curricle/progress.py` — the event ledger's pure fold and append-time
   validation against the manifest.
+- `curricle/theme.py` — the design system: one set of tokens (light and dark),
+  the shared stylesheet, and the waypath. The page renderers compose
+  `theme.style(own_css)` rather than carrying palettes of their own; the
+  rationale and the computed contrast table are in
+  [`DIRECTION.md`](DIRECTION.md).
 - `curricle/webapp.py` — FastAPI app serving the three views in server mode
   (state folded from Postgres, writes POSTed as events).
 - `migrations/` — Alembic; the schema changes by migration only.
-- `build/` — compiled manifests, committed for inspection. Sidecars live in
-  the course repos (`<course>/learning/course.yaml`).
+- `build/` — compiled manifests and rendered pages, committed for inspection
+  and regenerated in the same commit as any change upstream of them. Sidecars
+  live in the course repos (`<course>/learning/course.yaml`).
 
 ## Invariants (enforced, not aspirational)
 

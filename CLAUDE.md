@@ -11,7 +11,7 @@ unless the user reopens them.
 ```bash
 source .venv/bin/activate
 python -m unittest discover tests                    # full suite (fast)
-python -m curricle compile <course_root> --sidecar courses/<id>.course.yaml --out build/<id>.manifest.yaml
+python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # sidecar: <root>/learning/course.yaml
 ```
 
 ## Conventions
@@ -96,6 +96,36 @@ python -m curricle compile <course_root> --sidecar courses/<id>.course.yaml --ou
   `local/anthropic-key`. Never commit, print, or read the key's value.
 - Two curriculum dialects exist: `bullets` (textual-flow, rhyme-schemer)
   and `headings` (ml-ai) — sidecar `dialect:` field selects.
+
+## The design system (Phase 4)
+
+- `curricle/theme.py` is the single source of design tokens, base CSS,
+  `WAYPATH_JS` and the milestone glyph. Renderers compose
+  `theme.style(own_css)` and define no palette of their own — `hubrender.py`
+  carried its own `:root` into Phase 4, and composing it without deleting
+  that block would have overridden the whole system with pre-sprint values.
+  Every stylesheet is guarded: a new module spending tokens joins `SHEETS`
+  in `tests/test_theme.py` or the suite fails.
+- The waypath goes only where something is genuinely tracked. The profile
+  page has no waypath because it tracks nothing; a gesture meaning "where you
+  are on a path" is a lie on a page with no path.
+- Evidence tiers and semantic chips carry their meaning in words — the tier
+  or label is always printed. Color is reinforcement, never the message.
+- `--faint` is decorative only: it computes 4.27 on light `--panel`, under
+  the 4.5 text floor. Placeholder and every other line of copy takes
+  `--muted`. `tests/test_theme.py` allowlists `--faint` per (stylesheet,
+  selector, property); adding an entry means confirming the use is a mark.
+- `theme.WAYPATH_JS` stays `%`-free and `BASE_CSS` is never `%`-formatted:
+  three renderers concatenate the former into a `SCRIPT % {...}` template,
+  and the latter is full of literal percents. This has taken a page down once.
+- The contrast table in `DIRECTION.md` is the record; `CONTRAST_PAIRS` in
+  `tests/test_theme.py` recomputes it from `theme.py` and asserts each floor.
+  Changing a token means recomputing both.
+- `build/*.html` are committed artifacts like the manifests: regenerate them
+  in the same commit as any renderer change. The committed HTML sat stale
+  from Phase 1 until #9 caught it.
+- `DIRECTION.md` at the repo root is the design rationale — the gesture, the
+  judgment calls, the contrast provenance, what was rejected and why.
 
 ## What this repo is not (yet)
 

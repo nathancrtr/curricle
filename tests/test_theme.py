@@ -1,18 +1,26 @@
 """The design system's invariants — the ones no renderer can check for us.
 
-`theme.py` is data: two palettes and a pile of CSS. Nothing imports it yet,
-so a mistake in it is invisible — a token deleted from one palette only, a
-`var(--x)` with no `--x` behind it, a color pair that quietly falls under its
-floor. Each of those breaks a page months later, in one theme, in a PR that
-did not touch this file. So the contract is asserted here directly.
+`theme.py` is data: two palettes and a pile of CSS. A mistake in it is
+invisible — a token deleted from one palette only, a `var(--x)` with no `--x`
+behind it, a color pair that quietly falls under its floor. Each of those
+breaks a page months later, in one theme, in a PR that did not touch this
+file. So the contract is asserted here directly.
+
+The same mistakes are just as invisible in the *renderers*, which is why the
+token and --faint guards below run over every stylesheet on the site (see
+SHEETS), not only the shared base. Hand-verifying a renderer's slice at
+review time is exactly the labor these guards exist to retire.
 
 The contrast math is *computed*, not transcribed from DIRECTION.md: the
 document's table is the claim, this is the check. The helper is validated
 against two known WCAG values before it is trusted with the palette.
 """
 
+import importlib
+import pathlib
 import re
 import unittest
+from typing import NamedTuple
 
 from curricle import theme
 
@@ -76,11 +84,126 @@ CONTRAST_PAIRS = [
     ("--faint", "--bg", 3.0),
 ]
 
-# Selectors in BASE_CSS allowed to reach for --faint. It computes 4.27 on
-# light --panel, under the 4.5 text floor, so it may color decoration and
-# nothing a learner has to read. Adding to this list is a deliberate act:
-# check the use is a mark, not copy. (Placeholder text is copy.)
-FAINT_DECORATIVE_SELECTORS = {".eyebrow .sep"}
+# --------------------------------------------------------------------------
+# Every stylesheet on the site, not only the shared one
+# --------------------------------------------------------------------------
+
+# Each renderer appends its own slice of CSS to the shared sheet, and that
+# slice is where the novel token references and the novel color pairings
+# actually live — currender's alone spends tokens forty times over. Guarding
+# BASE_CSS only left the larger half of the site to be verified by hand at
+# review time, so the sheets are registered here and every guard below runs
+# over all of them.
+#
+# The CSS is read off the imported modules rather than out of their source
+# text: composition has already happened at import time, so what we inspect
+# is exactly what the browser receives. The one bit of surgery is isolating a
+# module's *own* slice, by removing the shared prefix — and a slice that came
+# out wrong is precisely the failure that would turn these guards into
+# no-ops that still pass. Two things stop that: `themed` records how the
+# sheet is composed and is asserted rather than sniffed, and `sentinel` names
+# a selector that exists only in the module's own CSS, so an extraction that
+# silently returned the wrong text fails loudly.
+
+
+class Sheet(NamedTuple):
+    module: str      # dotted path; imported, and how a failure names the sheet
+    attr: str        # the module-level constant holding the composed sheet
+    sentinel: str    # a selector found only in this module's own slice
+    themed: bool     # composed through theme.style()?
+
+
+SHEETS = [
+    # hubrender is still on its pre-theme stylesheet (its own :root, the old
+    # purple accent, Georgia); the conversion is a separate PR. It is guarded
+    # anyway — it already spends only theme token *names*, so the checks hold
+    # today, and when style() finally wraps it, `themed` flips and the
+    # composition test says so rather than quietly widening the slice.
+    Sheet("curricle.hubrender", "STYLE", "#fill", themed=False),
+    Sheet("curricle.currender", "STYLE", ".gloss-mark", themed=True),
+    Sheet("curricle.resrender", "STYLE", ".why-mark", themed=True),
+    Sheet("curricle.profilerender", "_STYLE", ".pendingbox", themed=True),
+]
+
+SHARED_PREFIX = theme.TOKENS_CSS + theme.BASE_CSS
+
+
+def _own_css(sheet: Sheet) -> str:
+    """The CSS a renderer contributes itself, with the shared sheet removed."""
+    css = getattr(importlib.import_module(sheet.module), sheet.attr)
+    if not sheet.themed:
+        return css
+    head, found, own = css.partition(SHARED_PREFIX)
+    if not found or head:
+        raise AssertionError(
+            f"{sheet.module}.{sheet.attr} no longer begins with "
+            "theme.style()'s tokens+base; the own-CSS slice cannot be "
+            "isolated, so the guards below would check the wrong text")
+    return own
+
+
+def _stylesheets() -> list[tuple[str, str]]:
+    """(label, css) for the shared base and for each renderer's own slice."""
+    return ([("theme.BASE_CSS", theme.BASE_CSS)]
+            + [(s.module, _own_css(s)) for s in SHEETS])
+
+
+_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+
+
+def _rules(css: str) -> list[tuple[str, str]]:
+    """[(selector, declarations)] for every rule, at-rule blocks flattened."""
+    css = _COMMENT.sub("", css)
+    out, i = [], 0
+    while (opened := css.find("{", i)) >= 0:
+        depth, j = 1, opened + 1
+        while depth:
+            if j >= len(css):
+                raise AssertionError(f"unbalanced braces after {css[i:opened]!r}")
+            depth += {"{": 1, "}": -1}.get(css[j], 0)
+            j += 1
+        selector, body = " ".join(css[i:opened].split()), css[opened + 1:j - 1]
+        if "{" in body:                   # @media, @keyframes: recurse inside
+            out.extend(_rules(body))
+        else:
+            out.append((selector, body))
+        i = j
+    return out
+
+
+def _var_refs(css: str) -> list[tuple[str, str]]:
+    """[(selector, token)] for every var() reference, so failures locate."""
+    return [(selector, token)
+            for selector, body in _rules(css)
+            for token in re.findall(r"var\((--[a-z-]+)\)", body)]
+
+
+def _faint_uses(css: str) -> set[tuple[str, str]]:
+    """{(selector, property)} for every declaration painting with --faint."""
+    return {(selector, decl.partition(":")[0].strip())
+            for selector, body in _rules(css)
+            for decl in body.split(";") if "var(--faint)" in decl}
+
+
+def _describe(uses: set[tuple[str, str, str]]) -> str:
+    """Spell a set of --faint uses out for a failure message."""
+    return "; ".join(f"{label}: `{selector}` {{ {prop}:var(--faint) }}"
+                     for label, selector, prop in sorted(uses))
+
+
+# Every (stylesheet, selector, property) allowed to reach for --faint. It
+# computes 4.27 on light --panel, under the 4.5 text floor, so it may color
+# decoration and nothing a learner has to read. The property is part of the
+# entry deliberately: `.step-row.done label` is copy in --muted whose
+# strikethrough is drawn in --faint, and the entry licenses the strikethrough
+# only. Adding a line here is a deliberate act: check the use is a mark, not
+# copy. (Placeholder text is copy — both textareas take --muted.)
+FAINT_DECORATIVE_USES = {
+    ("theme.BASE_CSS", ".eyebrow .sep", "color"),            # the "·" between crumbs
+    ("curricle.currender", ".dot", "border"),                # hollow ring: step to do
+    ("curricle.currender", ".step-row.done label", "text-decoration-color"),
+    ("curricle.resrender", ".dot", "border"),                # same ring: unread
+}
 
 
 class TestPalettes(unittest.TestCase):
@@ -107,20 +230,108 @@ class TestPalettes(unittest.TestCase):
         self.assertEqual(theme.TOKENS_CSS.count(theme.LIGHT_VARS), 1)
 
 
-class TestBaseCss(unittest.TestCase):
+class TestEveryStylesheet(unittest.TestCase):
+    """The two token guards, run over the base sheet and every renderer's."""
+
     def test_every_var_reference_resolves_in_both_palettes(self):
-        referenced = set(re.findall(r"var\((--[a-z-]+)\)", theme.BASE_CSS))
-        self.assertTrue(referenced, "expected BASE_CSS to use tokens")
-        self.assertEqual(sorted(referenced - set(LIGHT)), [])
-        self.assertEqual(sorted(referenced - set(DARK)), [])
+        # An undefined token renders as nothing at all: no error in the
+        # console, no visual test that catches it, just a missing color.
+        for label, css in _stylesheets():
+            refs = _var_refs(css)
+            self.assertTrue(refs, f"expected {label} to use tokens")
+            for selector, token in refs:
+                for name, palette in (("light", LIGHT), ("dark", DARK)):
+                    if token not in palette:
+                        self.fail(f"{label}: `{selector}` references {token}, "
+                                  f"which the {name} palette does not define")
 
     def test_faint_colors_decoration_only(self):
-        # Every rule reaching for --faint, by selector.
-        users = {m.group(1).strip()
-                 for m in re.finditer(r"([^{}]+)\{[^{}]*var\(--faint\)[^{}]*\}",
-                                      theme.BASE_CSS)}
-        self.assertEqual(users, FAINT_DECORATIVE_SELECTORS)
+        found = {(label, selector, prop)
+                 for label, css in _stylesheets()
+                 for selector, prop in _faint_uses(css)}
+        if undeclared := found - FAINT_DECORATIVE_USES:
+            self.fail("--faint (4.27 on light --panel, under the 4.5 text "
+                      "floor) paints something not on the decorative "
+                      "allowlist; copy takes --muted — " + _describe(undeclared))
+        if stale := FAINT_DECORATIVE_USES - found:
+            self.fail("allowlisted --faint uses that no longer exist; trim the "
+                      "list so it stays reviewable — " + _describe(stale))
 
+    def test_each_own_css_slice_is_real(self):
+        # If the extraction ever comes back empty or holding the wrong text,
+        # the guards above pass by checking nothing. The sentinel is the
+        # proof they are reading the module they claim to read.
+        for sheet in SHEETS:
+            with self.subTest(module=sheet.module):
+                own = _own_css(sheet)
+                self.assertTrue(own.strip(), f"{sheet.module}: empty own CSS")
+                if sheet.sentinel in SHARED_PREFIX:
+                    self.fail(f"`{sheet.sentinel}` is in the shared sheet, so "
+                              "it cannot witness this module's own slice — "
+                              "pick another selector")
+                self.assertTrue(
+                    any(sheet.sentinel in selector for selector, _ in _rules(own)),
+                    f"{sheet.module}: `{sheet.sentinel}` missing from the "
+                    "extracted slice — the extraction is wrong, not the CSS")
+                self.assertEqual(
+                    [other for other, css in _stylesheets()
+                     if other != sheet.module and sheet.sentinel in css], [],
+                    f"`{sheet.sentinel}` is not unique to {sheet.module}, so "
+                    "it cannot tell that slice from another's — pick another")
+
+    def test_each_sheet_is_composed_the_way_it_declares(self):
+        # `themed` is asserted, never inferred: a renderer that starts (or
+        # stops) going through theme.style() fails here, where the registry
+        # can be corrected, rather than silently changing what gets guarded.
+        for sheet in SHEETS:
+            with self.subTest(module=sheet.module):
+                css = getattr(importlib.import_module(sheet.module), sheet.attr)
+                if sheet.themed and not css.startswith(SHARED_PREFIX):
+                    self.fail(f"{sheet.module} no longer composes through "
+                              "theme.style(); own-CSS slicing is broken")
+                if not sheet.themed and theme.BASE_CSS in css:
+                    self.fail(f"{sheet.module} now carries the shared sheet: "
+                              "mark it themed=True in SHEETS")
+
+    def test_every_module_with_css_is_registered(self):
+        # A fifth renderer that nobody adds to SHEETS is an unguarded
+        # stylesheet, which is the whole defect this file is closing.
+        package = pathlib.Path(theme.__file__).parent
+        with_css = {f"curricle.{path.stem}" for path in package.glob("*.py")
+                    if "var(--" in path.read_text(encoding="utf-8")}
+        registered = {sheet.module for sheet in SHEETS} | {"curricle.theme"}
+        if unguarded := with_css - registered:
+            self.fail("modules spending theme tokens with no entry in SHEETS, "
+                      "so nothing guards their CSS: " + ", ".join(sorted(unguarded)))
+        if gone := registered - with_css - {"curricle.theme"}:
+            self.fail("SHEETS entries whose module no longer carries CSS: "
+                      + ", ".join(sorted(gone)))
+
+
+class TestRuleParser(unittest.TestCase):
+    """The parser the guards stand on: if it under-reads, they under-check."""
+
+    def test_reads_selectors_declarations_and_nested_at_rules(self):
+        rules = _rules("""
+          /* a comment { with a brace } */
+          .a,
+          .b { color:var(--ink); }
+          @media (max-width:620px) { .c { color:var(--muted); } }
+        """)
+        self.assertEqual(rules, [(".a, .b", " color:var(--ink); "),
+                                 (".c", " color:var(--muted); ")])
+
+    def test_refuses_unbalanced_braces(self):
+        with self.assertRaises(AssertionError):
+            _rules(".a { color:var(--ink);")
+
+    def test_finds_what_the_guards_look_for(self):
+        css = ".x { border:2px solid var(--faint); color:var(--nope); }"
+        self.assertEqual(_var_refs(css), [(".x", "--faint"), (".x", "--nope")])
+        self.assertEqual(_faint_uses(css), {(".x", "border")})
+
+
+class TestBaseCss(unittest.TestCase):
     def test_f_string_braces_all_resolved(self):
         # BASE_CSS is an f-string, so every literal brace is doubled in the
         # source; a stray pair reaching the output means a mangled escape.

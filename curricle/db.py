@@ -388,12 +388,25 @@ def try_worker_lock(conn: sa.Connection) -> bool:
 
 
 def worker_alive(conn: sa.Connection) -> bool:
-    """Is a worker holding the lock right now? The welcome screen's question."""
+    """Is a worker holding the lock right now? The welcome screen's question.
+
+    `pg_locks` is cluster-wide and lists waiters beside holders, so both
+    predicates past the lock's identity are load-bearing: `granted` excludes
+    a session queued behind the lock, and the `database` term excludes a
+    worker serving a *different* database in the same cluster — a staging
+    instance next to production would otherwise report a live worker into a
+    database that has none. NB the test fixture is a single database, so it
+    can prove the `granted` half and not the `database` half; the latter is
+    argued here rather than pinned.
+    """
     classid, objid = WORKER_LOCK
     held = conn.execute(
         sa.text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
                 "AND classid = cast(:classid AS oid) "
-                "AND objid = cast(:objid AS oid)"),
+                "AND objid = cast(:objid AS oid) "
+                "AND granted "
+                "AND database = (SELECT oid FROM pg_database "
+                "                WHERE datname = current_database())"),
         {"classid": classid, "objid": objid},
     ).scalar()
     return bool(held)
@@ -402,11 +415,14 @@ def worker_alive(conn: sa.Connection) -> bool:
 def claim_next_run(conn: sa.Connection) -> sa.Row | None:
     """Take the oldest queued run, marking it running. None when idle.
 
-    `FOR UPDATE SKIP LOCKED` inside the caller's transaction is what makes
-    the claim a claim: a row another session is already holding is passed
-    over rather than waited on, so a second worker (or a stray script) can
-    never hand the same run out twice. The row must stay locked until the
-    caller commits, which is why this takes a connection and not an engine.
+    `FOR UPDATE SKIP LOCKED` is what makes the claim a claim: a row another
+    session is already holding is passed over rather than waited on, so two
+    claimers racing can never be handed the same run. It takes a connection
+    rather than an engine because the select and the update belong to one
+    transaction — the caller commits it immediately, so the claim is a fact
+    before the stage starts rather than something a later rollback could
+    undo (which is how a failing stage would otherwise be re-claimed
+    forever).
     """
     row = conn.execute(
         sa.select(factory_runs.c.id, factory_runs.c.tenant_id,
@@ -424,6 +440,23 @@ def claim_next_run(conn: sa.Connection) -> sa.Row | None:
         .values(status="running", claimed_at=sa.func.now())
     )
     return row
+
+
+def stale_runs(conn: sa.Connection) -> list[sa.Row]:
+    """Every run left `running`, oldest first.
+
+    Meaningful only to a caller that knows no worker is alive — one worker
+    at a time is the whole design, so a `running` row read at startup is the
+    wreckage of a process that died mid-stage, and read at any other moment
+    it is somebody's live claim.
+    """
+    return list(conn.execute(
+        sa.select(factory_runs.c.id, factory_runs.c.tenant_id,
+                  factory_runs.c.course, factory_runs.c.stage,
+                  factory_runs.c.payload)
+        .where(factory_runs.c.status == "running")
+        .order_by(factory_runs.c.id)
+    ).all())
 
 
 def finish_run(conn: sa.Connection, run_id: int, status: str,

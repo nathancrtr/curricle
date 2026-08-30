@@ -11,9 +11,10 @@ handed — the worker has no tenant of its own, so T1 here means the claimed
 row's `tenant_id` and nothing else reaching the stage.
 
 The queue is global by construction (the worker claims across tenants), so
-each fixture retires whatever another module left queued before asserting
-anything about order. That is a property of the table, not a wart in the
-tests: a run left queued anywhere is a run this worker would take.
+each fixture retires whatever another module left queued or running before
+asserting anything about order. That is a property of the table, not a wart
+in the tests: a run left queued anywhere is a run this worker would take,
+and one left running is one its startup sweep would fail.
 """
 
 import contextlib
@@ -53,7 +54,8 @@ class WorkerFixture(unittest.TestCase):
             cls.a = db.create_tenant(conn, f"worker-{cls.__name__}-a")
             cls.b = db.create_tenant(conn, f"worker-{cls.__name__}-b")
             conn.execute(sa.update(db.factory_runs)
-                         .where(db.factory_runs.c.status == "queued")
+                         .where(db.factory_runs.c.status.in_(("queued",
+                                                              "running")))
                          .values(status="done", finished_at=sa.func.now()))
 
     def runs(self, tenant_id: int):
@@ -77,6 +79,16 @@ class WorkerFixture(unittest.TestCase):
         with self.engine.begin() as conn:
             conn.execute(db.for_tenant(tenant_id)
                          .runs_insert(course, stage, payload or {}))
+
+    def strand(self, tenant_id: int, course: str, stage: str) -> None:
+        """A run left `running` — what a worker that died mid-stage leaves."""
+        with self.engine.begin() as conn:
+            conn.execute(db.for_tenant(tenant_id).runs_insert(course, stage, {}))
+            conn.execute(sa.update(db.factory_runs)
+                         .where(db.factory_runs.c.tenant_id == tenant_id,
+                                db.factory_runs.c.course == course,
+                                db.factory_runs.c.status == "queued")
+                         .values(status="running", claimed_at=sa.func.now()))
 
 
 class ClaimTest(WorkerFixture):
@@ -195,6 +207,57 @@ class DispatchTest(WorkerFixture):
         self.assertEqual(kind, "outline_ready")
         self.assertEqual(payload["estimate_usd"], "4.20")
 
+    def test_an_outcome_the_ledger_refuses_fails_the_run_and_frees_the_queue(self):
+        # The poison pill. A handler that returns a payload the ledger won't
+        # accept used to raise out of the claim's own transaction, rolling
+        # the claim back — the run went straight back to `queued` and the
+        # worker spent the rest of its life re-claiming it. Now the claim is
+        # already committed and a refused outcome is the handler's bug: the
+        # run ends failed, the invalid outcome is not recorded, and the queue
+        # moves on.
+        def malformed(engine, scope, run):
+            return "outline_ready", {"plan": "not-a-dict",
+                                     "estimate_usd": "4.20"}
+
+        self.enqueue(self.a, "poison", "outline")
+        self.enqueue(self.a, "after-poison", "noop")
+        handlers = {"outline": malformed, "noop": worker._noop}
+        self.assertTrue(worker.run_once(self.engine, handlers))
+
+        row, = [r for r in self.runs(self.a) if r.course == "poison"]
+        self.assertEqual((row.status, row.reason), ("failed", "worker_error"))
+        # The stage's failure is recorded the way any other failure is; what
+        # is not recorded is the outcome the ledger refused.
+        (kind, payload), = self.ledger(self.a, "poison")
+        self.assertEqual((kind, payload["reason"]),
+                         ("outline_failed", "worker_error"))
+        self.assertIn("plan", payload["detail"])
+
+        # The queue proceeds: the next run is claimed, not the poisoned one.
+        self.assertTrue(worker.run_once(self.engine, handlers))
+        after, = [r for r in self.runs(self.a) if r.course == "after-poison"]
+        self.assertEqual(after.status, "done")
+
+    def test_the_claim_is_committed_before_the_stage_starts(self):
+        # The two-transaction shape, seen from outside: while the handler
+        # works, another session already sees the run as `running`. Under one
+        # transaction it would have seen `queued` (and a stage's minutes of
+        # model calls would have held a row lock the whole time).
+        seen = []
+
+        def look(engine, scope, run):
+            with engine.connect() as other:
+                seen.append(other.execute(
+                    sa.select(db.factory_runs.c.status)
+                    .where(db.factory_runs.c.id == run.id)).scalar())
+            return None
+
+        self.enqueue(self.a, "watched", "noop")
+        self.assertTrue(worker.run_once(self.engine, {"noop": look}))
+        self.assertEqual(seen, ["running"])
+        row, = [r for r in self.runs(self.a) if r.course == "watched"]
+        self.assertEqual(row.status, "done")
+
     def test_a_promoted_course_supersedes_its_queued_runs(self):
         def never(engine, scope, run):
             raise AssertionError("a promoted course has nothing left to buy")
@@ -292,6 +355,50 @@ class SkipLockedTest(WorkerFixture):
                 sa.select(db.factory_runs.c.status)
                 .where(db.factory_runs.c.id.in_([first.id, second.id]))).all()
         self.assertEqual([s.status for s in statuses], ["queued", "queued"])
+
+
+class SweepTest(WorkerFixture):
+    """What the next worker does with a dead one's claims."""
+
+    def test_a_stranded_run_is_failed_at_startup_and_the_queue_proceeds(self):
+        self.strand(self.a, "abandoned", "build")
+        self.enqueue(self.a, "next-up", "noop")
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            self.assertEqual(worker.main(self.engine, once=True), 0)
+        self.assertIn("swept 1 interrupted run(s)", err.getvalue())
+
+        stranded, = [r for r in self.runs(self.a) if r.course == "abandoned"]
+        self.assertEqual((stranded.status, stranded.reason),
+                         ("failed", "interrupted"))
+        self.assertIsNotNone(stranded.finished_at)
+        (kind, payload), = self.ledger(self.a, "abandoned")
+        self.assertEqual((kind, payload["reason"]),
+                         ("build_failed", "interrupted"))
+        # O2: the reason the sweep invents has a sentence like any other.
+        self.assertIn(("build", "interrupted"), onboarding.WORDING)
+        # Failed, never re-run: a crash must not re-spend the learner's money
+        # unasked. Retrying is theirs to ask for.
+        self.assertEqual(
+            [r.status for r in self.runs(self.a) if r.course == "abandoned"],
+            ["failed"])
+        # And the sweep is not the end of the worker: it goes on to claim.
+        nxt, = [r for r in self.runs(self.a) if r.course == "next-up"]
+        self.assertEqual(nxt.status, "done")
+
+    def test_a_stage_with_no_failure_vocabulary_is_swept_on_the_row_alone(self):
+        # `noop` has no `*_failed` kind, so the ledger says nothing about it
+        # rather than saying something it cannot mean.
+        self.strand(self.b, "abandoned-noop", "noop")
+        self.assertEqual(worker.sweep_interrupted(self.engine), 1)
+
+        row, = [r for r in self.runs(self.b) if r.course == "abandoned-noop"]
+        self.assertEqual((row.status, row.reason), ("failed", "interrupted"))
+        self.assertEqual(self.ledger(self.b, "abandoned-noop"), [])
+
+    def test_an_empty_sweep_touches_nothing(self):
+        self.assertEqual(worker.sweep_interrupted(self.engine), 0)
 
 
 if __name__ == "__main__":

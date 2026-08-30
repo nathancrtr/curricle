@@ -2,7 +2,7 @@
 
 This is deliberately a parser for the *house format*, not for markdown in
 general: the conventions it recognizes are exactly the ones stable across
-rhyme-schemer, textual-flow, and ml-ai (see learning/platform-manifest.md §5).
+rhyme-schemer, textual-flow, and ml-ai (see docs/platform-manifest.md §5).
 Anything it does not recognize is preserved-and-ignored, never guessed at —
 the compiler decides which unrecognized content matters.
 

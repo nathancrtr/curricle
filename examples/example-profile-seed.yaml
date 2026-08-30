@@ -1,0 +1,129 @@
+# An example profile seed — a fictional learner, used to demonstrate the
+# Phase 2 pipeline end to end without anybody's real profile in the repo.
+#
+#   python -m curricle tenant create example
+#   python -m curricle profile import-seed examples/example-profile-seed.yaml \
+#       --tenant example
+#   python -m curricle profile render --tenant example \
+#       --out build/example-profile-SKILL.md
+#
+# Everything here arrives as `assert` — the seed is the learner's own
+# document, in their own voice, so it needs no review. Evidence the agent
+# proposes (`propose`) waits on /profile until the learner accepts it.
+#
+# The fields are the vocabulary in `curricle/profile.FIELDS`; the renderer
+# knows the sections, so a field outside that list is refused rather than
+# silently dropped. Keys are forever: re-asserting a (field, key) supersedes
+# the claim, which is how a profile gets edited.
+
+claims:
+
+- field: meta
+  key: description
+  text: >-
+    Learning profile for a backend engineer with a CS degree studying
+    distributed systems and formal methods through hands-on implementation.
+    Use this skill whenever the learner asks Claude to teach, explain, tutor,
+    design exercises, or review learning progress.
+
+- field: background
+  key: swe
+  text: >-
+    **Professional background:** Eight years building backend services —
+    mostly Go and Python over Postgres and Kafka, with real production
+    on-call experience. Has strong operational intuitions (what fails, how it
+    fails, what the graphs look like at 3am) that usually have formal
+    analogues the learner has never been shown. Reach for those: the
+    intuition is already there and only needs a name.
+
+- field: education
+  key: degree
+  text: >-
+    **Formal education:** BS in computer science. Data structures,
+    algorithms, and complexity are solid and need no scaffolding. The theory
+    sequence stopped at automata: no graduate distributed-systems course, no
+    formal-methods exposure, and probability was one service course a decade
+    ago and has faded. Assume the vocabulary of CS but not the machinery of
+    proofs.
+
+- field: tracks
+  key: prior
+  text: >-
+    **Prior self-directed tracks:** Worked through a Raft implementation from
+    the paper, and about half of a database-internals course before it
+    stalled at query planning. Both are fair game as sources of analogies.
+    Don't assume the stalled material stuck — check.
+
+- field: style
+  key: implement
+  text: >-
+    Learns by implementing. Pair every abstract idea with something runnable;
+    "show me the code" is always a fair request.
+
+- field: style
+  key: failure-first
+  text: >-
+    Reaches understanding through failure modes. Explaining what breaks, and
+    what the system does when it breaks, lands harder than explaining what
+    the happy path guarantees.
+
+- field: style
+  key: why-not-how
+  text: >-
+    Wants the motivation before the mechanism — what problem forced this
+    design, and what the obvious simpler thing gets wrong.
+
+- field: domain_bias
+  key: systems
+  text: >-
+    **Domain preferences:** Prefers exercise domains drawn from storage
+    engines, consensus, and stream processing. Not a requirement, but when
+    there is a free choice, these land.
+
+- field: pacing
+  key: hours
+  text: >-
+    **Pacing:** Targets roughly 4 hours per week, usually as two evening
+    sessions. Scope units so that one is a week's work at that rate.
+
+- field: calibration
+  key: procedure
+  text: |-
+    **When explaining a new concept:**
+    1. Open with the failure the concept exists to prevent
+    2. Show it concretely — code, a trace, or a worked interleaving
+    3. Then give the formal statement, and name it properly
+    4. Connect back to something the learner has already operated in production
+
+- field: skip
+  key: engineering
+  text: >-
+    Don't explain what an index is, what a transaction is, how HTTP works,
+    what a queue is, or any language-level feature of Go or Python.
+
+- field: skip
+  key: complexity
+  text: >-
+    Don't explain big-O, common data structures, or basic algorithm analysis
+    — the CS degree covered these and they held.
+
+- field: scaffold
+  key: probability
+  text: >-
+    Probability and statistics: rebuild from the ground up when a tail-latency
+    or failure-rate argument needs it. Assume nothing has stuck.
+
+- field: scaffold
+  key: proofs
+  text: >-
+    Proof technique and formal notation — invariants, induction over
+    executions, temporal logic. Introduce each notation on first use, then use
+    it freely rather than re-explaining.
+
+- field: subject_adapters
+  key: general
+  text: >-
+    This profile is subject-agnostic. Whatever the subject, lead with the
+    failure the idea prevents, bridge from operational intuition to the formal
+    concept, assume strong engineering judgment and weak mathematical
+    machinery, and keep the tone peer-level rather than instructional.

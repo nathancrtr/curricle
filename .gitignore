@@ -2,5 +2,19 @@
 __pycache__/
 *.pyc
 .DS_Store
+
+# Editable-install metadata. Note that `build/` itself is NOT ignored: the
+# compiled manifests and rendered pages there are committed artifacts.
+*.egg-info/
+
+# The personal layer. `local/` holds the profile seed and the API key; the
+# rendered learner profile is a projection of one person's evidence ledger and
+# is never an artifact of this repository (build/example-profile-SKILL.md is
+# the committed illustration instead).
 local/
+build/learner-profile-SKILL.md
+
+# Agent worktrees. Both spellings: Claude Code has used each, and an
+# unignored one stages an entire nested checkout on `git add -A`.
 .claude-worktrees/
+.claude/worktrees/

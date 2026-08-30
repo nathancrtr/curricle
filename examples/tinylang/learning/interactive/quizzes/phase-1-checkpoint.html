@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phase 1 Checkpoint — tinylang</title>
+<link rel="stylesheet" href="../../theme.css">
+<style>
+  /* Native to curricle (see DIRECTION.md, "The material contract"): all chrome
+     from the served theme.css; right and wrong keep their words (the ✓/✗ and
+     the explanation text), with the theme's good/warn pairs as reinforcement
+     rather than as the message. */
+  .wrap { max-width:820px; margin:0 auto; padding:28px 20px 80px; }
+  h1 { font-size:26px; margin:14px 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; font-size:14.5px; }
+  .q { padding:16px 18px; margin-bottom:16px; }
+  .q h3 { margin:0 0 10px; font-size:16px; }
+  .opt { display:block; width:100%; text-align:left; margin:6px 0; padding:9px 13px;
+         border:1.5px solid var(--line); border-radius:12px; background:var(--chip);
+         cursor:pointer; font-size:14px; line-height:1.45; color:var(--ink); }
+  .opt:hover { border-color:var(--accent); }
+  .opt.right { border-color:var(--good); background:var(--good-soft); }
+  .opt.wrong { border-color:var(--warn-text); background:var(--warn-soft); }
+  .why { display:none; margin-top:4px; padding:8px 12px; border-radius:0 10px 10px 0;
+         font-size:13.5px; line-height:1.5; }
+  .why.show { display:block; }
+  .why.right { background:var(--good-soft); border-left:3px solid var(--good); }
+  .why.wrong { background:var(--warn-soft); border-left:3px solid var(--warn-text); }
+  #score { font-size:15px; font-weight:600; color:var(--accent-text); margin-top:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow"><a href="../../index.html">← course hub</a>
+  <span class="sep">·</span> <a href="../../curriculum.html">curriculum</a>
+  <span class="sep">·</span> phase 1 checkpoint</p>
+  <h1>Phase 1 Checkpoint</h1>
+  <p class="sub">Eight questions on lexing and parsing. Every option explains itself when clicked —
+  the explanation is the point, the score is a side effect. First click per question counts.</p>
+  <div id="quiz"></div>
+  <div id="score"></div>
+</div>
+<script src="../../material.js"></script>
+<script>
+const QUESTIONS = [
+  { q: "Why are lexing and parsing two stages rather than one?",
+    opts: [
+      { t: "They answer questions at different scales — what a piece <i>is</i>, versus how pieces <i>relate</i>", ok: true,
+        why: "Right. The lexer works over characters and classifies runs of them; the parser works over tokens and finds structure. Splitting them means the parser never thinks about whitespace and the lexer never thinks about precedence." },
+      { t: "Lexing is fast and parsing is slow, so separating them lets you cache the tokens", ok: false,
+        why: "Performance is not the reason, and almost nobody caches token streams. The split is about keeping two different kinds of decision out of each other's way." },
+      { t: "Because a single grammar cannot describe both characters and structure", ok: false,
+        why: "It can, actually — scannerless parsers exist and work. The split is a design choice that buys clarity, not a formal necessity." },
+      { t: "The lexer validates the program and the parser builds it", ok: false,
+        why: "The lexer validates almost nothing. <code>let let let</code> lexes perfectly happily; it is the parser that objects." },
+    ]},
+
+  { q: "Your lexer turns <code>1+2</code> into a single NUMBER token. What is missing?",
+    opts: [
+      { t: "Lookahead — the number scan never checks whether the next character can extend the number", ok: true,
+        why: "Exactly. A number ends at the first character that cannot extend it, and finding that boundary means peeking at the next character before consuming it." },
+      { t: "A rule that operators must be surrounded by spaces", ok: false,
+        why: "That would be a language design decision, and a hostile one. Every mainstream language lexes <code>1+2</code> as three tokens; the fix belongs in the scanner, not in the syntax." },
+      { t: "The parser should split it later, once it knows the context", ok: false,
+        why: "This is exactly the entanglement the two-stage split exists to prevent. If the parser has to re-scan token text, the lexer has not done its job." },
+      { t: "A separate token kind for expressions", ok: false,
+        why: "Token kinds classify lexemes, not expressions. An expression is a tree the parser builds — it is never a token." },
+    ]},
+
+  { q: "Why must <code>&lt;=</code> be one token rather than two?",
+    opts: [
+      { t: "Maximal munch: at each position the lexer takes the longest match available", ok: true,
+        why: "Right, and it is a rule you have to implement deliberately — check the two-character operators before the one-character ones, or the ordering of your table does it for you." },
+      { t: "Because <code>&lt;</code> and <code>=</code> are different token kinds", ok: false,
+        why: "They would both be OP. The issue is not their kinds but the boundary: two tokens would leave the parser trying to make sense of a comparison followed by an assignment." },
+      { t: "Because the parser reads tokens in pairs", ok: false,
+        why: "It doesn't. A recursive-descent or Pratt parser looks at one token at a time, which is exactly why the lexer must hand it the right ones." },
+      { t: "It doesn't have to be — the parser can recombine them", ok: false,
+        why: "It could be made to, but then the parser needs to know that <code>&lt;</code> immediately followed by <code>=</code> means something else, which is character-level reasoning smuggled into the wrong stage." },
+    ]},
+
+  { q: "A lexer matching keywords as it scans reports <code>lettuce</code> as KEYWORD(let) + IDENT(tuce). What is the fix?",
+    opts: [
+      { t: "Scan the whole identifier first, then ask whether the finished word is in the keyword set", ok: true,
+        why: "Yes — keywords are identifiers that happen to be reserved, so recognise the identifier and reclassify it afterwards. Obvious in hindsight; a very common first-draft bug." },
+      { t: "Sort the keyword list longest-first", ok: false,
+        why: "That fixes <code>lettuce</code> only until someone writes <code>letter</code>. Prefix matching is the wrong shape here, no matter the order." },
+      { t: "Require keywords to be followed by a space", ok: false,
+        why: "It patches this case and breaks <code>print(x)</code>. The rule you want is about word boundaries in general, which is what scanning the whole identifier gives you." },
+      { t: "Move keyword recognition into the parser", ok: false,
+        why: "Workable, and some languages do it — but it means the parser matches on token text rather than kind, which spreads the keyword list across two stages." },
+    ]},
+
+  { q: "What does a grammar give you that hand-written parsing code does not?",
+    opts: [
+      { t: "A specification you can check the code against — and argue about separately from the code", ok: true,
+        why: "Right. The grammar states the language; the parser implements it. Keeping them separate is what lets you notice that your implementation accepts something your specification doesn't." },
+      { t: "Faster parsing", ok: false,
+        why: "Generated parsers are not reliably faster than hand-written recursive descent, and hand-written parsers usually produce better error messages." },
+      { t: "Automatic error recovery", ok: false,
+        why: "Error recovery is a design problem either way. Generators offer hooks, but nothing about writing a grammar decides where to resynchronise." },
+      { t: "Left recursion handling", ok: false,
+        why: "The opposite, in fact: a left-recursive grammar rule is the one thing recursive descent cannot implement directly, which is why the textbook grammar and the implementable one often differ." },
+    ]},
+
+  { q: "In Pratt parsing, what does binding power actually encode?",
+    opts: [
+      { t: "Precedence and associativity together — the second as a deliberate asymmetry between the left and right powers", ok: true,
+        why: "Exactly. Recursing with the same power gives you left associativity; recursing with slightly less gives you right. A one-line difference expresses what a precedence cascade needs a whole function to say." },
+      { t: "How many tokens of lookahead an operator needs", ok: false,
+        why: "Lookahead is a separate question and stays at one token. Binding power is about how tightly an operator holds its operands." },
+      { t: "The order in which operators were declared", ok: false,
+        why: "Declaration order is incidental — you can shuffle the table freely as long as the numbers stay in the right relative order." },
+      { t: "Whether an operator is unary or binary", ok: false,
+        why: "That distinction lives in which parse function the token dispatches to (prefix versus infix), not in the power value itself." },
+    ]},
+
+  { q: "Your parser accepts <code>1 + + 2</code>. Where is the bug most likely to be?",
+    opts: [
+      { t: "In the prefix position: something is treating <code>+</code> as a valid start of an expression", ok: true,
+        why: "Right. After consuming the first <code>+</code> as an infix operator, the parser asks for an expression and gets another <code>+</code> — which should have no prefix handler. If it silently produces something, that is where to look." },
+      { t: "In the lexer, which should have rejected two operators in a row", ok: false,
+        why: "The lexer has no business knowing that. <code>1 + -2</code> is perfectly legal and lexes identically; only the parser can tell these apart." },
+      { t: "In the binding-power table, where <code>+</code> is set too low", ok: false,
+        why: "Binding power controls grouping, not legality. No value in that table makes <code>+ 2</code> a well-formed operand." },
+      { t: "Nowhere — that expression is valid in most languages", ok: false,
+        why: "It is valid where <code>+</code> has a unary meaning, but only because that language <i>defines</i> a prefix <code>+</code>. If tinylang doesn't, accepting it is a bug." },
+    ]},
+
+  { q: "Why print your AST as parenthesised prefix notation — <code>(+ 1 (* 2 3))</code>?",
+    opts: [
+      { t: "It makes grouping visible, so a precedence bug is obvious rather than subtle", ok: true,
+        why: "Yes, and that is worth the twenty minutes it costs. A tree that prints back as the input you typed can hide a wrong shape indefinitely; one that prints its own structure cannot." },
+      { t: "Because it is the format the evaluator consumes", ok: false,
+        why: "The evaluator walks the tree objects directly. The printed form is a debugging convenience and nothing depends on it." },
+      { t: "Because it round-trips — you can parse the output back", ok: false,
+        why: "You could build that, but it is not why the representation earns its place here. Visibility of structure is." },
+      { t: "It is the standard AST serialisation format", ok: false,
+        why: "There isn't one. This convention is borrowed from Lisp because it makes nesting unambiguous on a single line." },
+    ]},
+];
+
+const quiz = document.getElementById("quiz");
+let answered = 0, correct = 0;
+const misses = [];
+// The result reaches the ledger once, when the last question is answered —
+// score, total, and the missed questions' text, because the misses become
+// proposed profile evidence and they matter as much as the number. Opened
+// outside the served app there is no shim and no report; the quiz still
+// works, it just tells no one.
+function report() {
+  if (window.curricle)
+    curricle.checkpoint("quiz-p1",
+      { score: correct, total: QUESTIONS.length, misses });
+}
+QUESTIONS.forEach((item, qi) => {
+  const div = document.createElement("div");
+  div.className = "q panel";
+  div.innerHTML = `<h3>${qi + 1}. ${item.q}</h3>`;
+  const order = item.opts.map((_, i) => i).sort(() => Math.random() - 0.5);
+  let done = false;
+  order.forEach(oi => {
+    const o = item.opts[oi];
+    const btn = document.createElement("button");
+    btn.className = "opt"; btn.innerHTML = o.t;
+    const why = document.createElement("div");
+    why.className = "why " + (o.ok ? "right" : "wrong");
+    why.innerHTML = (o.ok ? "✓ " : "✗ ") + o.why;
+    btn.onclick = () => {
+      btn.classList.add(o.ok ? "right" : "wrong");
+      why.classList.add("show");
+      if (!done) {
+        done = true; answered++;
+        if (o.ok) correct++;
+        else misses.push(item.q.replace(/<[^>]+>/g, ""));
+        document.getElementById("score").textContent =
+          `Score: ${correct}/${answered}` + (answered === QUESTIONS.length ?
+            (correct >= 6 ? " — checkpoint passed. On to Phase 2." :
+             " — reread the misses' explanations, then run the token stream explorer against your own lexer.") : "");
+        if (answered === QUESTIONS.length) report();
+      }
+    };
+    div.appendChild(btn); div.appendChild(why);
+  });
+  quiz.appendChild(div);
+});
+</script>
+</body>
+</html>

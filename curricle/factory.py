@@ -15,7 +15,10 @@ compile clean was not generated.
 Calibration is the point: every prompt carries the learner profile — the
 *derived* projection from the evidence ledger, not a hand-written blurb —
 plus exemplars from the course's own earlier phases, so the factory writes
-in the course's established voice for this specific learner.
+in the course's established voice for this specific learner. A course's
+*first* build has no earlier phases to quote, so each of those lookups falls
+back to the shipped house set in `curricle/exemplars/`; from phase 2 on the
+course's own materials take over, exactly as before.
 """
 
 from __future__ import annotations
@@ -97,6 +100,39 @@ def read_exercise_exemplar(content_root: str, manifest: Manifest) -> str | None:
         if parts:
             return "\n\n".join(parts)
     return None
+
+
+# The house exemplars: what the roles are shown when the course itself has
+# nothing of the kind yet, which for a brand-new course is everything. They
+# live inside the package rather than at `llm.home()` because they are library
+# data, not operator configuration — an installed curricle carries its
+# reference voice the way it carries its renderers, and there is no version of
+# the factory that should write a first lesson with no lesson in front of it.
+EXEMPLARS_DIR = os.path.join(os.path.dirname(__file__), "exemplars")
+
+HOUSE_EXEMPLARS = {
+    "lesson": "lesson.md",
+    "widget": "widget.html",
+    "quiz": "quiz-shell.html",
+    "bank": "bank-section.md",
+}
+
+
+def house_exemplar(kind: str) -> str:
+    """The shipped exemplar of `kind` — refuse an unknown one, don't guess."""
+    with open(os.path.join(EXEMPLARS_DIR, HOUSE_EXEMPLARS[kind]),
+              encoding="utf-8") as f:
+        return f.read()
+
+
+def house_exercise_exemplar() -> str:
+    """The shipped exercise, in `read_exercise_exemplar`'s file-blob format."""
+    d = os.path.join(EXEMPLARS_DIR, "exercise")
+    parts = []
+    for fn in sorted(os.listdir(d)):
+        with open(os.path.join(d, fn), encoding="utf-8") as f:
+            parts.append(f"--- {fn} ---\n{f.read()}")
+    return "\n\n".join(parts)
 
 
 @dataclass
@@ -729,7 +765,8 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
 
     if spec.lesson_unit:
         unit = units[spec.lesson_unit]
-        exemplar = read_exemplar(content_root, manifest, "lesson") or ""
+        exemplar = (read_exemplar(content_root, manifest, "lesson")
+                    or house_exemplar("lesson"))
         template = _lesson_template()
         text = validate_lesson(run("lesson-writer", [
             ("course", course_line),
@@ -748,7 +785,8 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
 
     if spec.widget_unit:
         unit = units[spec.widget_unit]
-        exemplar = read_exemplar(content_root, manifest, "widget") or ""
+        exemplar = (read_exemplar(content_root, manifest, "widget")
+                    or house_exemplar("widget"))
         concept = spec.widget_concept or unit.gloss or unit.title
         text = validate_widget(run("widget-builder", [
             ("course", course_line),
@@ -770,7 +808,8 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
 
     if spec.exercise_unit:
         unit = units[spec.exercise_unit]
-        exemplar = read_exercise_exemplar(content_root, manifest) or ""
+        exemplar = (read_exercise_exemplar(content_root, manifest)
+                    or house_exercise_exemplar())
         data = validate_exercise(run("exercise-author", [
             ("course", course_line),
             ("unit", unit_md(unit)),
@@ -791,9 +830,12 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         checkpoint()
 
     if spec.quiz:
-        shell = read_exemplar(content_root, manifest, "quiz", max_bytes=200_000)
-        if shell is None:
-            raise ValidationFailed("no existing checkpoint quiz to use as shell")
+        # The shell is the course's own checkpoint page with its data swapped;
+        # a course that has none gets the house one, whose strings say "Phase
+        # 1" — which is what `old_phase` falls back to just below.
+        shell = (read_exemplar(content_root, manifest, "quiz",
+                               max_bytes=200_000)
+                 or house_exemplar("quiz"))
         old_phase = next((p.num for p in manifest.phases
                           for m in manifest.materials
                           if m.kind == "quiz" and m.phase == p.id), 1)
@@ -823,7 +865,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         text = validate_bank(run("bank-author", [
             ("course", course_line),
             ("phase", phase_context),
-            ("existing_bank", exemplar),
+            ("existing_bank", exemplar or house_exemplar("bank")),
         ]))
         rel = f"quizzes/bank-phase-{phase.num}.md"
         save(rel, text)

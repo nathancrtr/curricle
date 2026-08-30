@@ -37,6 +37,7 @@ from . import db, profile, progress, theme
 from .compiler import compile_course
 from .currender import render_curriculum
 from .hubrender import render_hub
+from . import refs
 from .profilerender import render_profile_page
 from .resrender import render_resources
 from .schema import Manifest
@@ -50,6 +51,11 @@ class CourseHandle:
     root: str
     content_root: str
     manifest: Manifest
+    # What the repo/ route may serve: exactly the repo-relative paths the
+    # manifest names — repo: references plus the docs pointers. The course
+    # repo holds more than the course (gitignored seeds, keys, .git), so
+    # the route hands out what the compiler blessed, never what's on disk.
+    repo_paths: frozenset[str] = frozenset()
 
 
 def load_course(root: str) -> CourseHandle:
@@ -64,10 +70,14 @@ def load_course(root: str) -> CourseHandle:
             f"{root}: course does not compile:\n" +
             "\n".join(str(i) for i in issues if i.level == "error"))
     curriculum_rel = sidecar.course.docs.curriculum_doc or "learning/curriculum.md"
+    docs = manifest.course.docs
+    repo_paths = refs.repo_ref_targets(manifest) | frozenset(
+        p for p in (docs.readme, docs.resources_doc, docs.curriculum_doc,
+                    docs.review, docs.exploration) if p)
     return CourseHandle(
         slug=manifest.course.id, root=root,
         content_root=os.path.join(root, os.path.dirname(curriculum_rel)),
-        manifest=manifest)
+        manifest=manifest, repo_paths=repo_paths)
 
 
 # --------------------------------------------------------------------------
@@ -382,8 +392,34 @@ def create_app(course_roots: list[str], tenant_slug: str,
         title = material.title if material else posixpath.basename(path)
         with open(target, encoding="utf-8") as f:
             text = f.read()
+        depth = len([seg for seg in f"read/{path}".split("/") if seg]) - 1
         return render_reader(h.manifest, text, doc_title=title,
-                             material=material)
+                             material=material, depth=depth)
+
+    # A repo-level document the manifest points at (a repo: reference, or a
+    # docs pointer): markdown reads in the theme, anything else serves raw.
+    # Only manifest-blessed paths — see CourseHandle.repo_paths.
+    @app.get("/c/{slug}/repo/{path:path}")
+    def repo_doc(slug: str, path: str) -> Response:
+        h = handle(slug)
+        if path not in h.repo_paths:
+            raise HTTPException(404)
+        target = os.path.realpath(os.path.join(h.root, path))
+        if not target.startswith(os.path.realpath(h.root) + os.sep):
+            raise HTTPException(404)
+        if not os.path.isfile(target):
+            raise HTTPException(404)
+        if target.endswith(".md"):
+            with open(target, encoding="utf-8") as f:
+                text = f.read()
+            depth = len([seg for seg in f"repo/{path}".split("/") if seg]) - 1
+            return HTMLResponse(render_reader(
+                h.manifest, text, doc_title=posixpath.basename(path),
+                depth=depth))
+        ctype = mimetypes.guess_type(target)[0] or "text/plain"
+        with open(target, "rb") as f:
+            return Response(f.read(), media_type=f"{ctype}; charset=utf-8"
+                            if ctype.startswith("text/") else ctype)
 
     @app.post("/c/{slug}/api/events")
     async def post_event(slug: str, request: Request) -> JSONResponse:

@@ -191,6 +191,24 @@ class WebAppTest(unittest.TestCase):
         evil2 = self.client.get("/c/textual-flow/interactive/%2e%2e/%2e%2e/%2e%2e/course.yaml")
         self.assertIn(evil2.status_code, (200, 404))  # resolves inside root or 404
 
+    def test_repo_route_serves_only_manifest_blessed_paths(self):
+        # REVIEW.md is a docs pointer, so it serves — through the themed
+        # reader, since it is markdown.
+        ok = self.client.get("/c/textual-flow/repo/REVIEW.md")
+        self.assertEqual(ok.status_code, 200)
+        self.assertIn("text/html", ok.headers["content-type"])
+        # Everything the manifest does not name 404s: the course repo holds
+        # more than the course (keys, .git), and none of it is servable.
+        for path in ("local/anthropic-key", ".git/config", "CLAUDE.md"):
+            r = self.client.get(f"/c/textual-flow/repo/{path}")
+            self.assertEqual(r.status_code, 404, path)
+
+    def test_unit_page_walks_the_course(self):
+        page = self.client.get("/c/textual-flow/unit/u1.html")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Phase 1 —", page.text)      # phase context line
+        self.assertIn("u2.html", page.text)        # onward navigation
+
     def test_resources_page_carries_server_state(self):
         r = self.client.post("/c/textual-flow/api/events", json={
             "kind": "resource_mark", "subject_id": "wg",

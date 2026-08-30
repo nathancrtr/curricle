@@ -422,9 +422,10 @@ def render_hub(mf: Manifest, *, api: str | None = None,
     # curriculum doc's directory — that is the content root the app serves
     # from, and it refuses anything resolving outside it. So a doc kept above
     # that root (textual-flow's REVIEW.md and exploration/) is a link that
-    # 404s on a served instance, and it is dropped there rather than shipped
-    # dead. A standalone render sits in the course repo, where the same
-    # relative paths do resolve, so it keeps them all.
+    # 404s on a served instance; a repo-level file serves through the repo/
+    # route instead, and only a directory pointer is dropped there rather
+    # than shipped dead. A standalone render sits in the course repo, where
+    # the same relative paths do resolve, so it keeps them all.
     #
     # The link text is the document's own file name. The manifest carries no
     # titles for documents — schema.Docs is five optional path strings — so
@@ -439,7 +440,15 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         if path.endswith("/"):
             href += "/"                       # a directory keeps its slash
         if api and href.startswith("../"):
-            return                            # outside the content root: unservable
+            # Outside the content root. A repo-level *file* is servable via
+            # the repo/ route (which serves exactly the docs the manifest
+            # names); a directory pointer still has nowhere to land.
+            if path.endswith("/"):
+                return
+            name = posixpath.basename(path)
+            doc_items.append(f'<li><a href="repo/{e(path)}">{e(name)}</a>'
+                             f" — {gloss}</li>")
+            return
         if api and href.endswith(".md"):
             # Served, a markdown document goes through the themed reader
             # rather than arriving as text/plain; the raw file stays at its

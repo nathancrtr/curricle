@@ -24,6 +24,7 @@ import posixpath
 
 from . import theme
 from .inlinemd import inline_html
+from .refs import RefResolver
 from .schema import Manifest
 
 STYLE = theme.style("""\
@@ -331,6 +332,19 @@ openHash();
 """
 
 
+def derived_interactive_html(mf: Manifest, unit_id: str,
+                             rr: RefResolver) -> str:
+    """The Interactive row, computed from material attachments (spec rule 2:
+    attachment is declared once, on the material; this row is a projection).
+    Kind in words, title as the link — never a naked path."""
+    parts = []
+    for m in mf.materials_for_unit(unit_id):
+        kind = html.escape(m.kind.replace("-", " "))
+        parts.append(f'{kind} — <a href="{html.escape(rr.material_href(m))}">'
+                     f"{html.escape(m.title)}</a>")
+    return " · ".join(parts)
+
+
 def _weeks_label(weeks: tuple[int, int | None] | None) -> str:
     if weeks is None:
         return ""
@@ -347,6 +361,9 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                       unit_pages: bool = False) -> str:
     c = mf.course
     e = html.escape
+    # One resolver for the whole page: it sits at the course base, and unit
+    # pages / the reader exist only when served.
+    rr = RefResolver(mf, to_root="", served=api is not None)
     units_by_id = {u.id: u for u in mf.units}
     milestones_by_id = {m.id: m for m in mf.milestones}
     track_names = {t.id: t.name for t in mf.tracks}
@@ -362,14 +379,22 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                 rows = []
                 for r in u.rows:
                     cls = "key" if r.kind == "key" else ""
-                    rows.append([r.label, inline_html(r.content), cls])
+                    rows.append([r.label, inline_html(r.content, rr), cls])
+                # The Interactive row derives from material attachments; an
+                # authored one (compiler-warned, pre-migration) is honored
+                # instead so the row never appears twice.
+                if not any(r.label == "Interactive" for r in u.rows):
+                    derived = derived_interactive_html(mf, u.id, rr)
+                    if derived:
+                        rows.append(["Interactive", derived, ""])
                 entries.append({
                     "id": u.id, "num": f"{u.num:02d}", "title": u.title,
-                    "gloss": inline_html(u.gloss) if u.gloss else "",
+                    "gloss": inline_html(u.gloss, rr) if u.gloss else "",
                     "tags": list(mf.tags_for_unit(u.id)),
                     "rows": rows,
-                    "check": ({"q": inline_html(u.check.q),
-                               "ans": inline_html(u.check.ans)} if u.check else None),
+                    "check": ({"q": inline_html(u.check.q, rr),
+                               "ans": inline_html(u.check.ans, rr)}
+                              if u.check else None),
                     "steps": ([[s.id, s.label] for s in u.steps] or None
                               if u.steps else None),
                     # SPIKE (one-stop-shop): units link to their served page.
@@ -386,7 +411,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                     # which reads as a stray period beside the label.
                     "id": m.id, "num": theme.FLAG_SVG,
                     "title": theme.strip_leading_pictograph(m.label),
-                    "gloss": inline_html(m.detail) if m.detail else "",
+                    "gloss": inline_html(m.detail, rr) if m.detail else "",
                     "tags": [m.kind], "rows": [], "check": None, "steps": None,
                     # Not a unit: the expand control says so (TOGGLE).
                     "ms": True,
@@ -394,13 +419,13 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
         checkpoint = None
         if p.checkpoint:
             checkpoint = {
-                "text": inline_html(p.checkpoint.prose),
-                "goals": [[track_names.get(tid, tid), inline_html(text)]
+                "text": inline_html(p.checkpoint.prose, rr),
+                "goals": [[track_names.get(tid, tid), inline_html(text, rr)]
                           for tid, text in p.checkpoint.track_goals],
             }
         phases_js.append({
             "num": str(p.num), "name": p.title,
-            "weeks": _weeks_label(p.weeks), "goal": inline_html(p.goal),
+            "weeks": _weeks_label(p.weeks), "goal": inline_html(p.goal, rr),
             "entries": entries, "checkpoint": checkpoint,
         })
 
@@ -412,7 +437,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
             if line.startswith("## "):
                 paras.append(f"<h2>{e(line[3:])}</h2>")
             else:
-                paras.append(f"<p>{inline_html(line)}</p>")
+                paras.append(f"<p>{inline_html(line, rr)}</p>")
         how = f'<div class="how panel">{"".join(paras)}</div>'
 
     says = ""

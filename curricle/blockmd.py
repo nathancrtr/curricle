@@ -18,7 +18,8 @@ from __future__ import annotations
 import html
 import re
 
-from .inlinemd import inline_html
+from .inlinemd import inline_html as _inline_html
+from .refs import RefResolver
 
 _HEADING = re.compile(r"^(#{1,6}) +(.*)$")
 _BULLET = re.compile(r"^([ \t]*)[-*] +(.*)$")
@@ -31,7 +32,11 @@ def _close(out: list[str], stack: list[str]) -> None:
         out.append(f"</{stack.pop()}>")
 
 
-def block_html(text: str) -> str:
+def block_html(text: str, resolver: RefResolver | None = None) -> str:
+    # Every inline span in this document resolves refs against the same page.
+    def inline_html(t: str) -> str:
+        return _inline_html(t, resolver)
+
     lines = text.splitlines()
     out: list[str] = []
     lists: list[str] = []          # open list tags, outermost first

@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 
 from .mdparse import DIALECTS, MdDoc, MdPhase, MdRow
+from .refs import find_refs, iter_content
 from .schema import (
     Check, Checkpoint, Course, Manifest, MANIFEST_VERSION, Material, Milestone,
     Pacing, Phase, Row, Unit, Version,
@@ -154,7 +155,7 @@ def compile_course(course_root: str, sidecar: Sidecar) -> tuple[Manifest | None,
         milestones=milestones,
         materials=materials,
     )
-    _validate(manifest, content_root, issues,
+    _validate(manifest, content_root, issues, course_root=course_root,
               coverage_ignore=sidecar.course.coverage_ignore)
     return (None, issues) if issues.has_errors else (manifest, issues)
 
@@ -248,7 +249,8 @@ def _build_materials(sidecar: Sidecar) -> tuple[Material, ...]:
 # Validation
 # ---------------------------------------------------------------------------
 
-def _validate(mf: Manifest, content_root: str, issues: Issues,
+def _validate(mf: Manifest, content_root: str, issues: Issues, *,
+              course_root: str,
               coverage_ignore: tuple[str, ...] = ()) -> None:
     # Global id uniqueness across everything progress-bearing or referenceable.
     seen: dict[str, str] = {}
@@ -326,7 +328,7 @@ def _validate(mf: Manifest, content_root: str, issues: Issues,
                     issues.warn("coverage", f"unregistered file: {rel}")
 
     # Content hygiene: bare URLs belong in resources, not prose (warn for now —
-    # ml-ai has two dozen; the ref-scheme rewrite is the real fix later).
+    # ml-ai has two dozen; ref-scheme links are the sanctioned path).
     for u in mf.units:
         for r in u.rows:
             urls = URL_RE.findall(r.content)
@@ -336,6 +338,14 @@ def _validate(mf: Manifest, content_root: str, issues: Issues,
                             if len(urls) > 1 else
                             f"bare URL in content: {urls[0]}")
             if r.label == "Interactive":
+                # The Interactive row is derived from material attachments
+                # (spec rule 2); an authored one is duplication that will
+                # drift. Renderers honor it while it exists, and skip
+                # deriving their own for that unit.
+                issues.warn(f"unit {u.id} [Interactive]",
+                            "authored Interactive row; the row derives from "
+                            "materials — move any prose into blurbs and "
+                            "delete it")
                 for path in INTERACTIVE_PATH_RE.findall(r.content):
                     norm = os.path.normpath(path)
                     if norm not in registered and not any(
@@ -344,6 +354,26 @@ def _validate(mf: Manifest, content_root: str, issues: Issues,
                     ):
                         issues.warn(f"unit {u.id} [Interactive]",
                                     f"references unregistered path: {path}")
+
+    # Reference links (refs.py): every res:/unit:/mat:/repo: target must
+    # resolve — a dangling reference is the compile error a dead URL never
+    # got to be. The walk over content-bearing fields lives in refs.py,
+    # shared with the app's repo/ route.
+    resource_keys = {r.key for r in mf.resources}
+    material_ids = {m.id for m in mf.materials}
+    for where, text in iter_content(mf):
+        for scheme, target in find_refs(text or ""):
+            if scheme == "res" and target not in resource_keys:
+                issues.error(where, f"res:{target} names no resource")
+            elif scheme == "unit" and target not in unit_ids:
+                issues.error(where, f"unit:{target} names no unit")
+            elif scheme == "mat" and target not in material_ids:
+                issues.error(where, f"mat:{target} names no material")
+            elif scheme == "repo":
+                if os.path.normpath(target).startswith((os.pardir, os.sep)):
+                    issues.error(where, f"repo:{target} escapes the repo")
+                elif not os.path.exists(os.path.join(course_root, target)):
+                    issues.error(where, f"repo:{target} does not exist")
 
     # Progress ids are the outward contract; they must be well-formed.
     pids = mf.progress_ids()

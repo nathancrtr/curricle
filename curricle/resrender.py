@@ -27,6 +27,7 @@ import posixpath
 
 from . import theme
 from .inlinemd import inline_html
+from .refs import RefResolver
 from .schema import Course, Manifest, Resource
 
 STYLE = theme.style("""\
@@ -158,7 +159,7 @@ function render() {
       ${tier.groups.map(g => `
         ${g.sub ? `<p class="subhead">${g.sub}</p>` : ""}
         ${g.entries.map(e => `
-          <article class="entry${tier.compact ? " compact" : ""}${state.inhand[e.id] ? " inhand" : ""}${state.notes[e.id] ? " hasnote" : ""}" data-id="${e.id}">
+          <article id="res-${e.id}" class="entry${tier.compact ? " compact" : ""}${state.inhand[e.id] ? " inhand" : ""}${state.notes[e.id] ? " hasnote" : ""}" data-id="${e.id}">
             <h3 class="title">${e.links.length
               ? `<a href="${e.links[0][1]}" ${e.links[0][1].startsWith("http") ? 'target="_blank" rel="noopener"' : ""}>${e.title}</a>`
               : e.title}<span class="chips">${e.chips.map(([t, c]) =>
@@ -305,7 +306,15 @@ def _no_shelf(mf: Manifest, api: str | None) -> str:
     if c.docs.resources_doc:
         root = posixpath.dirname(c.docs.curriculum_doc or "learning/curriculum.md")
         href = posixpath.relpath(c.docs.resources_doc, root)
-        if not (api and href.startswith("../")):
+        if api and href.startswith("../"):
+            # A repo-level shelf serves through the repo/ route.
+            name = posixpath.basename(c.docs.resources_doc)
+            href = "repo/" + c.docs.resources_doc
+            doc_para = (
+                "\n      <p>The course repo does keep a written shelf — "
+                f'<a href="{html.escape(href)}">{html.escape(name)}</a> — '
+                "it simply has not been brought into curricle yet.</p>")
+        else:
             name = href
             if api and href.endswith(".md"):
                 href = "read/" + href     # served markdown goes through the reader
@@ -346,6 +355,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     if not mf.resources:
         return _no_shelf(mf, api)
 
+    rr = RefResolver(mf, to_root="", served=api is not None)
     tiers_js = []
     for tier in sorted(mf.resource_tiers, key=lambda t: t.num):
         groups: list[dict] = []
@@ -366,20 +376,20 @@ def render_resources(mf: Manifest, *, api: str | None = None,
                 # as the hand-built page did.
                 "links": [[label, url] for label, url in r.all_links
                           if not url.startswith("urn:")],
-                "why": inline_html(r.why_this_one) if r.why_this_one else "",
-                "access": inline_html(r.access_note) if r.access_note else "",
+                "why": inline_html(r.why_this_one, rr) if r.why_this_one else "",
+                "access": inline_html(r.access_note, rr) if r.access_note else "",
             })
         tiers_js.append({
             "num": str(tier.num), "name": tier.name,
-            "role": inline_html(tier.role), "compact": tier.compact,
+            "role": inline_html(tier.role, rr), "compact": tier.compact,
             "groups": groups,
         })
 
-    standfirst = (f'<p class="standfirst">{inline_html(c.resources_intro)}</p>'
+    standfirst = (f'<p class="standfirst">{inline_html(c.resources_intro, rr)}</p>'
                   if c.resources_intro else "")
     reading = ""
     if c.reading_order:
-        items = "".join(f"<li>{inline_html(x)}</li>" for x in c.reading_order)
+        items = "".join(f"<li>{inline_html(x, rr)}</li>" for x in c.reading_order)
         reading = ('<section class="section"><h2>Suggested reading order</h2>'
                    '<p class="tier-intro">The curriculum formalizes this; here it is '
                    f"at a glance.</p><ol>{items}</ol></section>")

@@ -346,7 +346,8 @@ class OutlineRolesTest(unittest.TestCase):
             self.assertIn(tag, curator)
         for tag in ("<course_id>", "<exemplar_course>"):
             self.assertIn(tag, designer)
-        for tag in ("<curriculum_md>", "<exemplar_resources>"):
+        for tag in ("<curriculum_md>", "<resource_shelf>",
+                    "<exemplar_resources>"):
             self.assertIn(tag, curator)
 
 
@@ -359,9 +360,11 @@ class FakeOutlineSend:
     assertion rather than an inference.
     """
 
-    def __init__(self, designer, curator=None):
+    def __init__(self, designer, curator=None, usage=None):
         self.designer = designer
         self.curator = curator
+        self.usage = usage or {"input_tokens": 100, "output_tokens": 200,
+                               "cache_write_tokens": 0, "cache_read_tokens": 0}
         self.calls: list[tuple[str, str]] = []
 
     def __call__(self, model, system, prompt, max_tokens):
@@ -371,8 +374,7 @@ class FakeOutlineSend:
         self.calls.append((role, prompt))
         reply = self.designer if role == "curriculum-designer" else self.curator
         text = reply(prompt) if callable(reply) else reply
-        return text, {"input_tokens": 100, "output_tokens": 200,
-                      "cache_write_tokens": 0, "cache_read_tokens": 0}
+        return text, dict(self.usage)
 
     def roles(self):
         return [role for role, _ in self.calls]
@@ -458,10 +460,30 @@ class BuildOutlineTest(unittest.TestCase):
             self.assertIn(tag, designer_prompt)
         self.assertIn("Crafting Interpreters", designer_prompt)   # tinylang
         curator_prompt = send.prompts("resource-curator")[0]
-        for tag in ("<scope>", "<curriculum_md>", "<exemplar_resources>"):
+        for tag in ("<scope>", "<curriculum_md>", "<resource_shelf>",
+                    "<exemplar_resources>"):
             self.assertIn(tag, curator_prompt)
         self.assertIn("resource keys: primer", curator_prompt)
         self.assertNotIn("<reviewer_note>", curator_prompt)
+        # The shelf list is the exact titles and URLs the curator must
+        # reproduce — the whole reason agreement is checkable rather than
+        # guessed at.
+        self.assertIn("primer — The Manifest Primer — "
+                      "https://example.invalid/primer", curator_prompt)
+
+    def test_the_curator_gets_the_shelf_list_and_not_the_sidecar(self):
+        # The curator needs keys, titles and URLs; nothing else in course.yaml
+        # is its business, and a shelf it could quote the sidecar into would
+        # be agreement by copying rather than by contract.
+        send = FakeOutlineSend(designer_json(), GOOD_SHELF)
+        self.build(send)
+        curator_prompt = send.prompts("resource-curator")[0]
+        self.assertNotIn("<course_yaml>", curator_prompt)
+        for sidecar_only in ("sidecar_version", "why_this_one", "curriculum_doc",
+                             "resource_tiers"):
+            self.assertNotIn(sidecar_only, curator_prompt)
+        # The designer, by contrast, is shown a whole sidecar.
+        self.assertIn("sidecar_version", send.prompts("curriculum-designer")[0])
 
     def test_a_reviewer_note_reaches_both_roles(self):
         send = FakeOutlineSend(designer_json(), GOOD_SHELF)
@@ -561,6 +583,18 @@ class BuildOutlineTest(unittest.TestCase):
         self.assertEqual(caught.exception.reason, "compile_failed")
         self.assertIn("TypeError", caught.exception.detail)
 
+    def test_a_budget_spent_mid_rewrite_still_keeps_nothing(self):
+        # The first designer call spends the whole stage budget, so its
+        # rewrite is refused by the runner. Nothing partial survives that.
+        send = FakeOutlineSend(
+            designer_json(sidecar=BROKEN_SIDECAR), GOOD_SHELF,
+            usage={"input_tokens": 900_000, "output_tokens": 20_000,
+                   "cache_write_tokens": 0, "cache_read_tokens": 0})
+        with self.assertRaises(BudgetExceeded):
+            self.build(send)
+        for path in self.paths():
+            self.assertFalse(os.path.exists(path), path)
+
     def test_budget_refusal_propagates_untouched(self):
         def expensive(model, system, prompt, max_tokens):
             return designer_json(), {"input_tokens": 900_000,
@@ -572,6 +606,110 @@ class BuildOutlineTest(unittest.TestCase):
         with self.assertRaises(BudgetExceeded):
             factory.build_outline(runner, profile.ProfileState(), "tiny-demo",
                                   SCOPE, self.draft)
+
+
+def shelf_entry(title, url, essay="Because this one, for this learner."):
+    return (f"### {title}\n*Somebody · 2026 · free*\n→ <{url}>\n\n{essay}\n\n")
+
+
+def shelf_doc(*entries):
+    return ("# Learning resources\n\nTier 1 is the core path.\n\n---\n\n"
+            "## Tier 1 — Core path\n\n" + "".join(entries)
+            + "---\n\n*Resources v1.0 — 2026-08-30.*\n")
+
+
+class ShelfAgreementTest(unittest.TestCase):
+    """The curator's markdown and the sidecar name the same resources.
+
+    Only `build_outline` checks this — `docs.resources_doc` points the
+    compiler at the file but nothing reads it — and the check is exact by
+    design. The curator is handed each key's title and URL in
+    `<resource_shelf>`, so a heading it had to guess at is a heading that
+    drifted, and a matcher generous enough to forgive the drift is generous
+    enough to bless a fabrication.
+    """
+
+    def resource(self, key, title, url, **kw):
+        from curricle.schema import Resource
+        return Resource(key=key, title=title, url=url, **kw)
+
+    def test_an_honest_shelf_has_nothing_to_say(self):
+        res = self.resource("primer", "The Manifest Primer",
+                            "https://example.invalid/primer")
+        self.assertEqual(factory.shelf_findings(
+            (res,), shelf_doc(shelf_entry("The Manifest Primer",
+                                          "https://example.invalid/primer"))), [])
+
+    def test_both_directions_of_disagreement_are_findings(self):
+        res = self.resource("primer", "The Manifest Primer",
+                            "https://example.invalid/primer")
+        missing = factory.shelf_findings((res,), shelf_doc())
+        self.assertEqual(len(missing), 1)
+        self.assertIn("'primer'", missing[0].message)
+        self.assertEqual(missing[0].where, "learning/learning-resources.md")
+
+        invented = factory.shelf_findings((), shelf_doc(shelf_entry(
+            "A Book Nobody Asked For", "https://example.invalid/x")))
+        self.assertEqual(len(invented), 1)
+        self.assertIn("A Book Nobody Asked For", invented[0].message)
+
+    def test_a_subtitled_impostor_does_not_claim_the_real_entry(self):
+        # The exploit an approximate matcher blesses: a real title, extended,
+        # pointing somewhere else. Exactness refuses it from both sides.
+        res = self.resource("crafting", "Crafting Interpreters",
+                            "https://craftinginterpreters.com/")
+        findings = factory.shelf_findings((res,), shelf_doc(shelf_entry(
+            "Crafting Interpreters: The Video Series",
+            "https://not-crafting-interpreters.invalid/videos")))
+        self.assertEqual(len(findings), 2)
+        blob = " ".join(f.message for f in findings)
+        self.assertIn("'crafting'", blob)
+        self.assertIn("The Video Series", blob)
+
+    def test_the_right_title_pointing_somewhere_else_is_a_finding(self):
+        res = self.resource("crafting", "Crafting Interpreters",
+                            "https://craftinginterpreters.com/")
+        findings = factory.shelf_findings((res,), shelf_doc(shelf_entry(
+            "Crafting Interpreters", "https://mirror.invalid/crafting")))
+        self.assertEqual(len(findings), 1)
+        self.assertIn("https://mirror.invalid/crafting", findings[0].message)
+        self.assertIn("https://craftinginterpreters.com/", findings[0].message)
+
+    def test_a_shorter_title_does_not_steal_a_longer_one(self):
+        # Two honest resources whose titles nest. Greedy approximate matching
+        # let 'Python' claim 'Fluent Python' and then refuse an honest shelf.
+        one = self.resource("py", "Python", "https://example.invalid/python")
+        two = self.resource("fluent", "Fluent Python",
+                            "https://example.invalid/fluent")
+        doc = shelf_doc(shelf_entry("Python", "https://example.invalid/python"),
+                        shelf_entry("Fluent Python",
+                                    "https://example.invalid/fluent"))
+        self.assertEqual(factory.shelf_findings((one, two), doc), [])
+        self.assertEqual(factory.shelf_findings((two, one), doc), [])
+
+    def test_typography_is_not_disagreement(self):
+        # `&` for "and", a trailing slash, backticks and curly quotes: the two
+        # files spell these differently and mean the same resource.
+        both = (self.resource("ci", "Compilers & Interpreters",
+                              "https://example.invalid/c/"),
+                self.resource("tok", "Python: the tokenize module",
+                              "https://docs.python.invalid/tokenize"))
+        doc = shelf_doc(
+            shelf_entry("Compilers and Interpreters", "https://example.invalid/c"),
+            shelf_entry("Python: the `tokenize` module",
+                        "https://docs.python.invalid/tokenize"))
+        self.assertEqual(factory.shelf_findings(both, doc), [])
+
+    def test_the_example_course_agrees_with_its_own_shelf(self):
+        # The exemplar both roles are shown must itself pass the check, or
+        # they are being calibrated on a shelf the factory would refuse.
+        from curricle.sidecar import load_sidecar
+        root = os.path.join(llm.home(), "examples", "tinylang", "learning")
+        sidecar = load_sidecar(os.path.join(root, "course.yaml"))
+        with open(os.path.join(root, "learning-resources.md"),
+                  encoding="utf-8") as f:
+            self.assertEqual(factory.shelf_findings(sidecar.resources, f.read()),
+                             [])
 
 
 class BuildPlanTest(unittest.TestCase):
@@ -593,9 +731,16 @@ class BuildPlanTest(unittest.TestCase):
         plan = factory.default_build_plan(
             self.manifest_for(GOOD_CURRICULUM, GOOD_SIDECAR))
         self.assertEqual(plan, {
-            "phase": "p1", "lesson_unit": "u1", "widget_unit": "u2",
+            "phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
             "widget_concept": "The compiler refuses rather than guesses.",
             "exercise_unit": "u2", "quiz": True, "bank": True})
+        # The keys are BuildSpec's fields: an approved plan reaches the build
+        # with nothing in between to mistranslate it.
+        self.assertEqual(factory.BuildSpec(**plan),
+                         factory.BuildSpec(phase_id="p1", lesson_unit="u1",
+                                           widget_unit="u2",
+                                           widget_concept=plan["widget_concept"],
+                                           exercise_unit="u2"))
 
     def test_one_unit_phase_gets_no_widget(self):
         curriculum = GOOD_CURRICULUM[:GOOD_CURRICULUM.index("### Unit 2")] + (
@@ -617,7 +762,7 @@ class BuildPlanTest(unittest.TestCase):
             return config.cost(config.model_for_role(role),
                                input_tokens, output_tokens)
 
-        plan = {"phase": "p1", "lesson_unit": "u1", "widget_unit": "u2",
+        plan = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
                 "widget_concept": "closures", "exercise_unit": "u2",
                 "quiz": True, "bank": True}
         expected = sum((line(r) for _, r in factory.PLAN_ROLES), Decimal(0))

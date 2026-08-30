@@ -320,10 +320,13 @@ def outline_exemplar() -> str:
 
 # The shelf the learner reviews is the curator's markdown; the shelf the
 # compiler resolves `res:` against is the sidecar's. Nothing else checks that
-# they are the same shelf, so this does: entries are matched to keys by title,
-# by URL, or by the key itself appearing in the entry — generous about how a
-# resource is named, strict about a resource being on both lists.
+# they are the same shelf, so this does — and it checks by *exact* title and
+# URL, because the curator is handed both in `<resource_shelf>`. A matcher
+# that guessed would be a matcher that could be talked around: a fabricated
+# "…: The Video Series" entry pointing somewhere else is precisely the
+# disagreement worth catching, and a fuzzy pass would call it a match.
 SHELF_ENTRY_RE = re.compile(r"^###\s+(.+?)\s*$", re.M)
+URL_IN_TEXT_RE = re.compile(r"https?://[^\s<>()\[\]]+")
 
 
 def _shelf_entries(md: str) -> list[tuple[str, str]]:
@@ -338,54 +341,86 @@ def _shelf_entries(md: str) -> list[tuple[str, str]]:
 
 
 def _shelf_name(text: str) -> str:
+    """A title's identity, modulo typography the two files spell differently:
+    markdown emphasis, quote style, `&` for `and`, whitespace, a full stop."""
     text = re.sub(r"[`*_“”‘’\"']", "", text)
+    text = text.replace("&", " and ")
     return re.sub(r"\s+", " ", text).strip().strip(".").lower()
 
 
-def _claim_entry(res: Resource, entries: list[tuple[str, str]],
-                 claimed: set[int]) -> int | None:
-    title = _shelf_name(res.title)
-    free = [i for i in range(len(entries)) if i not in claimed]
-    for i in free:                                   # the heading is the title
-        if _shelf_name(entries[i][0]) == title:
-            return i
-    urls = {u for u in (res.url, *(u for _, u in res.links)) if u}
-    for i in free:                                   # or it cites the same URL
-        if any(u in entries[i][0] + entries[i][1] for u in urls):
-            return i
-    key_re = re.compile(rf"\b{re.escape(res.key)}\b")
-    for i in free:                                   # or names the key, or is
-        heading, body = entries[i]                   # a longer form of the title
-        name = _shelf_name(heading)
-        if key_re.search(heading + body) or (title and (title in name
-                                                        or name in title)):
-            return i
-    return None
+def _same_url(a: str, b: str) -> bool:
+    return a.strip().rstrip("/") == b.strip().rstrip("/")
+
+
+def _entry_urls(heading: str, body: str) -> list[str]:
+    return [u.rstrip(".,;>)") for u in URL_IN_TEXT_RE.findall(heading + body)]
 
 
 def shelf_findings(resources: tuple[Resource, ...], md: str) -> list[Issue]:
-    """Compiler-style findings for a shelf that disagrees with the sidecar."""
+    """Compiler-style findings for a shelf that disagrees with the sidecar.
+
+    One `###` entry per resource, its heading the listed title verbatim and
+    its link the listed URL. Three ways to disagree, all findings: a key with
+    no entry, an entry naming no key, and a pair whose URLs differ — the last
+    is how a real title acquires a fabricated destination.
+    """
     where = OUTLINE_FILES[2]
     entries = _shelf_entries(md)
+    by_name: dict[str, list[int]] = {}
+    for i, (heading, _) in enumerate(entries):
+        by_name.setdefault(_shelf_name(heading), []).append(i)
+
     claimed: set[int] = set()
     findings: list[Issue] = []
     for res in resources:
-        hit = _claim_entry(res, entries, claimed)
+        hit = next((i for i in by_name.get(_shelf_name(res.title), [])
+                    if i not in claimed), None)
         if hit is None:
             findings.append(Issue(
                 "error", where,
-                f"resource key '{res.key}' ({res.title!r}) has no '###' entry "
-                f"on the shelf — the sidecar's keys and the shelf are one "
-                f"list, and the shelf is the one the learner reads"))
-        else:
-            claimed.add(hit)
+                f"resource key '{res.key}' has no '###' entry titled "
+                f"{res.title!r} — the shelf reproduces each listed title "
+                f"exactly, and it is the shelf the learner reads"))
+            continue
+        claimed.add(hit)
+        found = _entry_urls(*entries[hit])
+        wanted = [u for u in (res.url, *(u for _, u in res.links)) if u]
+        if not any(_same_url(f, w) for f in found for w in wanted):
+            findings.append(Issue(
+                "error", where,
+                f"the entry for '{res.key}' links "
+                f"{found[0] if found else 'nothing'}; course.yaml lists "
+                f"{res.url} — one resource, one destination"))
     for i, (heading, _) in enumerate(entries):
         if i not in claimed:
             findings.append(Issue(
                 "error", where,
                 f"shelf entry '{heading}' matches no resource in course.yaml — "
-                f"the curriculum's keys are the shelf, so drop it"))
+                f"the listed keys are the whole shelf, so drop it"))
     return findings
+
+
+def resource_shelf_lines(course_yaml: str) -> str:
+    """The designer's resource entries as `key — title — url`, one per line.
+
+    The curator writes the shelf the learner reads, and the sidecar is the
+    shelf the compiler resolves `res:` against; handing over the exact titles
+    and URLs is what makes agreement between the two checkable rather than
+    guessable. Read leniently — a sidecar too broken to read here is about to
+    become a finding of its own, and an empty list is not worth crashing on.
+    """
+    try:
+        entries = yaml.safe_load(course_yaml)["resources"] or []
+    except (yaml.YAMLError, AttributeError, TypeError, KeyError, IndexError):
+        return ""
+    lines = []
+    for entry in entries:
+        try:
+            url = entry.get("url") or entry["links"][0][1]
+            lines.append(f"{entry['key']} — {entry['title']} — {url}")
+        except (AttributeError, TypeError, KeyError, IndexError):
+            continue
+    return "\n".join(lines)
 
 
 def _outline_envelope(text: str) -> tuple[str, str]:
@@ -506,8 +541,13 @@ def build_outline(runner: Runner, profile: ProfileState, course_id: str,
         # malformed envelope, and a malformed envelope gets no rewrite.
         return run("curriculum-designer", sections, max_tokens=64000)
 
-    def curator(curriculum_md: str, findings: str = "") -> str:
+    def curator(curriculum_md: str, course_yaml: str,
+                findings: str = "") -> str:
+        # The shelf list, not the sidecar: the curator needs the keys, titles
+        # and URLs it must reproduce, and nothing else in course.yaml is its
+        # business.
         sections = [("scope", scope_md), ("curriculum_md", curriculum_md),
+                    ("resource_shelf", resource_shelf_lines(course_yaml)),
                     ("exemplar_resources", _exemplar_file("learning-resources.md"))]
         if findings:
             sections.append(("compiler_findings", findings))
@@ -533,7 +573,7 @@ def build_outline(runner: Runner, profile: ProfileState, course_id: str,
                 os.remove(path)
 
     curriculum_md, course_yaml = _outline_envelope(designer())
-    resources_md = curator(curriculum_md)
+    resources_md = curator(curriculum_md, course_yaml)
     write(curriculum_md, course_yaml, resources_md)
 
     findings = _outline_findings(draft_dir, course_yaml, resources_md, course_id)
@@ -544,21 +584,24 @@ def build_outline(runner: Runner, profile: ProfileState, course_id: str,
         # check refuses it; the learner retries against a clean draft.
         report.retried = _implicated(findings)
         text = "\n".join(str(f) for f in findings)
+        kept = False
         try:
             if "curriculum-designer" in report.retried:
                 curriculum_md, course_yaml = _outline_envelope(designer(text))
             if "resource-curator" in report.retried:
-                resources_md = curator(curriculum_md, text)
-        except OutlineFailed:
-            discard()
-            raise
-        write(curriculum_md, course_yaml, resources_md)
-        findings = _outline_findings(draft_dir, course_yaml, resources_md,
-                                     course_id)
-        if findings:
-            discard()
-            raise OutlineFailed("compile_failed",
-                                "\n".join(str(f) for f in findings))
+                resources_md = curator(curriculum_md, course_yaml, text)
+            write(curriculum_md, course_yaml, resources_md)
+            findings = _outline_findings(draft_dir, course_yaml, resources_md,
+                                         course_id)
+            if findings:
+                raise OutlineFailed("compile_failed",
+                                    "\n".join(str(f) for f in findings))
+            kept = True
+        finally:
+            # Every way out but success — a refusal, a spent budget, anything
+            # the runner raises mid-rewrite — leaves nothing partial behind.
+            if not kept:
+                discard()
     return report
 
 
@@ -573,6 +616,9 @@ def default_build_plan(manifest: Manifest) -> dict:
     on its last, the checkpoint quiz and a bank section. Deterministic beats
     another model call: the learner reads the plan at the gate and can
     regenerate the phase if it is wrong.
+
+    The keys are `BuildSpec`'s field names, so an approved plan reaches the
+    build as `BuildSpec(**plan)` with nothing in between to mistranslate.
     """
     phase = next((p for p in manifest.phases if p.num == 1), None)
     if phase is None:
@@ -583,7 +629,7 @@ def default_build_plan(manifest: Manifest) -> dict:
         raise ValueError(f"phase {phase.id} has no units to build against")
     widget = entries[1] if len(entries) > 1 else None
     return {
-        "phase": phase.id,
+        "phase_id": phase.id,
         "lesson_unit": entries[0].id,
         "widget_unit": widget.id if widget else None,
         "widget_concept": (widget.gloss or widget.title) if widget else None,

@@ -55,6 +55,11 @@ python -m curricle serve --course examples/tinylang --tenant example --port 8765
 
 Pass `--course` more than once to serve several courses from one front door.
 
+`python -m curricle import-progress <course_root> --tenant … --json '<paste>'`
+is a one-time migration helper: it takes a JSON dump of a hand-built course
+page's `localStorage` and replays it into the ledger. You need it only if you
+are moving a course that already had learner state in a browser.
+
 ## The learner profile
 
 The profile is a fold over an evidence ledger, and the skill file every Claude
@@ -96,6 +101,14 @@ and the only mention of any model or price live in
 [`models.yaml`](models.yaml), so changing either is a YAML edit. Start with
 `--dry-run`, which assembles the prompts and reports their sizes without
 calling the API.
+
+**The factory is a checkout-mode feature.** `models.yaml` and `roles/*.md` are
+operator-editable configuration — you change a price or reword a role contract
+by editing a file you can see — so they live at the checkout root rather than
+inside the package. `pip install curricle` therefore gets you the compiler, the
+renderers, and the web app, but the factory needs the files: run it from a
+clone, or point `CURRICLE_HOME` at a directory holding `models.yaml` and
+`roles/`. Either way it says so plainly rather than failing obscurely.
 
 Outputs are refused rather than reviewed: generated exercise tests are executed
 against their stub, and if they pass, the build fails. Drafts land in
@@ -146,6 +159,7 @@ a unix socket in a temp directory, migrated and torn down at exit. It never
 reads a database URL from the environment and so cannot be pointed at a real
 database.
 
+[`CONTRIBUTING.md`](CONTRIBUTING.md) has the setup details and the house rules.
 Two things worth knowing before you read a green run as full coverage:
 
 - `tests/test_corpus.py` runs against private sibling course repos and

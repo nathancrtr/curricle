@@ -104,6 +104,14 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   calls it (invariant L1: no LLM on a request path, ever).
 - `models.yaml` is the only file naming a model or a price. Roles and code
   say cheap/frontier/premium. A price change is a YAML edit.
+- `models.yaml` and `roles/` are operator-editable configuration, so they stay
+  at the checkout root and are resolved per call by `llm.home()` —
+  `CURRICLE_HOME` if set, else the directory above the package. That makes the
+  factory a checkout-mode feature: an installed curricle has the compiler, the
+  renderers, and the web app but no role contracts, and must say so
+  (`FactoryConfigMissing`) rather than dying inside a YAML parse. Don't move
+  these into the package to "fix" the install — burying them in site-packages
+  defeats their purpose.
 - Role contracts live in `roles/*.md` (frontmatter + system prompt). The
   factory prompt = derived learner profile + manifest phase context +
   exemplars from the course's own earlier phases. Calibration is the point.

@@ -1,0 +1,263 @@
+# tinylang — the example course sidecar.
+#
+# The sidecar carries what curriculum.md legitimately doesn't: ids, glosses,
+# steps, the material registry, track ladders, milestones, resource keys.
+# Prose never lives here — if a field starts wanting paragraphs, it belongs in
+# the markdown. Every key below is loaded strictly (`curricle/sidecar.py`): an
+# unknown one raises with a path context rather than being ignored.
+#
+#   python -m curricle compile examples/tinylang --out build/tinylang.manifest.yaml
+
+sidecar_version: 1
+
+course:
+  id: tinylang
+  title: Interpreters, end to end
+  mode: project
+  hours_per_week:
+  - 4
+  - 4
+  docs:
+    readme: learning/README.md
+    resources_doc: learning/learning-resources.md
+    curriculum_doc: learning/curriculum.md
+  capstone: u4
+  storage_key: tinylang-progress
+  description: >-
+    Learn how interpreters work by building tinylang — a small
+    dynamically-typed language with functions, closures, and a REPL — from raw
+    characters through to a running program.
+  resources_intro: >-
+    **Tier 1** is the core path, worked through in curriculum order. **Tier 2**
+    is a second voice on the same material, for when one explanation doesn't
+    land. **Tier 3** is reference — looked up in, not read. Every entry says
+    *why this one*. The core path is free; the one paid entry is optional and
+    labelled as such.
+  reading_order:
+  - "Crafting Interpreters, chapter by chapter alongside Units 0–4 (the spine)"
+  - "Pratt's binding-power article once Unit 2's precedence cascade starts to itch"
+  - "Python's tokenize and ast docs as reference, from Unit 1 onward"
+  - "Writing an Interpreter in Go, optionally, as a second pass in another voice"
+  trigger_phrases:
+  - say: Teach me Unit 2 interactively.
+    note: a Socratic lesson guide exists for Unit 1; other units get improvised from the curriculum.
+  - say: Quiz me on Phase 1.
+    note: draws from the Phase 1 checkpoint quiz, teaching wrong answers rather than just marking them.
+  - say: My parser gets the precedence wrong. Help me find where.
+  - say: Review my evaluator — tear it apart.
+
+# A parallel ladder that advances on its own clock rather than unit by unit.
+# The track's rows are pulled out of the unit bullets by `row_labels`, and its
+# checkpoint goals by `checkpoint_labels` — so the markdown stays readable
+# prose and the structure is derived, not duplicated.
+tracks:
+- id: theory
+  name: Formal grammars
+  cadence: ~30 min/wk, alongside the build
+  stages:
+  - id: t-regular
+    label: regular languages
+    goal: Recognise what a lexer can and cannot decide.
+  - id: t-cfg
+    label: context-free grammars
+    goal: Read a grammar in BNF and write one for a small expression language.
+  - id: t-semantics
+    label: semantics
+    goal: State what an evaluator computes, precisely enough to argue about it.
+  row_labels:
+  - Theory track
+  checkpoint_labels:
+  - Theory by now
+
+resource_tiers:
+- num: 1
+  name: Core path
+  role: Worked through substantially, in curriculum order.
+- num: 2
+  name: Depth on demand
+  role: A second voice on the same material, for when one explanation doesn't land.
+- num: 3
+  name: Reference
+  role: Looked up in, not read.
+  compact: true
+
+resources:
+- key: crafting
+  tier: 1
+  group: Building interpreters
+  title: Crafting Interpreters
+  cite: "Robert Nystrom · Genever Benning · 2021"
+  formats: [TEXT, CODE]
+  cost: free online
+  free: true
+  links:
+  - ["Read online", "https://craftinginterpreters.com/"]
+  why_this_one: >-
+    The spine of this course, and the rare technical book that is both
+    complete and enjoyable. It builds two full interpreters — a tree-walker
+    and a bytecode VM — with every line of code on the page and every design
+    decision argued rather than asserted. The whole of Phases 0–2 hangs off
+    its first half.
+  access_note: Free in full online; the print and ebook editions are the same text if you prefer paper.
+
+- key: pratt
+  tier: 1
+  group: Building interpreters
+  title: "“Pratt Parsers: Expression Parsing Made Easy”"
+  cite: "Robert Nystrom · journal.stuffwithstuff.com · 2011"
+  formats: [TEXT]
+  cost: free
+  free: true
+  links:
+  - ["Read online", "https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/"]
+  why_this_one: >-
+    Unit 2's technique, in one sitting. Recursive descent handles precedence
+    with a cascade of near-identical functions; Pratt parsing replaces the
+    cascade with a table of binding powers that you extend by adding a row.
+    Read it after feeling the repetition it removes — the argument doesn't
+    land before then.
+
+- key: interpreterbook
+  tier: 2
+  group: Building interpreters
+  title: Writing an Interpreter in Go
+  cite: "Thorsten Ball · 2018"
+  formats: [TEXT, CODE]
+  cost: paid ~$35 (with its sequel)
+  free: false
+  links:
+  - ["Book site", "https://interpreterbook.com/"]
+  why_this_one: >-
+    The same journey in a different voice and a different language, at a
+    gentler slope. Useful precisely when the primary source doesn't land:
+    hearing the second explanation of an environment chain is often what makes
+    the first one make sense. Optional — nothing in the curriculum depends on it.
+  access_note: Paid, and genuinely optional. Skip it unless a Tier 1 explanation has failed you.
+
+- key: tokenize
+  tier: 3
+  group: Reference
+  title: "Python: the tokenize module"
+  cite: Python documentation
+  formats: [TOOL]
+  cost: free
+  free: true
+  links:
+  - ["docs.python.org", "https://docs.python.org/3/library/tokenize.html"]
+  why_this_one: >-
+    A production lexer you can run against your own files (`python -m tokenize
+    file.py`) and compare with yours. Its token kinds are a checklist of the
+    cases a real language has to handle and a toy one gets to skip.
+
+- key: pyast
+  tier: 3
+  group: Reference
+  title: "Python: the ast module"
+  cite: Python documentation
+  formats: [TOOL]
+  cost: free
+  free: true
+  links:
+  - ["docs.python.org", "https://docs.python.org/3/library/ast.html"]
+  why_this_one: >-
+    A real syntax tree to compare your node design against. `ast.dump(ast.parse("1 + 2 * 3"))`
+    in the REPL is the fastest way to see how a grown-up language shapes the
+    same tree you are building in Unit 2.
+
+units:
+- id: u0
+  num: 0
+  phase_body: true
+  gloss: >-
+    Get a skeleton running and see the whole pipeline at cartoon level before
+    building any stage of it.
+  steps:
+  - id: p0-skeleton
+    label: Project skeleton with one passing test
+  - id: p0-repl
+    label: REPL echoes a line and exits cleanly
+  - id: p0-map
+    label: "“A Map of the Territory” skimmed; the stages named"
+
+- id: u1
+  num: 1
+  gloss: >-
+    Characters become tokens — a state machine you have written before, now
+    with a name and a literature.
+  depends_on: [u0]
+  load_bearing: true
+
+- id: u2
+  num: 2
+  gloss: >-
+    Tokens become a tree, and precedence stops being a mystery once it is a
+    table of binding powers.
+  depends_on: [u1]
+  load_bearing: true
+
+- id: u3
+  num: 3
+  gloss: >-
+    The tree runs. Environments chain, and the evaluator turns out to be
+    smaller than the parser.
+  depends_on: [u2]
+  load_bearing: true
+
+- id: u4
+  num: 4
+  gloss: >-
+    A function is a value that carries the environment it was born in — the
+    conceptual summit, and the capstone.
+  depends_on: [u3]
+  load_bearing: true
+
+milestones:
+- id: m-errors
+  phase_num: 1
+  kind: side-quest
+  label: Error messages worth reading
+  detail: >-
+    Take one afternoon to make every error your front end can emit name a line,
+    a column, and the offending token. Optional, and the highest ratio of
+    quality-of-life to effort in the whole course — you are about to spend four
+    weeks reading your own error messages.
+  after_unit: u2
+
+materials:
+- id: lesson-u1
+  kind: lesson
+  title: "Unit 1 — the lexer, Socratically"
+  path: interactive/lessons/unit-01-lexer.md
+  unit: u1
+  blurb: A guided conversation that builds the scanner loop by asking rather than telling.
+
+- id: widget-u1
+  kind: widget
+  title: Token stream explorer
+  path: interactive/widgets/token-stream.html
+  unit: u1
+  blurb: Type source, watch it split into tokens — including the cases that break a naive lexer.
+
+- id: ex-u2
+  kind: exercise
+  title: "Unit 2 starter — the Pratt parser"
+  path: interactive/exercises/unit-02-starter
+  unit: u2
+  blurb: A stub and a failing test suite over expressions and their expected trees.
+  grader:
+    type: unit-test
+    runner: python
+    command: python -m unittest discover interactive/exercises/unit-02-starter
+
+- id: quiz-p1
+  kind: quiz
+  title: Phase 1 checkpoint quiz
+  path: interactive/quizzes/phase-1-checkpoint.html
+  phase_num: 1
+  blurb: Eight questions on lexing and parsing, each with the reasoning shown after you answer.
+
+- id: bank
+  kind: question-bank
+  title: Question Bank
+  path: interactive/quizzes/question-bank.md
+  blurb: The pool live quizzing draws from — recall, application, and explain-why, each with a teaching note.

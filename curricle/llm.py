@@ -21,14 +21,56 @@ import yaml
 from . import db
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODELS_PATH = os.path.join(REPO_ROOT, "models.yaml")
-ROLES_DIR = os.path.join(REPO_ROOT, "roles")
 
 FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 
 
+def home() -> str:
+    """Where `models.yaml` and `roles/` live.
+
+    They sit at the checkout root rather than inside the package on purpose:
+    they are operator-editable configuration, not library data. You change a
+    price or reword a role contract by editing a file you can see, and a copy
+    buried in site-packages is the opposite of that. Which does mean the
+    factory is a checkout-mode feature — `pip install curricle` gets you the
+    compiler, the renderers, and the web app, but the factory needs the files.
+
+    `CURRICLE_HOME` overrides, for an installed copy that keeps its
+    configuration somewhere deliberate. Resolved per call rather than pinned
+    at import, so setting it late still works.
+    """
+    return os.environ.get("CURRICLE_HOME") or REPO_ROOT
+
+
+def models_path() -> str:
+    return os.path.join(home(), "models.yaml")
+
+
+def roles_dir() -> str:
+    return os.path.join(home(), "roles")
+
+
 class BudgetExceeded(RuntimeError):
     pass
+
+
+class FactoryConfigMissing(RuntimeError):
+    """`models.yaml` or a role contract is not where the factory looked.
+
+    Its own exception because the usual cause is structural rather than a
+    typo — an installed copy with no checkout beside it — and a bare
+    `FileNotFoundError` out of `yaml.safe_load` sends people looking for the
+    wrong bug.
+    """
+
+    @staticmethod
+    def for_path(path: str, what: str) -> FactoryConfigMissing:
+        return FactoryConfigMissing(
+            f"{what} not found at {path}. The factory reads its configuration "
+            f"from the checkout root (currently {home()!r}); an installed "
+            f"curricle has no such files. Run the factory from a clone, or "
+            f"point CURRICLE_HOME at a directory holding models.yaml and "
+            f"roles/.")
 
 
 @dataclass(frozen=True)
@@ -57,7 +99,10 @@ class ModelsConfig:
                 + Decimal(cache_read) * Decimal(str(p["cache_read"]))) / per_m
 
 
-def load_models_config(path: str = MODELS_PATH) -> ModelsConfig:
+def load_models_config(path: str | None = None) -> ModelsConfig:
+    path = path or models_path()
+    if not os.path.isfile(path):
+        raise FactoryConfigMissing.for_path(path, "models.yaml")
     with open(path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return ModelsConfig(tiers=data["tiers"], prices=data["prices"],
@@ -70,8 +115,10 @@ class Role:
     system: str
 
 
-def load_role(name: str, roles_dir: str = ROLES_DIR) -> Role:
-    path = os.path.join(roles_dir, f"{name}.md")
+def load_role(name: str, roles: str | None = None) -> Role:
+    path = os.path.join(roles or roles_dir(), f"{name}.md")
+    if not os.path.isfile(path):
+        raise FactoryConfigMissing.for_path(path, f"the {name!r} role contract")
     with open(path, encoding="utf-8") as f:
         text = f.read()
     m = FRONTMATTER_RE.match(text)
@@ -131,12 +178,12 @@ class Runner:
 
     def __init__(self, engine: sa.Engine, scope: db.TenantScope,
                  config: ModelsConfig | None = None, send=None,
-                 roles_dir: str = ROLES_DIR):
+                 roles: str | None = None):
         self.engine = engine
         self.scope = scope
         self.config = config or load_models_config()
         self.send = send or _anthropic_send
-        self.roles_dir = roles_dir
+        self.roles = roles or roles_dir()
 
     def spent(self, stage: str) -> Decimal:
         with self.engine.begin() as conn:
@@ -145,7 +192,7 @@ class Runner:
 
     def run_role(self, role_name: str, prompt: str,
                  max_tokens: int = 32000) -> RunResult:
-        role = load_role(role_name, self.roles_dir)
+        role = load_role(role_name, self.roles)
         model = self.config.model_for_role(role_name)
         budget = self.config.budget_for_stage(role_name)
         already = self.spent(role_name)

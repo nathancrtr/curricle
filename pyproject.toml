@@ -2,6 +2,9 @@
 name = "curricle"
 version = "0.1.0"
 description = "Manifest layer of a personalized-learning platform: course schema + compiler over the learning-track corpus conventions"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "pyyaml>=6.0",

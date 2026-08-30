@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interpreters, end to end — curriculum</title>
+<style>
+  :root {
+  --bg:#FDF6EF; --panel:#FFFFFF; --ink:#3B2A1E; --muted:#6D5B4E; --faint:#8A7767;
+  --line:#EFDFD2; --line-soft:#F5EAE0;
+  --accent:#E06A4E; --accent-text:#B8432A; --accent-strong:#C6492E;
+  --accent-soft:#FBE9E2; --on-accent:#FFFFFF;
+  --good:#3D7A4A; --good-text:#2F6B3C; --good-soft:#E4F0E5;
+  --warn-text:#9C4A21; --warn-soft:#F9E9DC;
+  --chip:#F7EADF; --stone:#EBD9C8;
+  --shadow:0 1px 2px rgba(80,48,28,.05), 0 6px 18px rgba(80,48,28,.07);
+  --shadow-lift:0 2px 4px rgba(80,48,28,.06), 0 10px 28px rgba(80,48,28,.10);
+  color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+    }
+  }
+  :root[data-theme=dark] {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  a { color:var(--accent-text); }
+  :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
+                   border-radius:6px; }
+  button { font:inherit; color:inherit; background:none; border:none; padding:0;
+           cursor:pointer; }
+  code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
+         padding:1px 5px; border-radius:6px; }
+  h1, h2, h3, .display { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+
+  /* ---- the shared shell ---- */
+  .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+             font-size:13.5px; font-weight:500; color:var(--muted); }
+  /* The crumb link is padded so its hover pill has a hit area, and the
+     padding is cancelled by negative margins on *both* sides so the padding
+     never enters the rhythm: the text edge aligns with the page on the left,
+     and on the right the crumb keeps the same 8px gap the separators do
+     (compensating only the left stacked 12px of padding onto the flex gap,
+     giving 20px there against 8px everywhere else). Horizontal padding is
+     the gap, 8px, and no more: at exactly that size the hover pill fills the
+     gap and stops where the next crumb begins, so hovering never reaches
+     under the separator dot. Changing the gap means changing both. */
+  .eyebrow a { text-decoration:none; color:var(--accent-text);
+               padding:6px 8px; margin-left:-8px; margin-right:-8px;
+               border-radius:999px; }
+  .eyebrow a:hover { background:var(--accent-soft); }
+  .eyebrow .sep { color:var(--faint); }
+
+  /* ---- cards & chips ---- */
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:18px; box-shadow:var(--shadow); }
+  .chip { display:inline-block; font-size:11.5px; font-weight:600;
+          letter-spacing:.02em; border-radius:999px; padding:2px 9px;
+          background:var(--chip); color:var(--muted); white-space:nowrap; }
+  .chip.acc { background:var(--accent-soft); color:var(--accent-text); }
+  .chip.good { background:var(--good-soft); color:var(--good-text); }
+  .chip.warn { background:var(--warn-soft); color:var(--warn-text); }
+
+  /* ---- pill controls (generous touch targets) ---- */
+  .pill { display:inline-flex; align-items:center; gap:7px; min-height:38px;
+          font-size:14px; font-weight:600; color:var(--muted);
+          border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
+          background:var(--panel); cursor:pointer;
+          transition:border-color .2s, color .2s, background .2s; }
+  .pill:hover { border-color:var(--accent); color:var(--ink); }
+  .pill[aria-pressed="true"] { background:var(--accent-strong);
+          border-color:var(--accent-strong); color:var(--on-accent); }
+  .pill.primary { background:var(--accent-strong); border-color:var(--accent-strong);
+          color:var(--on-accent); text-decoration:none; }
+  .pill.primary:hover { filter:brightness(1.06); }
+
+  /* ---- the waypath (the signature gesture) ---- */
+  .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);
+              transition:background .35s ease, box-shadow .35s ease; }
+  .wp-stone.lit { background:var(--accent-strong); }
+  .wp-stone.here { background:transparent;
+                   box-shadow:inset 0 0 0 2px var(--accent-strong); }
+  .wp-stone.pop { animation:wp-pop .45s ease; }
+  @keyframes wp-pop {
+    0% { transform:scale(1); } 45% { transform:scale(1.55); }
+    100% { transform:scale(1); }
+  }
+  .wp-count { font-size:14px; font-weight:600; color:var(--muted);
+              white-space:nowrap; }
+
+  /* ---- toast ---- */
+  .saving { position:fixed; bottom:18px; left:50%;
+            transform:translateX(-50%) translateY(12px);
+            font-size:13px; font-weight:600; background:var(--ink);
+            color:var(--bg); padding:8px 18px; border-radius:999px;
+            opacity:0; pointer-events:none; transition:.25s; }
+  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+           font-size:13.5px; color:var(--muted); }
+  @media (prefers-reduced-motion:reduce) {
+    * { transition-duration:.01ms !important; animation-duration:.01ms !important; }
+  }
+  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:40px 0 26px; }
+  h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
+       letter-spacing:-.01em; margin:14px 0 0; }
+  .standfirst { max-width:60ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .how { margin:26px 0 0; padding:18px 22px; }
+  .how h2 { font-size:13px; font-weight:700; letter-spacing:.06em;
+            text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  .how p { margin:0 0 10px; font-size:14.5px; line-height:1.6; }
+  .how p:last-child { margin-bottom:0; }
+  .controls { margin:26px 0 0; padding:16px 20px; }
+  .controls .waypath { margin:2px 0 14px; }
+  .meta-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px 22px; }
+  .spacer { flex:1 1 auto; }
+  .phase { margin:52px 0 0; }
+  .phase-head { display:flex; align-items:flex-start; gap:12px; }
+  .phase-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
+               border-radius:12px; background:var(--accent-soft);
+               color:var(--accent-text); font:700 17px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .phase-name { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+                font-weight:700; margin:4px 0 0; }
+  .phase-weeks { margin:8px 0 0 auto; }
+  .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .entry { border-bottom:1px solid var(--line-soft); scroll-margin-top:18px; }
+  .entry.hidden { display:none; }
+  .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
+          text-align:left; padding:20px 0 4px; border-radius:12px; }
+  .head:hover .title { color:var(--accent-text); }
+  .num { font:600 13px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--muted);
+         padding-top:7px; }
+  /* A milestone's gutter carries the flag instead of a number, in the green
+     that means done/checkpoint everywhere else — the same glyph in the same
+     tint the hub gives the same row. */
+  .num .flag { color:var(--good-text); vertical-align:-1px; }
+  .body-col { min-width:0; }
+  .title { font-weight:600; font-size:19px; line-height:1.3; margin:0; }
+  .title .chip { vertical-align:3px; margin-left:8px; }
+  .gloss { position:relative; margin:8px 0 0; font-size:14.5px; line-height:1.55;
+           max-width:62ch; color:var(--ink); }
+  .gloss-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
+                background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
+                transform:scaleX(0); transform-origin:0 50%;
+                transition:transform .55s cubic-bezier(.2,.7,.3,1); }
+  .gloss-text { position:relative; z-index:1; }
+  .entry.done .gloss-mark { transform:scaleX(1); }
+  .entry.done .title { color:var(--muted); }
+  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px;
+             margin:8px 0 0; padding:0 0 18px 60px; }
+  .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
+         font-size:13.5px; font-weight:600; color:var(--muted);
+         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         transition:color .2s, background .2s; }
+  .act:hover { color:var(--ink); background:var(--chip); }
+  .chev { display:inline-block; transition:transform .3s ease; }
+  .entry.open .chev { transform:rotate(90deg); }
+  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
+         background:transparent; transition:.3s; }
+  .entry.done .dot { background:var(--good); border-color:var(--good); }
+  .entry.done .mlabel { color:var(--good-text); }
+  .detail { display:grid; grid-template-rows:0fr; transition:grid-template-rows .35s cubic-bezier(.4,0,.2,1); }
+  .entry.open .detail { grid-template-rows:1fr; }
+  .detail-inner { overflow:hidden; }
+  .detail-pad { padding:0 0 26px 60px; max-width:68ch; }
+  .row { margin:0 0 12px; font-size:14.5px; line-height:1.6; }
+  .row b.lbl { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
+               text-transform:uppercase; color:var(--muted); margin:0 0 3px; }
+  .row a { text-underline-offset:2px; }
+  .key { background:var(--accent-soft); padding:11px 15px; border-radius:12px; }
+  .key b.lbl { color:var(--accent-text); }
+  .steps { margin:0 0 12px; }
+  .step-row { display:flex; align-items:baseline; gap:9px; font-size:14.5px; margin:0 0 6px; }
+  .step-row input { width:17px; height:17px; accent-color:var(--accent-strong); }
+  .step-row.done label { color:var(--muted); text-decoration:line-through;
+                         text-decoration-color:var(--faint); }
+  .notes-label { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
+                 text-transform:uppercase; color:var(--muted); margin:18px 0 6px; }
+  textarea { width:100%; min-height:64px; resize:vertical;
+             font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif;
+             color:var(--ink); background:var(--panel); border:1.5px solid var(--line);
+             border-radius:12px; padding:10px 13px; }
+  /* Placeholder copy is read to be acted on, so it is body text, not a
+     decorative mark: --muted (6.45 on panel), never --faint (4.27). */
+  textarea::placeholder { color:var(--muted); }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .checkpoint { margin:26px 0 0; padding:16px 20px; background:var(--good-soft);
+                border:1px solid var(--good); border-radius:16px; font-size:14.5px; }
+  .checkpoint b.cp { display:block; font-size:12px; font-weight:700;
+                     letter-spacing:.06em; text-transform:uppercase;
+                     color:var(--good-text); margin:0 0 6px; }
+  .checkpoint .track-goal { margin-top:8px; color:var(--muted); }
+  details.check { margin:22px 0 0; padding:13px 17px; background:var(--panel);
+                  border:1.5px solid var(--line); border-radius:14px; font-size:14.5px; }
+  details.check summary { cursor:pointer; font-weight:600; }
+  details.check div { margin-top:10px; color:var(--muted); }
+  .section { margin:56px 0 0; }
+  .section > h2 { font-size:22px; font-weight:700; margin:0 0 10px; }
+  .section p, .section li { font-size:14.5px; }
+  .section .sub { color:var(--muted); margin:10px 0 0; }
+  .say { font:13.5px ui-monospace, Menlo, Consolas, monospace; background:var(--chip); padding:3px 9px;
+         border-radius:8px; }
+  .saylist { list-style:none; padding:0; margin:12px 0 0; }
+  .saylist li { margin:0 0 10px; }
+  .empty { display:none; padding:44px 0; text-align:center;
+           font-size:17px; color:var(--muted); }
+  .empty.show { display:block; }
+  @media (max-width:620px) {
+    .head { grid-template-columns:1fr; }
+    .num { padding:0 0 4px; }
+    .actions, .detail-pad { padding-left:0; }
+    .phase-weeks { margin:8px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow"><a href="index.html">← course hub</a>
+    <span class="sep">·</span> the curriculum
+    <span class="sep">·</span> 3 phases · 5 units</p>
+    <h1>Interpreters, end to end</h1>
+    <p class="standfirst">Learn how interpreters work by building tinylang — a small dynamically-typed language with functions, closures, and a REPL — from raw characters through to a running program.</p>
+    <div class="how panel"><p>Learn how interpreters work <b>by building tinylang</b> — a small dynamically-typed language with functions, closures, and a REPL — from raw characters through to a running program. For an experienced engineer at ~4 hrs/week; roughly 8 weeks, in phases that each stand alone.</p><p>This is the example course that ships with curricle. It is deliberately small — four units and two phases — but it is a real course, not a fixture: it exercises every part of the manifest schema (tracks, milestones, materials, graders, all four reference schemes) and it compiles clean. Copy this directory and start editing when you want a course of your own.</p><h2>How this curriculum works</h2><p><b>The interpreter is the spine.</b> Every unit adds one stage to a pipeline that already runs end to end. By the end of Unit 1 you can turn source text into tokens; by the end of Unit 4 you can define a closure and call it. Nothing is scaffolding that gets thrown away.</p><p><b>Each unit has:</b> Build (the implementation step) · Read (precise sources — see <code>learning-resources.md</code> for every citation) · Concepts · Exercise · Milestone, and sometimes a Key insight. The Interactive row is not written here — it is derived from the material registry in <code>course.yaml</code>, so a widget or a lesson appears on the unit page as soon as it is registered.</p><p><b>Pacing.</b> One unit ≈ two weeks at four hours. Unit 2 (parsing) is the long one; Unit 3 is the one that suddenly feels like magic. Phases end with checkpoints; if a checkpoint feels shaky, camp there.</p><p><b>Tests are your grader.</b> From Unit 1 onward you keep a test suite. The house style: test the shapes and the invariants rather than exact strings, so a change to error formatting doesn't turn twenty tests red at once.</p><p><b>Working with Claude.</b> <i>"Teach me Unit 2 interactively"</i> runs the Socratic lesson guide; <i>"quiz me on Phase 1"</i> draws from the checkpoint quiz.</p></div>
+    <div class="controls panel">
+      <div class="waypath" id="ticks" aria-hidden="true"></div>
+      <div class="meta-row">
+      <span class="wp-count" id="count"></span>
+      <span class="spacer"></span>
+      <button class="pill" id="filter" aria-pressed="false">Remaining only</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="list"></main>
+  <p class="empty" id="empty">Nothing left under this filter — everything here is done.</p>
+
+  <section class="section"><h2>Working with Claude</h2><ul class="saylist"><li><span class="say">Teach me Unit 2 interactively.</span> — a Socratic lesson guide exists for Unit 1; other units get improvised from the curriculum.</li><li><span class="say">Quiz me on Phase 1.</span> — draws from the Phase 1 checkpoint quiz, teaching wrong answers rather than just marking them.</li><li><span class="say">My parser gets the precedence wrong. Help me find where.</span></li><li><span class="say">Review my evaluator — tear it apart.</span></li></ul></section>
+
+  <footer>
+    Rendered by curricle from the course manifest — canonical text:
+    <a href="curriculum.md">curriculum.md</a> (v1.0, 2026-08-30) ·
+    progress marks are shared with <a href="index.html">the hub</a> and
+    live in this browser's localStorage · <a href="index.html">← back to the hub</a>
+  </footer>
+</div>
+<div class="saving" id="toast">Saved</div>
+<script>
+function waypath(el, ids, done, nextId) {
+  const had = el._wp || null;
+  el._wp = {};
+  ids.forEach((id, i) => {
+    let s = el.children[i];
+    if (!s) { s = document.createElement("span"); el.appendChild(s); }
+    const lit = !!done(id);
+    s.className = "wp-stone" + (lit ? " lit" : "") + (id === nextId ? " here" : "");
+    if (had && had[id] === false && lit) {
+      s.classList.add("pop");
+      s.addEventListener("animationend", () => s.classList.remove("pop"), { once: true });
+    }
+    el._wp[id] = lit;
+  });
+  while (el.children.length > ids.length) el.lastChild.remove();
+}
+const KEY = "tinylang-progress";
+const NOTES_KEY = "tinylang-curriculum-notes";
+const API = null;          // null: localStorage mode; else: POST events here
+const INITIAL = null;  // {progress, notes} server-folded, or null
+const PHASES = [{"num": "0", "name": "Orientation", "weeks": "Week 0", "goal": "Understand the shape of the pipeline before building any of it, and get a project skeleton that runs its own tests.", "entries": [{"id": "u0", "num": "00", "title": "Orientation", "gloss": "Get a skeleton running and see the whole pipeline at cartoon level before building any stage of it.", "tags": [], "rows": [["Build", "Create the project skeleton — a <code>tinylang/</code> package, a <code>tests/</code> directory, and a single failing test. Wire up whatever runs your tests with one command. Then write <code>tinylang/repl.py</code>: read a line, echo it back, loop. It does nothing useful yet, and that is the point — you will replace its middle, once per phase, and watch the language grow.", ""], ["Read", "<a href=\"https://craftinginterpreters.com/\" target=\"_blank\" rel=\"noopener\">Crafting Interpreters</a>, \"A Map of the Territory\" — the one chapter that shows the whole landscape at once. Skim, don't study: you want the vocabulary (scanning, parsing, evaluating) and the sense that these are separable stages.", ""], ["Concepts", "why interpretation splits into stages at all; what a tree-walking interpreter is and what it gives up (speed) for what it buys (you can hold it in your head); source text → tokens → syntax tree → value as the through-line of the whole course.", ""], ["Theory track", "start the ladder. What a <i>regular language</i> is, and the one-sentence version of why it is the right level of power for a lexer: no counting, no nesting, no memory beyond the current state.", ""], ["Milestone", "<code>python -m tinylang.repl</code> starts, echoes, and exits cleanly on Ctrl-D; one test runs and passes.", ""]], "check": {"q": "A lexer and a parser both \"read the input and produce structure.\" Why are they two stages instead of one?", "ans": "Because they answer questions at different scales, and merging them means answering both at once in one grammar. The lexer works over characters and asks <i>what is this piece</i> — this run of digits is one number, this quote starts a string, this whitespace is nothing. The parser works over tokens and asks <i>how do these pieces relate</i> — this expression is the left operand of that operator. Splitting them means the parser never thinks about whitespace and the lexer never thinks about precedence. Unit 2 is where you feel the payoff."}, "steps": [["p0-skeleton", "Project skeleton with one passing test"], ["p0-repl", "REPL echoes a line and exits cleanly"], ["p0-map", "“A Map of the Territory” skimmed; the stages named"]]}], "checkpoint": {"text": "Something runs, even if it only echoes. You can name the three stages of the pipeline and say what each one hands to the next.", "goals": [["Formal grammars", "you have met the phrase \"regular language\" and can say, roughly, what it rules out. Nothing here is deep yet — the point of Phase 0 is to have a place to put Unit 1."]]}}, {"num": "1", "name": "The front end", "weeks": "Weeks 1–4", "goal": "Turn source text into a syntax tree you can print, test, and trust. By the end of this phase nothing evaluates yet, but everything parses.", "entries": [{"id": "u1", "num": "01", "title": "Characters to tokens", "gloss": "Characters become tokens — a state machine you have written before, now with a name and a literature.", "tags": ["lesson", "widget"], "rows": [["Build", "A hand-written lexer in <code>tinylang/lexer.py</code>. Scan a source string into a list of <code>Token(kind, text, line)</code>: numbers, strings, identifiers, keywords, operators, and a final <code>EOF</code>. Handle whitespace and <code>#</code> comments by skipping them. Report an unterminated string as an error that names the line, not as a crash.", ""], ["Read", "<a href=\"https://craftinginterpreters.com/\" target=\"_blank\" rel=\"noopener\">Crafting Interpreters</a>, the \"Scanning\" chapter, all of it — it is the closest thing to a canonical treatment. Then look at <a href=\"https://docs.python.org/3/library/tokenize.html\" target=\"_blank\" rel=\"noopener\">Python's <code>tokenize</code> module</a> output for a small Python file (<code>python -m tokenize somefile.py</code>) to see what a production lexer emits and how much more of it there is than you expected.", ""], ["Concepts", "lexeme vs. token vs. token kind; maximal munch, and why <code>&lt;=</code> must be one token rather than two; why keywords are recognised <i>after</i> identifiers rather than during; the lookahead question — how far ahead must you peek, and why one character is almost always enough.", ""], ["Theory track", "finish regular languages. Write the regular expression your number scanner is really implementing, then find the thing it cannot express — balanced parentheses — and notice that this is exactly the job you hand to the parser in <a href=\"curriculum.html#u-u2\">Unit 2</a>.", ""], ["Exercise", "Extend your lexer with a <code>--tokens</code> flag on the REPL that prints the token stream instead of evaluating. You will use it for debugging in every remaining unit, so make the output readable.", ""], ["Milestone", "<code>lex()</code> with tests over a fixture of tricky inputs — an empty string, a string containing a <code>#</code>, a number touching an operator (<code>1+2</code>), an unterminated string.", ""], ["Key insight", "A lexer is a state machine you happen to be writing as a loop with a <code>switch</code>. You have written this shape before, without the name — every protocol parser and every log-line splitter is the same animal. What the name buys you is the literature: once you call it a lexer, decades of accumulated technique become searchable.", "key"], ["Interactive", "lesson — <a href=\"interactive/lessons/unit-01-lexer.md\">Unit 1 — the lexer, Socratically</a> · widget — <a href=\"interactive/widgets/token-stream.html\">Token stream explorer</a>", ""]], "check": null, "steps": null}, {"id": "u2", "num": "02", "title": "Tokens to a tree", "gloss": "Tokens become a tree, and precedence stops being a mystery once it is a table of binding powers.", "tags": ["tests", "quiz"], "rows": [["Build", "A recursive-descent parser in <code>tinylang/parser.py</code> producing an AST: literals, unary and binary operations, grouping, and variable references. Implement precedence with Pratt parsing (a binding-power table) rather than one function per precedence level — it is fewer lines and it extends without restructuring. Add a <code>__repr__</code> on your nodes that prints the tree as parenthesised prefix notation, so <code>1 + 2 * 3</code> prints as <code>(+ 1 (* 2 3))</code> and a wrong precedence is visible at a glance.", ""], ["Read", "<a href=\"https://craftinginterpreters.com/\" target=\"_blank\" rel=\"noopener\">Crafting Interpreters</a>, the \"Parsing Expressions\" chapter for the recursive-descent frame, then <a href=\"https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/\" target=\"_blank\" rel=\"noopener\">Pratt Parsers: Expression Parsing Made Easy</a> for the binding-power technique that replaces its precedence cascade. Read them in that order — the second is an optimisation of the first, and it doesn't land until you have felt the repetition it removes. <a href=\"https://interpreterbook.com/\" target=\"_blank\" rel=\"noopener\">The Go interpreter book</a> covers the same ground at book length if you want a second pass in another voice.", ""], ["Concepts", "grammars as a specification vs. code as an implementation; left- and right-associativity as a <i>choice</i>, expressed as a one-line asymmetry in binding power; why <code>1 + + 2</code> must be a syntax error and where in your code that decision lives; error recovery — synchronising to the next statement boundary so one mistake doesn't cascade into fifty.", ""], ["Theory track", "context-free grammars. Write tinylang's expression grammar in BNF, then write the same grammar left-recursively and watch it hang your parser — the reason the textbook grammar and the implementable grammar differ is worth an hour.", ""], ["Exercise", "<a href=\"interactive/exercises/unit-02-starter/task.md\">The Unit 2 starter</a> — a stub with failing tests over a fixture of expressions and their expected parenthesised forms. Make them pass, then point the same parser at the tokens coming out of <a href=\"../tinylang/lexer.py\">your lexer</a>.", ""], ["Milestone", "Green tests; <code>1 + 2 * 3</code> and <code>(1 + 2) * 3</code> produce visibly different trees; a syntax error names the line and the offending token.", ""], ["Interactive", "exercise — <a href=\"interactive/exercises/unit-02-starter/task.md\">Unit 2 starter — the Pratt parser</a>", ""]], "check": null, "steps": null}, {"id": "m-errors", "num": "<svg class=\"flag\" width=\"11\" height=\"13\" viewBox=\"0 0 11 13\" aria-hidden=\"true\"><path d=\"M1.5 1v11M1.5 1.6c2-.9 3.6-.9 5 0 1.2.8 2.4.9 3.5.4v5c-1.1.5-2.3.4-3.5-.4-1.4-.9-3-.9-5 0z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg>", "title": "Error messages worth reading", "gloss": "Take one afternoon to make every error your front end can emit name a line, a column, and the offending token. Optional, and the highest ratio of quality-of-life to effort in the whole course — you are about to spend four weeks reading your own error messages.", "tags": ["side-quest"], "rows": [], "check": null, "steps": null, "ms": true}], "checkpoint": {"text": "You can turn source text into a syntax tree and print it. You can explain, without hedging, why lexing and parsing are separate stages, and you can add a new binary operator at the right precedence in under five minutes.", "goals": [["Formal grammars", "regular languages and context-free grammars are distinct in your head, and you can say which of your two stages needs which — and why that is a statement about power, not about style. A good sign that this has landed: you find yourself annoyed that the tree doesn't <i>do</i> anything yet. That is Phase 2."]]}}, {"num": "2", "name": "Making it run", "weeks": "Weeks 5–8", "goal": "Walk the tree and produce values. By the end of this phase tinylang is a language you can write small programs in.", "entries": [{"id": "u3", "num": "03", "title": "Walking the tree", "gloss": "The tree runs. Environments chain, and the evaluator turns out to be smaller than the parser.", "tags": [], "rows": [["Build", "A tree-walking evaluator in <code>tinylang/interp.py</code>. Evaluate literals, arithmetic, comparison, and truthiness; add <code>let</code> bindings backed by an <code>Environment</code> that maps names to values. Wire it into the REPL so a typed expression prints its value. Delete the echo from Unit 0 — you have earned it.", ""], ["Read", "<a href=\"https://craftinginterpreters.com/\" target=\"_blank\" rel=\"noopener\">Crafting Interpreters</a>, the \"Evaluating Expressions\" and \"Statements and State\" chapters. Read the environment section twice: the chaining it introduces is what <a href=\"curriculum.html#u-u4\">Unit 4</a> turns into closures, and a fuzzy understanding here becomes a real bug there.", ""], ["Concepts", "the visitor pattern, and why a dispatch table or <code>match</code> is the same idea with less ceremony in Python; environments as a linked list of scopes rather than one flat dictionary; runtime errors vs. syntax errors, and why the two need different reporting paths; truthiness as a <i>language design decision</i> you are making, not a fact you are discovering.", ""], ["Theory track", "semantics. Write down, in English precise enough to argue with, what your evaluator computes for a binary expression. You have just written a small-step operational semantics; the notation comes later, and it will look familiar when it does.", ""], ["Exercise", "Add a <code>print</code> statement and string concatenation. Then find the smallest program that reveals whether your <code>Environment</code> chains correctly — a variable shadowed in an inner scope and read again in the outer one, in three lines.", ""], ["Milestone", "The REPL evaluates arithmetic, comparisons, and <code>let</code> bindings across lines; an undefined variable produces a clean error naming the variable rather than a <code>KeyError</code> traceback.", ""], ["Key insight", "The evaluator is smaller than the parser, and that surprises everybody. Nearly all the difficulty in a language front end is in deciding <i>what the program says</i>; once that is a tree, saying what it <i>means</i> is mostly recursion.", "key"]], "check": null, "steps": null}, {"id": "u4", "num": "04", "title": "Functions and closures", "gloss": "A function is a value that carries the environment it was born in — the conceptual summit, and the capstone.", "tags": [], "rows": [["Build", "Function declarations, calls, and returns. Represent a function as a value that carries its own defining environment — that captured environment is the whole trick. Implement <code>return</code> by raising and catching a control-flow exception, then write a comment explaining why that is a legitimate technique rather than a hack. Verify the classic counter: a function that returns a function that increments a captured variable.", ""], ["Read", "<a href=\"https://craftinginterpreters.com/\" target=\"_blank\" rel=\"noopener\">Crafting Interpreters</a>, the \"Functions\" and \"Closures\" chapters. If you have time for only one, take \"Closures\" slowly — it is the conceptual summit of this course.", ""], ["Concepts", "call frames and the environment stack; closures as \"a function plus the environment it was born in\"; why dynamic scope is easier to implement and almost always wrong; recursion falling out for free once functions can see their own name; the beginnings of tail calls, and why you are not doing them today.", ""], ["Theory track", "close the ladder. State what a closure <i>is</i> semantically — a pair of a function body and an environment — and convince yourself that this one sentence explains both the counter exercise and every scoping bug you have ever shipped.", ""], ["Exercise", "Write <code>make_counter</code> in tinylang itself and show that two counters made from the same factory are independent. If they share state, your closure is capturing the wrong environment — the failure is exactly the one <a href=\"curriculum.html#u-u3\">Unit 3</a> warned about.", ""], ["Milestone", "<b>Capstone.</b> A recursive <code>fib</code> and an independent-counters program both run under <code>python -m tinylang.repl &lt; program.tl</code>. Write a paragraph on what your language cannot do — no classes, no modules, no error handling — and pick which one you would build next.", ""]], "check": null, "steps": null}], "checkpoint": {"text": "tinylang runs. You have written a lexer, a parser, and an evaluator, and you can explain what each stage is responsible for and how a change in one propagates through the others.", "goals": [["Formal grammars", "you can state what your evaluator computes precisely enough that someone could disagree with it, which is the whole point of writing a semantics down. A good sign that this has landed: the next language you read the source of feels navigable, because you now know which file to open first."]]}}];
+const HUB_IDS = ["p0-skeleton", "p0-repl", "p0-map", "u1", "u2", "m-errors", "u3", "u4"];
+
+let progress = (INITIAL && INITIAL.progress) || {};
+let notes = (INITIAL && INITIAL.notes) || {};
+if (!API) {
+  try { progress = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) {}
+  try { notes = JSON.parse(localStorage.getItem(NOTES_KEY) || "{}"); } catch (e) {}
+}
+function send(kind, id, payload) {
+  fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, subject_id: id, payload }) }).catch(() => {});
+}
+function putMark(id, v) {
+  progress[id] = v;
+  if (API) send("mark", id, { done: v });
+  else persist(KEY, progress);
+}
+
+const isDone = e => e.steps ? e.steps.every(s => progress[s[0]]) : !!progress[e.id];
+const setDone = (e, v) => { if (e.steps) e.steps.forEach(s => putMark(s[0], v)); else putMark(e.id, v); };
+
+const $ = id => document.getElementById(id);
+function persist(key, obj) { try { localStorage.setItem(key, JSON.stringify(obj)); toast("Saved"); } catch (e) {} }
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1200);
+}
+
+const ALL = PHASES.flatMap(p => p.entries);
+const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+// [shut, open] for the expand control. A milestone is not a unit, and what
+// its detail holds is the note box and nothing else, so it says so.
+const TOGGLE = e => e.ms ? ["Note", "Hide note"] : ["Full unit", "Hide unit"];
+function render() {
+  $("list").innerHTML = PHASES.map(p => `
+    <section class="phase">
+      <div class="phase-head">
+        <span class="phase-num">${p.num}</span>
+        <h2 class="phase-name">${p.name}</h2>
+        ${p.weeks ? `<span class="phase-weeks chip">${p.weeks}</span>` : ""}
+      </div>
+      <p class="phase-goal">${p.goal}</p>
+      ${p.entries.map(e => `
+        <article class="entry${isDone(e) ? " done" : ""}" id="u-${e.id}" data-id="${e.id}">
+          <button class="head" aria-expanded="false">
+            <span class="num">${e.num}</span>
+            <span class="body-col">
+              <h3 class="title">${e.title}${(e.tags || []).map(t =>
+                `<span class="chip${t === "widget" ? " acc" : ""}">${t}</span>`).join("")}</h3>
+              ${e.gloss ? `<p class="gloss"><span class="gloss-mark"></span><span class="gloss-text">${e.gloss}</span></p>` : ""}
+            </span>
+          </button>
+          <div class="actions">
+            <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
+            <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
+            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
+          </div>
+          <div class="detail"><div class="detail-inner"><div class="detail-pad">
+            ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `
+              <div class="step-row${progress[sid] ? " done" : ""}">
+                <input type="checkbox" id="${sid}" ${progress[sid] ? "checked" : ""}>
+                <label for="${sid}">${slabel}</label>
+              </div>`).join("")}</div>` : ""}
+            ${e.rows.map(([lbl, html, cls]) =>
+              `<div class="row ${cls || ""}"><b class="lbl">${lbl}</b>${html}</div>`).join("")}
+            ${e.check ? `<details class="check"><summary>Check yourself: ${e.check.q}</summary><div>${e.check.ans}</div></details>` : ""}
+            <label class="notes-label" for="n-${e.id}">Your note</label>
+            <textarea id="n-${e.id}" placeholder="What stuck, what to chase, where the numbers disagreed…">${esc(notes[e.id] || "")}</textarea>
+          </div></div></div>
+        </article>`).join("")}
+      ${p.checkpoint ? `<div class="checkpoint"><b class="cp">Phase ${p.num} checkpoint</b>${p.checkpoint.text}${(p.checkpoint.goals || []).map(g => `<div class="track-goal"><b>${g[0]}:</b> ${g[1]}</div>`).join("")}</div>` : ""}
+    </section>`).join("");
+  wire();
+  updateMeter();
+  applyFilter();
+}
+
+function updateMeter() {
+  const done = HUB_IDS.filter(i => progress[i]).length;
+  const nextId = HUB_IDS.find(i => !progress[i]) || null;
+  $("count").textContent = done === 0
+    ? `${HUB_IDS.length} steps ahead of you`
+    : `${done} of ${HUB_IDS.length} done`;
+  waypath($("ticks"), HUB_IDS, i => !!progress[i], nextId);
+}
+
+function openEntry(entry, want) {
+  const on = want !== undefined ? want : !entry.classList.contains("open");
+  entry.classList.toggle("open", on);
+  entry.querySelector(".head").setAttribute("aria-expanded", String(on));
+  const e = ALL.find(x => x.id === entry.dataset.id);
+  entry.querySelector(".tlabel").textContent = TOGGLE(e)[on ? 1 : 0];
+}
+
+function syncEntry(entry, e) {
+  entry.classList.toggle("done", isDone(e));
+  entry.querySelector(".mlabel").textContent = isDone(e) ? "Done" : "Mark done";
+  updateMeter();
+  if (remainingOnly) setTimeout(applyFilter, 600);
+}
+
+function wire() {
+  document.querySelectorAll(".entry").forEach(entry => {
+    const e = ALL.find(x => x.id === entry.dataset.id);
+    entry.querySelector(".head").addEventListener("click", ev => {
+      if (ev.target.closest("a")) return;
+      openEntry(entry);
+    });
+    entry.querySelector(".toggle").addEventListener("click", () => openEntry(entry));
+    entry.querySelector(".mark").addEventListener("click", () => {
+      setDone(e, !isDone(e));
+      if (e.steps) entry.querySelectorAll(".step-row").forEach(r => {
+        r.querySelector("input").checked = isDone(e);
+        r.classList.toggle("done", isDone(e));
+      });
+      syncEntry(entry, e);
+    });
+    if (e.steps) entry.querySelectorAll(".step-row input").forEach(cb => {
+      cb.addEventListener("click", ev => ev.stopPropagation());
+      cb.addEventListener("change", () => {
+        putMark(cb.id, cb.checked);
+        cb.closest(".step-row").classList.toggle("done", cb.checked);
+        syncEntry(entry, e);
+      });
+    });
+    const ta = entry.querySelector("textarea");
+    let t;
+    ta.addEventListener("input", () => {
+      notes[e.id] = ta.value;
+      clearTimeout(t);
+      t = setTimeout(() => {
+        if (API) { send("note", e.id, { text: ta.value }); toast("Saved"); }
+        else persist(NOTES_KEY, notes);
+      }, 500);
+    });
+  });
+}
+
+let remainingOnly = false;
+function applyFilter() {
+  let shown = 0;
+  document.querySelectorAll(".entry").forEach(entry => {
+    const hide = remainingOnly && isDone(ALL.find(x => x.id === entry.dataset.id));
+    entry.classList.toggle("hidden", hide);
+    if (!hide) shown++;
+  });
+  document.querySelectorAll(".phase").forEach(ph => {
+    const any = [...ph.querySelectorAll(".entry")].some(x => !x.classList.contains("hidden"));
+    ph.style.display = any ? "" : "none";
+  });
+  $("empty").classList.toggle("show", shown === 0);
+}
+$("filter").addEventListener("click", () => {
+  remainingOnly = !remainingOnly;
+  $("filter").setAttribute("aria-pressed", String(remainingOnly));
+  $("filter").textContent = remainingOnly ? "Show all" : "Remaining only";
+  applyFilter();
+});
+
+// The hub's Begin/Continue action arrives here as #u-<id> — an entry id, or
+// a step id inside one. Open that entry and bring it into view.
+function openHash() {
+  const m = location.hash.match(/^#u-(.+)$/);
+  if (!m) return;
+  // A fragment carrying a malformed escape throws in the decode instead of
+  // returning a string; unreadable is unresolvable, so it is the same no-op.
+  let id;
+  try { id = decodeURIComponent(m[1]); } catch (err) { return; }
+  const e = ALL.find(x => x.id === id || (x.steps || []).some(s => s[0] === id));
+  if (!e) return;
+  const entry = document.querySelector(`.entry[data-id="${CSS.escape(e.id)}"]`);
+  if (!entry) return;
+  openEntry(entry, true);
+  entry.scrollIntoView({ block: "start" });
+}
+
+render();
+window.addEventListener("hashchange", openHash);
+openHash();
+</script>
+</body>
+</html>

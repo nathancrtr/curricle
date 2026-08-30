@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interpreters, end to end — the resources</title>
+<style>
+  :root {
+  --bg:#FDF6EF; --panel:#FFFFFF; --ink:#3B2A1E; --muted:#6D5B4E; --faint:#8A7767;
+  --line:#EFDFD2; --line-soft:#F5EAE0;
+  --accent:#E06A4E; --accent-text:#B8432A; --accent-strong:#C6492E;
+  --accent-soft:#FBE9E2; --on-accent:#FFFFFF;
+  --good:#3D7A4A; --good-text:#2F6B3C; --good-soft:#E4F0E5;
+  --warn-text:#9C4A21; --warn-soft:#F9E9DC;
+  --chip:#F7EADF; --stone:#EBD9C8;
+  --shadow:0 1px 2px rgba(80,48,28,.05), 0 6px 18px rgba(80,48,28,.07);
+  --shadow-lift:0 2px 4px rgba(80,48,28,.06), 0 10px 28px rgba(80,48,28,.10);
+  color-scheme:light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+    }
+  }
+  :root[data-theme=dark] {
+  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
+  --line:#42352A; --line-soft:#382C22;
+  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
+  --accent-soft:#43291F; --on-accent:#221A14;
+  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
+  --warn-text:#EFA275; --warn-soft:#3E2C1E;
+  --chip:#3A2D23; --stone:#4A3A2C;
+  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  [hidden] { display:none !important; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  a { color:var(--accent-text); }
+  :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
+                   border-radius:6px; }
+  button { font:inherit; color:inherit; background:none; border:none; padding:0;
+           cursor:pointer; }
+  code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
+         padding:1px 5px; border-radius:6px; }
+  h1, h2, h3, .display { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+
+  /* ---- the shared shell ---- */
+  .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+             font-size:13.5px; font-weight:500; color:var(--muted); }
+  /* The crumb link is padded so its hover pill has a hit area, and the
+     padding is cancelled by negative margins on *both* sides so the padding
+     never enters the rhythm: the text edge aligns with the page on the left,
+     and on the right the crumb keeps the same 8px gap the separators do
+     (compensating only the left stacked 12px of padding onto the flex gap,
+     giving 20px there against 8px everywhere else). Horizontal padding is
+     the gap, 8px, and no more: at exactly that size the hover pill fills the
+     gap and stops where the next crumb begins, so hovering never reaches
+     under the separator dot. Changing the gap means changing both. */
+  .eyebrow a { text-decoration:none; color:var(--accent-text);
+               padding:6px 8px; margin-left:-8px; margin-right:-8px;
+               border-radius:999px; }
+  .eyebrow a:hover { background:var(--accent-soft); }
+  .eyebrow .sep { color:var(--faint); }
+
+  /* ---- cards & chips ---- */
+  .panel { background:var(--panel); border:1px solid var(--line);
+           border-radius:18px; box-shadow:var(--shadow); }
+  .chip { display:inline-block; font-size:11.5px; font-weight:600;
+          letter-spacing:.02em; border-radius:999px; padding:2px 9px;
+          background:var(--chip); color:var(--muted); white-space:nowrap; }
+  .chip.acc { background:var(--accent-soft); color:var(--accent-text); }
+  .chip.good { background:var(--good-soft); color:var(--good-text); }
+  .chip.warn { background:var(--warn-soft); color:var(--warn-text); }
+
+  /* ---- pill controls (generous touch targets) ---- */
+  .pill { display:inline-flex; align-items:center; gap:7px; min-height:38px;
+          font-size:14px; font-weight:600; color:var(--muted);
+          border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
+          background:var(--panel); cursor:pointer;
+          transition:border-color .2s, color .2s, background .2s; }
+  .pill:hover { border-color:var(--accent); color:var(--ink); }
+  .pill[aria-pressed="true"] { background:var(--accent-strong);
+          border-color:var(--accent-strong); color:var(--on-accent); }
+  .pill.primary { background:var(--accent-strong); border-color:var(--accent-strong);
+          color:var(--on-accent); text-decoration:none; }
+  .pill.primary:hover { filter:brightness(1.06); }
+
+  /* ---- the waypath (the signature gesture) ---- */
+  .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);
+              transition:background .35s ease, box-shadow .35s ease; }
+  .wp-stone.lit { background:var(--accent-strong); }
+  .wp-stone.here { background:transparent;
+                   box-shadow:inset 0 0 0 2px var(--accent-strong); }
+  .wp-stone.pop { animation:wp-pop .45s ease; }
+  @keyframes wp-pop {
+    0% { transform:scale(1); } 45% { transform:scale(1.55); }
+    100% { transform:scale(1); }
+  }
+  .wp-count { font-size:14px; font-weight:600; color:var(--muted);
+              white-space:nowrap; }
+
+  /* ---- toast ---- */
+  .saving { position:fixed; bottom:18px; left:50%;
+            transform:translateX(-50%) translateY(12px);
+            font-size:13px; font-weight:600; background:var(--ink);
+            color:var(--bg); padding:8px 18px; border-radius:999px;
+            opacity:0; pointer-events:none; transition:.25s; }
+  .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  footer { margin-top:64px; padding-top:22px; border-top:1px solid var(--line);
+           font-size:13.5px; color:var(--muted); }
+  @media (prefers-reduced-motion:reduce) {
+    * { transition-duration:.01ms !important; animation-duration:.01ms !important; }
+  }
+  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  .masthead { padding:40px 0 26px; }
+  h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
+       letter-spacing:-.01em; margin:14px 0 0; }
+  .standfirst { max-width:58ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .standfirst b { color:var(--ink); }
+  .controls { margin:26px 0 0; padding:16px 20px; }
+  .controls .waypath { margin:2px 0 14px; }
+  .meta-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px 22px; }
+  .spacer { flex:1 1 auto; }
+  .tier { margin:52px 0 0; }
+  .tier-head { display:flex; align-items:flex-start; gap:12px; }
+  .tier-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
+              border-radius:12px; background:var(--accent-soft);
+              color:var(--accent-text); font:700 17px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .tier-name { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+               font-weight:700; margin:4px 0 0; }
+  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .subhead { font-size:12px; font-weight:700; letter-spacing:.06em;
+             text-transform:uppercase; color:var(--muted); margin:26px 0 0; }
+  .entry { border-bottom:1px solid var(--line-soft); padding:18px 0 16px; }
+  .entry.hidden { display:none; }
+  .entry.compact { padding:12px 0 10px; }
+  .title { font-weight:600; font-size:18px; line-height:1.35; margin:0; }
+  .entry.compact .title { font-size:15.5px; }
+  .title a { color:var(--ink); text-decoration:none; }
+  .title a:hover { color:var(--accent-text); text-decoration:underline;
+                   text-underline-offset:3px; }
+  .entry.inhand .title { color:var(--muted); }
+  .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:2px; margin-left:9px; }
+  .cite { font-size:12.5px; font-weight:500; color:var(--muted); margin:5px 0 0;
+          line-height:1.5; }
+  .why { position:relative; margin:9px 0 0; font-size:14.5px; line-height:1.55;
+         max-width:64ch; }
+  .why-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
+              background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
+              transform:scaleX(0); transform-origin:0 50%;
+              transition:transform .55s cubic-bezier(.2,.7,.3,1); }
+  .why-text { position:relative; z-index:1; }
+  .entry.inhand .why-mark { transform:scaleX(1); }
+  .access { margin:8px 0 0; font-size:13.5px; color:var(--muted); }
+  .access b { color:var(--ink); font-weight:600; }
+  .links { display:flex; flex-wrap:wrap; gap:6px 8px; margin:10px 0 0; }
+  .rlink { display:inline-flex; align-items:center; gap:5px; min-height:30px;
+           font-size:12.5px; font-weight:600; text-decoration:none;
+           color:var(--accent-text); background:var(--accent-soft);
+           border-radius:999px; padding:2px 12px; transition:filter .2s; }
+  .rlink:hover { filter:brightness(.96); }
+  .rlink .arr { opacity:.7; }
+  .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px; margin:8px 0 0; }
+  .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
+         font-size:13.5px; font-weight:600; color:var(--muted);
+         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         transition:color .2s, background .2s; }
+  .act:hover { color:var(--ink); background:var(--chip); }
+  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
+         background:transparent; transition:.3s; }
+  .entry.inhand .dot { background:var(--good); border-color:var(--good); }
+  .entry.inhand .mlabel { color:var(--good-text); }
+  .notewrap { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
+  .entry.noting .notewrap { grid-template-rows:1fr; }
+  .notewrap > div { overflow:hidden; }
+  textarea { width:100%; max-width:64ch; min-height:52px; resize:vertical; margin-top:10px;
+             font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+             background:var(--panel); border:1.5px solid var(--line);
+             border-radius:12px; padding:9px 12px; }
+  textarea::placeholder { color:var(--muted); }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .entry.hasnote .nlabel { color:var(--accent-text); }
+  .section { margin:56px 0 0; }
+  .section > h2 { font-size:22px; font-weight:700; margin:0 0 10px; }
+  .section ol { font-size:14.5px; padding-left:22px; }
+  .section li { margin:0 0 6px; }
+  .tier-intro { margin:6px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .empty { display:none; padding:44px 0; text-align:center;
+           font-size:17px; color:var(--muted); }
+  .empty.show { display:block; }
+  .no-shelf { margin:34px 0 0; padding:24px 26px; font-size:15.5px;
+              line-height:1.65; max-width:64ch; }
+  .no-shelf p { margin:0 0 12px; }
+  .no-shelf p:last-child { margin-bottom:0; }
+  .no-shelf b { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow"><a href="index.html">← course hub</a>
+    <span class="sep">·</span> the resources
+    <span class="sep">·</span> 3 tiers </p>
+    <h1>Your resources</h1>
+    <p class="standfirst"><b>Tier 1</b> is the core path, worked through in curriculum order. <b>Tier 2</b> is a second voice on the same material, for when one explanation doesn't land. <b>Tier 3</b> is reference — looked up in, not read. Every entry says <i>why this one</i>. The core path is free; the one paid entry is optional and labelled as such.</p>
+    <div class="controls panel">
+      <div class="waypath" id="ticks" aria-hidden="true"></div>
+      <div class="meta-row">
+      <span class="wp-count" id="count"></span>
+      <span class="spacer"></span>
+      <button class="pill" id="f-free" aria-pressed="false">Free only</button>
+      <button class="pill" id="f-need" aria-pressed="false">Not in hand</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="list"></main>
+  <p class="empty" id="empty">Nothing matches this filter.</p>
+
+  <section class="section"><h2>Suggested reading order</h2><p class="tier-intro">The curriculum formalizes this; here it is at a glance.</p><ol><li>Crafting Interpreters, chapter by chapter alongside Units 0–4 (the spine)</li><li>Pratt's binding-power article once Unit 2's precedence cascade starts to itch</li><li>Python's tokenize and ast docs as reference, from Unit 1 onward</li><li>Writing an Interpreter in Go, optionally, as a second pass in another voice</li></ol></section>
+
+  <footer>
+    Rendered by curricle from the course manifest — canonical text:
+    <a href="learning-resources.md">learning-resources.md</a>. In-hand marks and notes
+    live in this browser's localStorage ·
+    <a href="curriculum.html">the curriculum</a> ·
+    <a href="index.html">← back to the hub</a>
+  </footer>
+</div>
+<div class="saving" id="toast">Saved</div>
+<script>
+function waypath(el, ids, done, nextId) {
+  const had = el._wp || null;
+  el._wp = {};
+  ids.forEach((id, i) => {
+    let s = el.children[i];
+    if (!s) { s = document.createElement("span"); el.appendChild(s); }
+    const lit = !!done(id);
+    s.className = "wp-stone" + (lit ? " lit" : "") + (id === nextId ? " here" : "");
+    if (had && had[id] === false && lit) {
+      s.classList.add("pop");
+      s.addEventListener("animationend", () => s.classList.remove("pop"), { once: true });
+    }
+    el._wp[id] = lit;
+  });
+  while (el.children.length > ids.length) el.lastChild.remove();
+}
+const KEY = "tinylang-resources";
+const API = null;          // null: localStorage mode; else: POST events here
+const INITIAL = null;  // {inhand, notes} server-folded, or null
+const TIERS = [{"num": "1", "name": "Core path", "role": "Worked through substantially, in curriculum order.", "compact": false, "groups": [{"sub": "Building interpreters", "entries": [{"id": "crafting", "title": "Crafting Interpreters", "cite": "Robert Nystrom · Genever Benning · 2021", "chips": [["text", ""], ["code", ""], ["free online", "good"]], "free": true, "links": [["Read online", "https://craftinginterpreters.com/"]], "why": "The spine of this course, and the rare technical book that is both complete and enjoyable. It builds two full interpreters — a tree-walker and a bytecode VM — with every line of code on the page and every design decision argued rather than asserted. The whole of Phases 0–2 hangs off its first half.", "access": "Free in full online; the print and ebook editions are the same text if you prefer paper."}, {"id": "pratt", "title": "“Pratt Parsers: Expression Parsing Made Easy”", "cite": "Robert Nystrom · journal.stuffwithstuff.com · 2011", "chips": [["text", ""], ["free", "good"]], "free": true, "links": [["Read online", "https://journal.stuffwithstuff.com/2011/03/19/pratt-parsers-expression-parsing-made-easy/"]], "why": "Unit 2's technique, in one sitting. Recursive descent handles precedence with a cascade of near-identical functions; Pratt parsing replaces the cascade with a table of binding powers that you extend by adding a row. Read it after feeling the repetition it removes — the argument doesn't land before then.", "access": ""}]}]}, {"num": "2", "name": "Depth on demand", "role": "A second voice on the same material, for when one explanation doesn't land.", "compact": false, "groups": [{"sub": "Building interpreters", "entries": [{"id": "interpreterbook", "title": "Writing an Interpreter in Go", "cite": "Thorsten Ball · 2018", "chips": [["text", ""], ["code", ""], ["paid ~$35 (with its sequel)", "warn"]], "free": false, "links": [["Book site", "https://interpreterbook.com/"]], "why": "The same journey in a different voice and a different language, at a gentler slope. Useful precisely when the primary source doesn't land: hearing the second explanation of an environment chain is often what makes the first one make sense. Optional — nothing in the curriculum depends on it.", "access": "Paid, and genuinely optional. Skip it unless a Tier 1 explanation has failed you."}]}]}, {"num": "3", "name": "Reference", "role": "Looked up in, not read.", "compact": true, "groups": [{"sub": "Reference", "entries": [{"id": "tokenize", "title": "Python: the tokenize module", "cite": "Python documentation", "chips": [["tool", ""], ["free", "good"]], "free": true, "links": [["docs.python.org", "https://docs.python.org/3/library/tokenize.html"]], "why": "A production lexer you can run against your own files (<code>python -m tokenize file.py</code>) and compare with yours. Its token kinds are a checklist of the cases a real language has to handle and a toy one gets to skip.", "access": ""}, {"id": "pyast", "title": "Python: the ast module", "cite": "Python documentation", "chips": [["tool", ""], ["free", "good"]], "free": true, "links": [["docs.python.org", "https://docs.python.org/3/library/ast.html"]], "why": "A real syntax tree to compare your node design against. <code>ast.dump(ast.parse(\"1 + 2 * 3\"))</code> in the REPL is the fastest way to see how a grown-up language shapes the same tree you are building in Unit 2.", "access": ""}]}]}];
+
+let state = Object.assign({ inhand: {}, notes: {} }, INITIAL || {});
+if (!API) {
+  try { state = Object.assign(state, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+}
+function send(kind, id, payload) {
+  fetch(API, { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind, subject_id: id, payload }) }).catch(() => {});
+}
+
+const TIER1_IDS = (TIERS[0] || {groups:[]}).groups.flatMap(g => g.entries.map(e => e.id));
+const ALL = TIERS.flatMap(t => t.groups.flatMap(g => g.entries));
+const $ = id => document.getElementById(id);
+const esc = s => s.replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+let saveTimer, toastTimer;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); toast("Saved"); } catch (e) {}
+  }, 400);
+}
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1200);
+}
+
+function render() {
+  $("list").innerHTML = TIERS.map(tier => `
+    <section class="tier">
+      <div class="tier-head">
+        <span class="tier-num">${tier.num}</span>
+        <h2 class="tier-name">${tier.name}</h2>
+      </div>
+      <p class="tier-role">${tier.role}</p>
+      ${tier.groups.map(g => `
+        ${g.sub ? `<p class="subhead">${g.sub}</p>` : ""}
+        ${g.entries.map(e => `
+          <article id="res-${e.id}" class="entry${tier.compact ? " compact" : ""}${state.inhand[e.id] ? " inhand" : ""}${state.notes[e.id] ? " hasnote" : ""}" data-id="${e.id}">
+            <h3 class="title">${e.links.length
+              ? `<a href="${e.links[0][1]}" ${e.links[0][1].startsWith("http") ? 'target="_blank" rel="noopener"' : ""}>${e.title}</a>`
+              : e.title}<span class="chips">${e.chips.map(([t, c]) =>
+                `<span class="chip${c ? " " + c : ""}">${t}</span>`).join("")}</span></h3>
+            ${e.cite ? `<p class="cite">${e.cite}</p>` : ""}
+            ${e.why ? `<p class="why"><span class="why-mark"></span><span class="why-text">${e.why}</span></p>` : ""}
+            ${e.access ? `<p class="access">${e.access}</p>` : ""}
+            ${e.links.length ? `<div class="links">${e.links.map(([l, u]) =>
+              `<a class="rlink" href="${u}" ${u.startsWith("http") ? 'target="_blank" rel="noopener"' : ""}>${l}<span class="arr">↗</span></a>`).join("")}</div>` : ""}
+            <div class="actions">
+              <button class="act mark"><span class="dot"></span><span class="mlabel">${state.inhand[e.id] ? "In hand" : "Mark in hand"}</span></button>
+              <button class="act note nlabel">Note${state.notes[e.id] ? " ●" : ""}</button>
+            </div>
+            <div class="notewrap"><div>
+              <textarea placeholder="Loan due dates, which edition you bought, where your copy lives…">${esc(state.notes[e.id] || "")}</textarea>
+            </div></div>
+          </article>`).join("")}`).join("")}
+    </section>`).join("");
+  wire();
+  updateMeter();
+  applyFilter();
+}
+
+function updateMeter() {
+  const n = TIER1_IDS.filter(i => state.inhand[i]).length;
+  const nextId = TIER1_IDS.find(i => !state.inhand[i]) || null;
+  $("count").textContent = `core path: ${n} of ${TIER1_IDS.length} in hand`;
+  waypath($("ticks"), TIER1_IDS, i => !!state.inhand[i], nextId);
+}
+
+function wire() {
+  document.querySelectorAll(".entry").forEach(entry => {
+    const id = entry.dataset.id;
+    entry.querySelector(".mark").addEventListener("click", () => {
+      state.inhand[id] = !state.inhand[id];
+      entry.classList.toggle("inhand", state.inhand[id]);
+      entry.querySelector(".mlabel").textContent = state.inhand[id] ? "In hand" : "Mark in hand";
+      updateMeter();
+      if (API) send("resource_mark", id, { inhand: !!state.inhand[id] }); else save();
+      if (needOnly) setTimeout(applyFilter, 600);
+    });
+    entry.querySelector(".note").addEventListener("click", () => {
+      entry.classList.toggle("noting");
+      if (entry.classList.contains("noting")) entry.querySelector("textarea").focus();
+    });
+    const ta = entry.querySelector("textarea");
+    ta.addEventListener("input", () => {
+      state.notes[id] = ta.value;
+      entry.classList.toggle("hasnote", !!ta.value);
+      entry.querySelector(".note").textContent = "Note" + (ta.value ? " ●" : "");
+      if (API) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => { send("resource_note", id, { text: ta.value }); toast("Saved"); }, 400);
+      } else save();
+    });
+  });
+}
+
+let freeOnly = false, needOnly = false;
+function applyFilter() {
+  let shown = 0;
+  document.querySelectorAll(".entry").forEach(entry => {
+    const e = ALL.find(x => x.id === entry.dataset.id);
+    const hide = (freeOnly && !e.free) || (needOnly && state.inhand[e.id]);
+    entry.classList.toggle("hidden", hide);
+    if (!hide) shown++;
+  });
+  document.querySelectorAll(".tier").forEach(t => {
+    const any = [...t.querySelectorAll(".entry")].some(x => !x.classList.contains("hidden"));
+    t.style.display = any ? "" : "none";
+  });
+  document.querySelectorAll(".subhead").forEach(sh => {
+    let el = sh.nextElementSibling, any = false;
+    while (el && el.classList.contains("entry")) {
+      if (!el.classList.contains("hidden")) { any = true; break; }
+      el = el.nextElementSibling;
+    }
+    sh.style.display = any ? "" : "none";
+  });
+  $("empty").classList.toggle("show", shown === 0);
+}
+function wireFilter(btn, get, set) {
+  btn.addEventListener("click", () => {
+    set(!get());
+    btn.setAttribute("aria-pressed", String(get()));
+    applyFilter();
+  });
+}
+wireFilter($("f-free"), () => freeOnly, v => freeOnly = v);
+wireFilter($("f-need"), () => needOnly, v => needOnly = v);
+
+render();
+</script>
+</body>
+</html>

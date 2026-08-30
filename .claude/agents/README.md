@@ -6,10 +6,13 @@ anyone working in this repository.
 
 ## Where they come from
 
-The bodies are the portable role definitions from `~/.claude/agents/` (and, for
-the two that only existed there, `~/repos/job-radar/.claude/agents/`). Each file
-then carries an appended `## In this repo` section holding only what that role
-additionally needs to know about curricle.
+The bodies are portable role definitions maintained outside this repository —
+originally the author's user-level `~/.claude/agents/` and a sibling project.
+Each file then carries an appended `## In this repo` section holding only what
+that role additionally needs to know about curricle.
+
+That upstream is personal and not public, so treat these two files as the
+authoritative copies here. Nothing depends on the upstream existing.
 
 Keep project context in the appended section and nowhere else, so re-syncing an
 upstream improvement stays a mechanical diff above the `---`.

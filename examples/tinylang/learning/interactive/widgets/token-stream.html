@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Stream Explorer — tinylang</title>
+<link rel="stylesheet" href="../../theme.css">
+<style>
+  /* Native to curricle (see DIRECTION.md, "The material contract"): chrome
+     comes from the served theme.css and this file defines no palette. Local
+     tokens are data ink only — one tint per token class, defined per theme
+     like any token pair. */
+  :root { --t-num:#E4EFE0; --t-str:#FBE9E2; --t-word:#E4EBF5;
+          --t-op:#F3E8D2; --t-end:#EDEDED; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme=light]) {
+      --t-num:#2C3A2A; --t-str:#43291F; --t-word:#263041;
+      --t-op:#3B3222; --t-end:#2A2A2A; }
+  }
+  :root[data-theme=dark] {
+    --t-num:#2C3A2A; --t-str:#43291F; --t-word:#263041;
+    --t-op:#3B3222; --t-end:#2A2A2A; }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 20px 80px; }
+  h1 { font-size: 26px; margin: 14px 0 6px; }
+  h2 { font-size: 18px; margin: 32px 0 8px; }
+  .sub { color: var(--muted); margin: 0 0 14px; font-size: 14.5px; max-width: 62ch; }
+  .panel { border: 1px solid var(--line); border-radius: 12px;
+           background: var(--panel); padding: 14px 16px; }
+  textarea { width: 100%; box-sizing: border-box; min-height: 108px;
+             font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             font-size: 14px; line-height: 1.55; padding: 10px 12px;
+             border: 1px solid var(--line); border-radius: 8px;
+             background: var(--bg); color: var(--ink); resize: vertical; }
+  .cases { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
+  button.case { padding: 5px 12px; font-size: 13.5px; cursor: pointer;
+                border: 1.5px solid var(--line); border-radius: 999px;
+                background: var(--chip); color: var(--ink); }
+  button.case:hover { border-color: var(--accent); }
+  .stream { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .tok { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px;
+         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+         font-size: 13px; line-height: 1.35; text-align: center; }
+  .tok .k { display: block; font-size: 10.5px; letter-spacing: .04em;
+            color: var(--muted); font-family: inherit; }
+  .tok.NUMBER { background: var(--t-num); }
+  .tok.STRING { background: var(--t-str); }
+  .tok.IDENT, .tok.KEYWORD { background: var(--t-word); }
+  .tok.OP, .tok.LPAREN, .tok.RPAREN { background: var(--t-op); }
+  .tok.EOF { background: var(--t-end); color: var(--muted); }
+  .err { margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+         border: 1px solid var(--warn-line, var(--line));
+         background: var(--chip); color: var(--warn-text, var(--ink));
+         font-size: 14px; }
+  .count { color: var(--muted); font-size: 13.5px; margin: 10px 0 0; }
+  .note { color: var(--muted); font-size: 14px; line-height: 1.6;
+          max-width: 62ch; margin: 10px 0 0; }
+  table.kinds { border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+  table.kinds th, table.kinds td { border: 1px solid var(--line);
+                                   padding: 5px 10px; text-align: left; }
+  table.kinds th { background: var(--chip); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Token stream explorer</h1>
+  <p class="sub">Type tinylang source and watch it split into tokens. The
+  presets below are the cases that separate a working lexer from a
+  nearly-working one — run each of them past your own <code>lex()</code> and
+  compare.</p>
+
+  <div class="panel">
+    <textarea id="src" spellcheck="false" aria-label="tinylang source"></textarea>
+    <div class="cases" id="cases"></div>
+  </div>
+
+  <h2>Tokens</h2>
+  <div id="out"></div>
+  <p class="count" id="count"></p>
+
+  <h2>What to notice</h2>
+  <p class="note" id="note"></p>
+
+  <h2>The kinds</h2>
+  <table class="kinds">
+    <tr><th>Kind</th><th>What it holds</th></tr>
+    <tr><td>NUMBER</td><td>An integer or decimal literal.</td></tr>
+    <tr><td>STRING</td><td>A double-quoted literal, quotes stripped.</td></tr>
+    <tr><td>IDENT</td><td>A name that is not a keyword.</td></tr>
+    <tr><td>KEYWORD</td><td>One of <code>let true false nil print</code>.</td></tr>
+    <tr><td>OP</td><td>An operator, taken by longest match.</td></tr>
+    <tr><td>LPAREN / RPAREN</td><td>Grouping, kept separate for the parser's benefit.</td></tr>
+    <tr><td>EOF</td><td>The end. Always exactly one, always last.</td></tr>
+  </table>
+
+</div>
+
+<script>
+"use strict";
+
+var KEYWORDS = ["let", "true", "false", "nil", "print"];
+// Longest first: the operator scan takes the first match, so ordering is what
+// implements maximal munch here.
+var OPS = ["==", "!=", "<=", ">=", "+", "-", "*", "/", "<", ">", "="];
+
+var CASES = [
+  { label: "A first program",
+    src: 'let x = 1 + 2\nprint x',
+    note: "The easy case, and the one every first draft handles. Everything below is the part that bites." },
+  { label: "No spaces",
+    src: 'let x = 1+2',
+    note: "Three tokens, not one. A number ends at the first character that cannot extend it — which means the lexer looked ahead to decide. If yours produces one NUMBER here, that lookahead is missing." },
+  { label: "Two-character operators",
+    src: 'x <= 1\ny >= 2\nz == 3',
+    note: "One token each, not two. Take the longest match at every position (“maximal munch”), which in practice means checking the two-character operators before the one-character ones." },
+  { label: "Keyword prefixes",
+    src: 'let lettuce = 1',
+    note: "“lettuce” is an IDENT, not KEYWORD + IDENT. Scan the whole word first, then ask whether the finished word is a keyword. Matching keywords by prefix is the bug this case exists to catch." },
+  { label: "A comment holding code",
+    src: 'let x = 1  # let y = "2"\nprint x',
+    note: "Everything after # is gone, including things that look like tokens. Comments are discarded by the lexer, so the parser never learns they existed." },
+  { label: "A # inside a string",
+    src: 'print "the # is data"',
+    note: "The opposite of the last case: inside a string, # is an ordinary character. Whichever construct opened first wins, and a lexer that checks for comments before checking whether it is inside a string gets this wrong." },
+  { label: "Unterminated string",
+    src: 'let s = "oops',
+    note: "A lex error, and it should name the line rather than raise a traceback. The characters here do not form words at all — which is a different failure from a parse error, and deserves a different message." }
+];
+
+function isDigit(c) { return c >= "0" && c <= "9"; }
+function isAlpha(c) { return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z") || c === "_"; }
+function isAlnum(c) { return isAlpha(c) || isDigit(c); }
+
+// A reference lexer, written the way Unit 1 asks you to write yours: one pass,
+// one character of lookahead, no regular expressions.
+function lex(src) {
+  var toks = [];
+  var i = 0, line = 1;
+  while (i < src.length) {
+    var c = src[i];
+
+    if (c === "\n") { line++; i++; continue; }
+    if (c === " " || c === "\t" || c === "\r") { i++; continue; }
+    if (c === "#") { while (i < src.length && src[i] !== "\n") i++; continue; }
+
+    if (isDigit(c)) {
+      var start = i;
+      while (i < src.length && isDigit(src[i])) i++;
+      if (src[i] === "." && isDigit(src[i + 1])) {
+        i++;
+        while (i < src.length && isDigit(src[i])) i++;
+      }
+      toks.push({ kind: "NUMBER", text: src.slice(start, i), line: line });
+      continue;
+    }
+
+    if (c === '"') {
+      var s = i + 1, buf = "";
+      while (s < src.length && src[s] !== '"') {
+        if (src[s] === "\n") break;
+        buf += src[s]; s++;
+      }
+      if (s >= src.length || src[s] !== '"') {
+        return { error: "unterminated string on line " + line, tokens: toks };
+      }
+      toks.push({ kind: "STRING", text: buf, line: line });
+      i = s + 1;
+      continue;
+    }
+
+    if (isAlpha(c)) {
+      var w = i;
+      while (i < src.length && isAlnum(src[i])) i++;
+      var word = src.slice(w, i);
+      toks.push({
+        kind: KEYWORDS.indexOf(word) >= 0 ? "KEYWORD" : "IDENT",
+        text: word, line: line
+      });
+      continue;
+    }
+
+    if (c === "(") { toks.push({ kind: "LPAREN", text: "(", line: line }); i++; continue; }
+    if (c === ")") { toks.push({ kind: "RPAREN", text: ")", line: line }); i++; continue; }
+
+    var matched = null;
+    for (var k = 0; k < OPS.length; k++) {
+      if (src.startsWith(OPS[k], i)) { matched = OPS[k]; break; }
+    }
+    if (matched) {
+      toks.push({ kind: "OP", text: matched, line: line });
+      i += matched.length;
+      continue;
+    }
+
+    return { error: "unexpected character " + JSON.stringify(c) + " on line " + line, tokens: toks };
+  }
+  toks.push({ kind: "EOF", text: "", line: line });
+  return { error: null, tokens: toks };
+}
+
+var srcEl = document.getElementById("src");
+var outEl = document.getElementById("out");
+var countEl = document.getElementById("count");
+var noteEl = document.getElementById("note");
+var casesEl = document.getElementById("cases");
+var currentNote = CASES[1].note;
+
+function render() {
+  var res = lex(srcEl.value);
+  outEl.textContent = "";
+
+  var stream = document.createElement("div");
+  stream.className = "stream";
+  res.tokens.forEach(function (t) {
+    var el = document.createElement("div");
+    el.className = "tok " + t.kind;
+    var k = document.createElement("span");
+    k.className = "k";
+    k.textContent = t.kind;
+    el.appendChild(k);
+    el.appendChild(document.createTextNode(
+      t.kind === "EOF" ? "·" : (t.kind === "STRING" ? '"' + t.text + '"' : t.text)));
+    el.title = t.kind + " on line " + t.line;
+    stream.appendChild(el);
+  });
+  outEl.appendChild(stream);
+
+  if (res.error) {
+    var e = document.createElement("div");
+    e.className = "err";
+    e.textContent = "LexError: " + res.error;
+    outEl.appendChild(e);
+    countEl.textContent = res.tokens.length + " token(s) before the error — and no EOF, because the scan never finished.";
+  } else {
+    countEl.textContent = res.tokens.length + " tokens, including the final EOF.";
+  }
+
+  noteEl.textContent = currentNote;
+}
+
+CASES.forEach(function (c) {
+  var b = document.createElement("button");
+  b.className = "case";
+  b.type = "button";
+  b.textContent = c.label;
+  b.addEventListener("click", function () {
+    srcEl.value = c.src;
+    currentNote = c.note;
+    render();
+  });
+  casesEl.appendChild(b);
+});
+
+srcEl.addEventListener("input", function () {
+  currentNote = "Your own input — the presets above each carry a note about what they are testing.";
+  render();
+});
+
+srcEl.value = CASES[1].src;
+render();
+</script>
+</body>
+</html>

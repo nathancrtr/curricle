@@ -5,7 +5,7 @@ structure a renderer or the progress service consumes is defined here, and
 nowhere else. Decoding is strict: an unknown key raises, because a silently
 ignored field is a schema disagreement waiting to ship.
 
-Design rules carried over from the schema spec (learning/platform-manifest.md):
+Design rules carried over from the schema spec (docs/platform-manifest.md):
 ids are forever (tombstones, never deletion); attachment is declared once on
 the material; tags are computed, never stored; everything progress-bearing is
 enumerable via ``Manifest.progress_ids()``.

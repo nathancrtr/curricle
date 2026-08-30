@@ -1,10 +1,12 @@
 # CLAUDE.md
 
 curricle is the platform distilled from the learning-track corpus. Read
-`~/repos/learning/platform-design.md` (the architecture and its decided
-trade-offs) and `~/repos/learning/platform-manifest.md` (the schema spec)
-before changing anything structural — decisions recorded there are settled
-unless the user reopens them.
+`docs/platform-design.md` (the architecture and its decided trade-offs) and
+`docs/platform-manifest.md` (the schema spec) before changing anything
+structural — decisions recorded there are settled unless the user reopens
+them. Both are vendored copies of the originating design documents, so the
+repository is self-contained; they cite a private corpus for evidence but
+depend on none of it.
 
 ## Commands
 
@@ -33,6 +35,14 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   `../rhyme-schemer`) and skips when absent. The progress-id pin for
   textual-flow is a migration-safety contract — do not "fix" it to match
   code; fix code to match it, or consciously migrate.
+- `examples/tinylang` is the shipped course: the compiler's integration
+  coverage for anyone without the private corpus, and the thing people copy.
+  `tests/test_example_course.py` never skips and holds it to **zero warnings**,
+  not just zero errors. It is the one course that has to keep exercising every
+  part of the schema — a track, a non-unit milestone, all four material kinds,
+  a grader, and all four ref schemes — so add there when the schema grows.
+  Its Unit 2 starter ships red on purpose and a test enforces that; solving it
+  in the repo is the failure mode being guarded.
 - Compiled manifests in `build/` are committed for inspection; regenerate
   them in the same commit as any compiler or sidecar change.
 - The YAML `on:` key parses as boolean True (YAML 1.1); the sidecar loader
@@ -79,7 +89,12 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - Claim identity is (field, key) and keys are forever; the field vocabulary
   is `profile.FIELDS` — grow it deliberately, renderers know the sections.
 - The personal seed lives in gitignored `local/`; tests use synthetic
-  fixtures only.
+  fixtures only. The rendered personal projection is gitignored too
+  (`build/learner-profile-SKILL.md`) — it is one person's evidence, not an
+  artifact of this repository. What ships instead is
+  `examples/example-profile-seed.yaml` (a fictional learner) and
+  `build/example-profile-SKILL.md`, exactly what `import-seed` + `render`
+  produce from it. Regenerate that pair together, never by hand.
 
 ## The course factory (Phase 3)
 
@@ -89,6 +104,14 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   calls it (invariant L1: no LLM on a request path, ever).
 - `models.yaml` is the only file naming a model or a price. Roles and code
   say cheap/frontier/premium. A price change is a YAML edit.
+- `models.yaml` and `roles/` are operator-editable configuration, so they stay
+  at the checkout root and are resolved per call by `llm.home()` —
+  `CURRICLE_HOME` if set, else the directory above the package. That makes the
+  factory a checkout-mode feature: an installed curricle has the compiler, the
+  renderers, and the web app but no role contracts, and must say so
+  (`FactoryConfigMissing`) rather than dying inside a YAML parse. Don't move
+  these into the package to "fix" the install — burying them in site-packages
+  defeats their purpose.
 - Role contracts live in `roles/*.md` (frontmatter + system prompt). The
   factory prompt = derived learner profile + manifest phase context +
   exemplars from the course's own earlier phases. Calibration is the point.

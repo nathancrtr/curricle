@@ -11,8 +11,10 @@ import textwrap
 import unittest
 from decimal import Decimal
 
-from curricle import db, factory, profile
-from curricle.llm import BudgetExceeded, Runner, load_models_config, load_role
+from curricle import db, factory, llm, profile
+from curricle.llm import (
+    BudgetExceeded, FactoryConfigMissing, Runner, load_models_config, load_role,
+)
 
 from corpuspaths import HAVE_ML, ML_ROOT
 from pg import test_engine
@@ -108,6 +110,70 @@ class ValidatorTest(unittest.TestCase):
         self.assertIn("Phase 2 Checkpoint", out)
         self.assertIn("Question 0?", out)
         self.assertNotIn("'old'", out)
+
+
+class ConfigLocationTest(unittest.TestCase):
+    """Where the factory reads `models.yaml` and `roles/` from.
+
+    They live at the checkout root because they are operator-editable
+    configuration, which makes the factory a checkout-mode feature: an
+    installed curricle has the compiler and the web app but no role contracts.
+    That is a supported outcome, not a bug — so it has to fail *legibly*
+    rather than as a FileNotFoundError from inside a YAML parse.
+    """
+
+    def setUp(self):
+        self._saved = os.environ.get("CURRICLE_HOME")
+
+    def tearDown(self):
+        if self._saved is None:
+            os.environ.pop("CURRICLE_HOME", None)
+        else:
+            os.environ["CURRICLE_HOME"] = self._saved
+
+    def test_defaults_to_the_checkout_root(self):
+        os.environ.pop("CURRICLE_HOME", None)
+        self.assertEqual(llm.home(), llm.REPO_ROOT)
+        self.assertTrue(os.path.isfile(llm.models_path()))
+        self.assertTrue(os.path.isdir(llm.roles_dir()))
+
+    def test_curricle_home_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["CURRICLE_HOME"] = tmp
+            # Resolved per call, not pinned at import: setting it late works.
+            self.assertEqual(llm.home(), tmp)
+            self.assertEqual(llm.models_path(), os.path.join(tmp, "models.yaml"))
+
+    def test_a_home_holding_a_real_config_is_used(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "roles"))
+            with open(os.path.join(llm.models_path()), encoding="utf-8") as f:
+                real = f.read()
+            with open(os.path.join(tmp, "models.yaml"), "w", encoding="utf-8") as f:
+                f.write(real)
+            with open(os.path.join(tmp, "roles", "quiz-author.md"), "w",
+                      encoding="utf-8") as f:
+                f.write("---\nname: quiz-author\n---\nA stand-in contract.\n")
+            os.environ["CURRICLE_HOME"] = tmp
+            self.assertEqual(load_role("quiz-author").system,
+                             "A stand-in contract.")
+            self.assertTrue(load_models_config().tiers)
+
+    def test_missing_models_yaml_says_what_to_do(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["CURRICLE_HOME"] = tmp
+            with self.assertRaises(FactoryConfigMissing) as caught:
+                load_models_config()
+        message = str(caught.exception)
+        self.assertIn("models.yaml", message)
+        self.assertIn("CURRICLE_HOME", message)
+
+    def test_missing_role_names_the_role(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            os.environ["CURRICLE_HOME"] = tmp
+            with self.assertRaises(FactoryConfigMissing) as caught:
+                load_role("quiz-author")
+        self.assertIn("quiz-author", str(caught.exception))
 
 
 class RunnerTest(unittest.TestCase):

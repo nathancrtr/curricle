@@ -823,8 +823,8 @@ phases:
     quiz: q-phase-1
     track_goals:
     - - greek
-      - Decker through ~ch. 8; you can parse articles and first/second-declension nouns and are reading
-        the exercise sentences without dread.
+      - '[Decker](res:decker) through ~ch. 8; you can parse articles and first/second-declension nouns
+        and are reading the exercise sentences without dread.'
 - id: p2
   num: 2
   title: The critics and the dispute
@@ -845,8 +845,8 @@ phases:
       would settle this?"
     track_goals:
     - - greek
-      - Decker through ~ch. 14; verbs have arrived (present/imperfect); you're translating short LXX/NT
-        sentences daily.
+      - '[Decker](res:decker) through ~ch. 14; verbs have arrived (present/imperfect); you''re translating
+        short LXX/NT sentences daily.'
 - id: p3
   num: 3
   title: Building the simulator
@@ -866,8 +866,9 @@ phases:
       all seeded and reproducible. Nobody has ever had this for the CBGM.'
     track_goals:
     - - greek
-      - Decker through ~ch. 20 (aorist unlocked). **Start reading 1 John** alongside — a chapter a week
-        with STEP Bible's tagged text; it will humble and then encourage you.
+      - '[Decker](res:decker) through ~ch. 20 (aorist unlocked). **Start reading 1 John** alongside —
+        a chapter a week with [STEP Bible](res:step)''s tagged text; it will humble and then encourage
+        you.'
 - id: p4
   num: 4
   title: The simulation study
@@ -884,9 +885,9 @@ phases:
     prose: 'Deliverable #1 exists and is public. You can defend every number in it.'
     track_goals:
     - - greek
-      - 'Decker finished or nearly (chs. ~28–33 are reference-grade; don''t stall on them); 1–3 John read
-        in Greek; and — via the apparatus-trainer and die-bibel.de''s NA28 — you can decode an apparatus
-        entry: witnesses, readings, the sigla that once looked like line noise.'
+      - '[Decker](res:decker) finished or nearly (chs. ~28–33 are reference-grade; don''t stall on them);
+        1–3 John read in Greek; and — via the apparatus-trainer and [die-bibel.de](res:na28)''s NA28 —
+        you can decode an apparatus entry: witnesses, readings, the sigla that once looked like line noise.'
 - id: p5
   num: 5
   title: The sensitivity study
@@ -905,8 +906,8 @@ phases:
       every unstable variation unit in Greek yourself.'
     track_goals:
     - - greek
-      - intermediate reading (Mark with helps; Wallace as shelf reference); you can follow a *Textual
-        Commentary* entry and have opinions about it.
+      - intermediate reading (Mark with helps; [Wallace](res:wallace) as shelf reference); you can follow
+        a [*Textual Commentary*](res:metzger) entry and have opinions about it.
 - id: p6
   num: 6
   title: The philology apprenticeship → the LLM study
@@ -927,32 +928,29 @@ units:
   title: Orientation
   rows:
   - label: Build
-    content: 'Clone and build [open-cbgm](https://github.com/jjmccollum/open-cbgm) (and `open-cbgm-standalone`).
-      Run the full pipeline on the bundled ECM **3 John** collation (137 witnesses × 116 variation units):
-      populate the cache, print a witness comparison, generate one textual-flow diagram and the global
-      stemma. Don''t understand it yet — just make it run and look at every output artifact.'
+    content: 'Clone and build [open-cbgm](res:opencbgm) (and `open-cbgm-standalone`). Run the full pipeline
+      on the bundled ECM **3 John** collation (137 witnesses × 116 variation units): populate the cache,
+      print a witness comparison, generate one textual-flow diagram and the global stemma. Don''t understand
+      it yet — just make it run and look at every output artifact.'
   - label: Read
     content: this repo's `README.md` and `REVIEW.md` (where this program sits in the field); `exploration/convergence.md`
-      (why these questions); Wasserman & Gurry, *A New Approach to Textual Criticism*, front matter +
-      ch. 1 — and skim the whole book fast (~100 pp.) for shape, not mastery.
+      (why these questions); [Wasserman & Gurry](res:wg), *A New Approach to Textual Criticism*, front
+      matter + ch. 1 — and skim the whole book fast (~100 pp.) for shape, not mastery.
   - label: Concepts
     content: why "the original text" became "the initial text (*Ausgangstext*)"; the CBGM pipeline at
       cartoon level (local decisions → coherence → textual flow → global stemma); what an ECM variation
       unit is; what this program will do to that pipeline (perturb it, simulate it, imitate its human
       layer).
   - label: Greek track
-    content: 'the alphabet until it''s boring. Decker, *Reading Koine Greek* chs. 1–2; write the alphabet
-      daily; pick a pronunciation and stop worrying about it (Erasmian if you want to match Mounce/Daily
-      Dose materials; reconstructed Koine if your linguist''s conscience insists — Decker discusses the
-      options). Set up the Anki deck. The boring machine: `interactive/quizzes/greek-alphabet-trainer.html`
+    content: 'the alphabet until it''s boring. [Decker](res:decker), *Reading Koine Greek* chs. 1–2; write
+      the alphabet daily; pick a pronunciation and stop worrying about it (Erasmian if you want to match
+      [Mounce](res:mounce)/[Daily Dose](res:ddg) materials; reconstructed Koine if your linguist''s conscience
+      insists — Decker discusses the options). Set up the [Anki deck](res:anki). The boring machine: `interactive/quizzes/greek-alphabet-trainer.html`
       — reference table + four streak drills.'
     track: greek
   - label: Milestone
     content: 'open-cbgm outputs in hand for 3 John; a paragraph in your own words: what does the CBGM
       take in, what does it emit, and where in that pipe do humans sit?'
-  - label: Interactive
-    content: quiz `interactive/quizzes/phase-0-checkpoint.html` — take it after the skim; it grades the
-      milestone paragraph's ingredients.
   gloss: Make open-cbgm run on 3 John, skim the map of the field, start the alphabet — and say in one
     paragraph where the humans sit in the pipe.
   provenance: bespoke
@@ -975,13 +973,14 @@ units:
   title: Witnesses, variants, and the shape of the data
   rows:
   - label: Build
-    content: 'A TEI collation parser. Read the 3 John TEI XML from open-cbgm''s `examples/`; parse it
-      (lxml or ElementTree) into your own model: `VariationUnit`, `Reading`, `Witness`, attestations.
+    content: 'A TEI collation parser. Read the 3 John TEI XML from [open-cbgm](res:opencbgm)''s `examples/`;
+      parse it (lxml or ElementTree) into your own model: `VariationUnit`, `Reading`, `Witness`, attestations.
       Print summary tables: units per chapter, readings per unit, coverage per witness (lacunae!).'
   - label: Read
-    content: Wasserman & Gurry ch. 1 carefully this time; Parker, *An Introduction to the NT Manuscripts
-      and Their Texts*, the chapters on what manuscripts are and how an edition is made (Parts I–II selectively);
-      the TEI Critical Apparatus module docs as reference while parsing.
+    content: '[Wasserman & Gurry](res:wg) ch. 1 carefully this time; [Parker](res:parker), *An Introduction
+      to the NT Manuscripts and Their Texts*, the chapters on what manuscripts are and how an edition
+      is made (Parts I–II selectively); the [TEI Critical Apparatus module](res:teimodule) docs as reference
+      while parsing.'
   - label: Concepts
     content: witness, reading, variation unit, lacuna, correction hands (424C!); positive vs. negative
       apparatus; why "witness" ≠ "manuscript" (versions, fathers); the ECM as data, not book.
@@ -995,10 +994,6 @@ units:
       mostly empty, every cell a philological judgment. You've spent a career normalizing other people's
       opinionated schemas; this one is just older.
     kind: key
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-01-collation-data-model.md`; starter `interactive/exercises/unit-01-starter/`
-      — the toy tradition as TEI, 12 failing tests, and the oracle is unit-02's fixture (same tradition,
-      two encodings — your parser proves it).
   gloss: Parse the ECM's TEI into your own data model — and meet the apparatus as a sparse matrix with
     an opinionated schema.
   provenance: bespoke
@@ -1009,13 +1004,13 @@ units:
   rows:
   - label: Build
     content: 'Implement percentage agreement: for every witness pair, agreements / jointly-extant units.
-      Produce each witness''s ranked "closest relatives" table. **Cross-validate:** open-cbgm''s witness
-      comparison output for the same pairs must match your numbers.'
+      Produce each witness''s ranked "closest relatives" table. **Cross-validate:** [open-cbgm](res:opencbgm)''s
+      witness comparison output for the same pairs must match your numbers.'
   - label: Read
-    content: Wasserman & Gurry, the pregenealogical coherence chapter; the INTF *Genealogical Queries*
-      guide (`intf.uni-muenster.de/cbgm2/guide_en.html`), "comparison of witnesses" and "potential ancestors"
-      modules — then use the live tool at `ntg.uni-muenster.de` on the Catholic Letters and find the same
-      witnesses you've been computing.
+    content: '[Wasserman & Gurry](res:wg), the pregenealogical coherence chapter; the INTF *Genealogical
+      Queries* guide ([`intf.uni-muenster.de/cbgm2/guide_en.html`](res:gq)), "comparison of witnesses"
+      and "potential ancestors" modules — then use the live tool at [`ntg.uni-muenster.de`](res:gq) on
+      the Catholic Letters and find the same witnesses you''ve been computing.'
   - label: Concepts
     content: pregenealogical = *no direction yet*, pure similarity; why percentages (not raw counts) —
       the lacunae problem; coherent vs. incoherent attestation; connectivity as "how many relatives count
@@ -1026,9 +1021,6 @@ units:
   - label: Milestone
     content: Green tests; your agreement matrix matches open-cbgm; you can say what it means that 01 and
       03 are (or aren't) close in 3 John.
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-02-pregenealogical-coherence.md`; widget `interactive/widgets/coherence-explorer.html`
-      (the toy tradition — inspect its agreement pane now, ignore the rest until Units 3–4).
   gloss: Percent agreement over jointly extant units — the pure-similarity layer that deliberately claims
     no direction.
   provenance: bespoke
@@ -1041,12 +1033,12 @@ units:
     content: 'Extend the parser to read the local stemmata encoded in the TEI (`<graph>` elements). Implement
       the genealogical comparison: for each witness pair (W1, W2), count units where W1''s reading is
       prior, posterior, equal, or unrelated per the local stemma. Derive potential-ancestor rankings.
-      Cross-validate against open-cbgm.'
+      Cross-validate against [open-cbgm](res:opencbgm).'
   - label: Read
-    content: 'Mink, "Contamination, Coherence, and Coincidence" (in Wachtel & Holmes, *The Textual History
-      of the Greek NT*) — first pass: read for the *definitions* (local stemma, coherence, potential ancestor),
-      skip the worked examples; you''ll return in Unit 5. Wasserman & Gurry''s corresponding chapter as
-      the gentler parallel text.'
+    content: '[Mink](res:mink), "Contamination, Coherence, and Coincidence" (in Wachtel & Holmes, *The
+      Textual History of the Greek NT*) — first pass: read for the *definitions* (local stemma, coherence,
+      potential ancestor), skip the worked examples; you''ll return in Unit 5. [Wasserman & Gurry](res:wg)''s
+      corresponding chapter as the gentler parallel text.'
   - label: Concepts
     content: a local stemma is a *directed graph over readings, not witnesses* — the single most commonly
       confused point in the entire method; how thousands of tiny directed judgments aggregate into witness-level
@@ -1065,9 +1057,6 @@ units:
       function. You have seen this architecture before: labeled training data feeding a model. Phase 6
       takes that analogy literally.'
     kind: key
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-03-local-stemmata.md`; the widget's local-stemma toggles
-      now make sense — flip arrows and watch the ancestor rankings move.
   gloss: Thousands of per-unit directed judgments aggregate into witness-level ancestry — and one flipped
     arrow can make a tie.
   provenance: bespoke
@@ -1079,10 +1068,10 @@ units:
   - label: Build
     content: Generate textual-flow diagrams from your own data structures (emit Graphviz DOT) for a "perfectly
       coherent" unit and a fragmented one. Implement the connectivity parameter and show how a flow diagram
-      changes at connectivity 5 vs. 499. Reproduce one diagram that matches open-cbgm's.
+      changes at connectivity 5 vs. 499. Reproduce one diagram that matches [open-cbgm](res:opencbgm)'s.
   - label: Read
-    content: Wasserman & Gurry, the textual flow + initial text chapters; the *Genealogical Queries* guide's
-      coherence-at-variant-passages module, used live against your diagrams.
+    content: '[Wasserman & Gurry](res:wg), the textual flow + initial text chapters; the [*Genealogical
+      Queries* guide](res:gq)''s coherence-at-variant-passages module, used live against your diagrams.'
   - label: Concepts
     content: textual flow as "for this attestation, where did the reading most plausibly flow from, given
       global coherence"; connectivity as a *prior on transmission promiscuity*; the initial text A as
@@ -1096,10 +1085,6 @@ units:
     content: 'Your mini-CBGM produces flow diagrams; a short note: "the three dials a human sets in this
       method are ___" (local stemmata, connectivity, witness selection — you''ll spend Phase 5 turning
       them).'
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-04-textual-flow.md`; widget `interactive/widgets/flow-explorer.html`
-      (the toy tradition's flow diagrams with the connectivity dial — the u3 experiment is the unit in
-      miniature); then quiz `interactive/quizzes/phase-1-checkpoint.html`.
   gloss: Flow diagrams, the connectivity prior, and the reconstructed witness A — where the editors' dials
     live.
   provenance: bespoke
@@ -1112,17 +1097,18 @@ units:
     content: 'Nothing new — annotate. Maintain a `notes/dispute.md` capturing every *testable* claim you
       encounter, in a table: claim · source · what data would decide it.'
   - label: Read
-    content: Gurry, *A Critical Examination of the CBGM*, the chapters on the method's assumptions and
-      its effect on the text (his count of NA28 changes); Mink's "Contamination, Coherence, and Coincidence,"
-      second pass — now the worked examples; Hixson & Gurry (eds.), *Myths and Mistakes*, ch. on "myths
-      about variants" for calibration on effect sizes.
+    content: '[Gurry](res:gurry), *A Critical Examination of the CBGM*, the chapters on the method''s
+      assumptions and its effect on the text (his count of NA28 changes); [Mink](res:mink)''s "Contamination,
+      Coherence, and Coincidence," second pass — now the worked examples; [Hixson & Gurry](res:myths)
+      (eds.), *Myths and Mistakes*, ch. on "myths about variants" for calibration on effect sizes.'
   - label: Concepts
     content: contamination as the method's *raison d'être* and its Achilles' heel; editor-dependence (GIGO
       surface); the "initial text" debate (Epp); what the CBGM changed in practice (~34 Catholic-Letters
       decisions) vs. the rhetoric around it.
   - label: Exercise
-    content: From Gurry's list of NA28 changes in the Catholic Letters, pick two, look them up in *Genealogical
-      Queries*, and reconstruct in one paragraph each why coherence tipped the editors.
+    content: From [Gurry](res:gurry)'s list of NA28 changes in the Catholic Letters, pick two, look them
+      up in [*Genealogical Queries*](res:gq), and reconstruct in one paragraph each why coherence tipped
+      the editors.
   - label: Milestone
     content: '`notes/dispute.md` with ≥10 testable claims — this is the requirements document for your
       simulator.'
@@ -1134,12 +1120,13 @@ units:
   title: Carlson's bias argument, reproduced
   rows:
   - label: Build
-    content: 'Encode Carlson''s 5-witness, 18-passage counterexample (JBL 2020) as a TEI collation. Run
-      it through open-cbgm *and* your mini-CBGM. Reproduce the misordering: the potential-ancestor criterion
-      demoting the faithful copyist of an old exemplar.'
+    content: 'Encode [Carlson](res:carlson)''s 5-witness, 18-passage counterexample (JBL 2020) as a TEI
+      collation. Run it through [open-cbgm](res:opencbgm) *and* your mini-CBGM. Reproduce the misordering:
+      the potential-ancestor criterion demoting the faithful copyist of an old exemplar.'
   - label: Read
-    content: Carlson, "A Bias at the Heart of the CBGM" (JBL 139.2, open copy via ACU repository); Mink's
-      reply ("Remarks on Carlson," INTF blog, 2020); both slowly, with your `dispute.md` open.
+    content: '[Carlson](res:carlson), "A Bias at the Heart of the CBGM" (JBL 139.2, open copy via ACU
+      repository); [Mink''s reply](res:carlson) ("Remarks on Carlson," INTF blog, 2020); both slowly,
+      with your `dispute.md` open.'
   - label: Concepts
     content: '*why* the bias arises (a witness preserving many superseded-but-prior readings looks "posterior
       on average"); Mink''s two defenses (illegitimate hypothetical witnesses; wrong module tested) and
@@ -1151,8 +1138,6 @@ units:
   - label: Milestone
     content: '`carlson-2020/` directory in the repo: the encoded example, a script, a README showing the
       reproduced effect. Six years dormant, now executable — this artifact alone is worth a blog post.'
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-06-carlson-bias.md`.
   gloss: The 2020 counterexample, encoded as TEI and re-run — dormant six years, now executable.
   provenance: bespoke
 - id: u7
@@ -1165,11 +1150,11 @@ units:
       and a design doc mapping the artificial-tradition literature''s choices (tradition size, loss rate,
       mixture model) onto constructor parameters.'
   - label: Read
-    content: '*Handbook of Stemmatology* (open access), ch. 5 (computational methods) and the sections
-      on evaluation with artificial traditions; Roos & Heikkilä (LLC 2009) for the benchmark idea; Camps
-      & Randon-Furling, "Lost Manuscripts and Extinct Texts" (arXiv) as the generative-model template;
-      skim Hyytiäinen–McCollum–Finney (DSH 2026) to see the state of the art on *real* data and confirm
-      what it lacks (ground truth).'
+    content: '[*Handbook of Stemmatology*](res:handbook) (open access), ch. 5 (computational methods)
+      and the sections on evaluation with artificial traditions; [Roos & Heikkilä](res:roos) (LLC 2009)
+      for the benchmark idea; [Camps & Randon-Furling](res:camps), "Lost Manuscripts and Extinct Texts"
+      (arXiv) as the generative-model template; skim [Hyytiäinen–McCollum–Finney](res:hmf) (DSH 2026)
+      to see the state of the art on *real* data and confirm what it lacks (ground truth).'
   - label: Concepts
     content: stemma vs. phylogeny vs. network; contamination breaks trees; artificial traditions as the
       field's own answer to "how would we know a method works?"; birth–death processes as an engineer's
@@ -1193,8 +1178,8 @@ units:
       to be "extant witnesses." Pure tree mode first (single exemplar per copy). Parameters: birth/death
       rates, timeline length, target extant count.'
   - label: Read
-    content: Camps & Randon-Furling (both papers) — for the model family and for honest priors on loss
-      rates; your own design doc.
+    content: '[Camps & Randon-Furling](res:camps) (both papers) — for the model family and for honest
+      priors on loss rates; your own design doc.'
   - label: Concepts
     content: the *true stemma* as a byproduct of generation; why massive loss (>90% of medieval traditions)
       makes reconstruction hard *in principle*; seeding and reproducibility discipline for simulation
@@ -1206,9 +1191,6 @@ units:
   - label: Milestone
     content: Traditions generating; a gallery of five true stemmata rendered via Graphviz at different
       loss rates.
-  - label: Interactive
-    content: widget `interactive/widgets/transmission-simulator.html` — the browser version of what you
-      just built; use it to *feel* the parameter space before you sweep it. Lesson `interactive/lessons/unit-08-simulation-design.md`.
   gloss: A birth–death copying process that produces manuscript traditions with their true history attached.
   provenance: bespoke
 - id: u9
@@ -1244,13 +1226,13 @@ units:
   title: TEI export and the validation loop
   rows:
   - label: Build
-    content: '`simulate/export.py`: synthetic tradition → TEI XML in open-cbgm''s dialect (your Unit-1
-      parser round-trips it — test that). Then the moment of truth: open-cbgm consumes a synthetic tradition
-      and emits its answers. `score.py`: initial-text recovery rate, potential-ancestor rank correlation
-      (Kendall τ against true ancestor sets), flow-diagram edge accuracy.'
+    content: '`simulate/export.py`: synthetic tradition → TEI XML in [open-cbgm](res:opencbgm)''s dialect
+      (your Unit-1 parser round-trips it — test that). Then the moment of truth: open-cbgm consumes a
+      synthetic tradition and emits its answers. `score.py`: initial-text recovery rate, potential-ancestor
+      rank correlation (Kendall τ against true ancestor sets), flow-diagram edge accuracy.'
   - label: Read
-    content: open-cbgm's README/design paper for its TEI expectations; teiphy's docs (you'll want its
-      format conversions in Unit 13).
+    content: '[open-cbgm](res:opencbgm)''s README/design paper for its TEI expectations; [teiphy](res:teiphy)''s
+      docs (you''ll want its format conversions in Unit 13).'
   - label: Concepts
     content: 'the validation question stated properly: *on clean tree-shaped data with a perfect editor,
       the CBGM should shine* — establishing that it does is not a gotcha, it''s the calibration every
@@ -1274,8 +1256,8 @@ units:
       mixture (sporadic correction against a second exemplar), each at configurable rates; the true history
       records every mixture event.'
   - label: Read
-    content: 'Mink''s contamination sections, third visit — now as an adversary: what does his method
-      *predict* it can survive? The *Handbook*''s contamination discussion.'
+    content: '[Mink](res:mink)''s contamination sections, third visit — now as an adversary: what does
+      his method *predict* it can survive? The [*Handbook*](res:handbook)''s contamination discussion.'
   - label: Concepts
     content: why contamination breaks tree methods structurally; coherence as Mink's wager that it's survivable
       statistically; simulating the thing a method claims to handle is the sharpest test available.
@@ -1319,14 +1301,14 @@ units:
   title: Rivals on the same ground truth
   rows:
   - label: Build
-    content: teiphy-convert your synthetic collations; run Bayesian phylogenetics (BEAST 2) and a distance
-      method (NeighborNet via SplitsTree) on the same traditions; score all three families against truth
-      with the same metrics.
+    content: '[teiphy](res:teiphy)-convert your synthetic collations; run Bayesian phylogenetics ([BEAST
+      2](res:beast)) and a distance method (NeighborNet via SplitsTree) on the same traditions; score
+      all three families against truth with the same metrics.'
   - label: Read
-    content: Taming the BEAST, the introductory tutorial + one dated-tips tutorial; McCollum & Turnbull
-      (DSH 2024) as the worked example of BEAST-on-collation; McElreath *Statistical Rethinking* chs.
-      1–2 (and the 2023/2026 lectures) if Bayesian machinery feels like folklore — his simulation-first
-      style is exactly your Phase 3 instinct applied to statistics.
+    content: '[Taming the BEAST](res:ttb), the introductory tutorial + one dated-tips tutorial; [McCollum
+      & Turnbull](res:hmf) (DSH 2024) as the worked example of BEAST-on-collation; [McElreath](res:mcelreath)
+      *Statistical Rethinking* chs. 1–2 (and the [2023/2026 lectures](res:srvideo)) if Bayesian machinery
+      feels like folklore — his simulation-first style is exactly your Phase 3 instinct applied to statistics.'
   - label: Concepts
     content: 'what a posterior over trees even is; clock models in one paragraph; the crucial scoping
       note from `REVIEW.md`: rivals-on-*real*-data is published five times over — rivals-on-*synthetic*-data
@@ -1349,18 +1331,15 @@ units:
       calibration (it works on clean data) → the measured Carlson effect → contamination limits → method
       comparison → what this does and doesn''t say about the NT text (reception rules!).'
   - label: Read
-    content: 'Two models of tone: the Hyytiäinen–McCollum–Finney DSH paper; Carlson''s JBL piece. Note
-      how each earns its claims.'
+    content: 'Two models of tone: the [Hyytiäinen–McCollum–Finney](res:hmf) DSH paper; [Carlson](res:carlson)''s
+      JBL piece. Note how each earns its claims.'
   - label: Concepts
-    content: 'the venue ladder (`exploration/candidates/05` §5): preprint → *TC* or *DSH*; ETC-blog summary
-      for the field''s attention; McCollum and Carlson get courtesy previews (you have their attention
+    content: 'the venue ladder (`exploration/candidates/05` §5): preprint → [*TC*](res:tc) or *DSH*; [ETC-blog](res:etc)
+      summary for the field''s attention; McCollum and Carlson get courtesy previews (you have their attention
       from Phase 2).'
   - label: Milestone
     content: Preprint out. **This is the program's "move within a year" commitment kept** (convergence
       doc, action 3).
-  - label: Interactive
-    content: quiz `interactive/quizzes/apparatus-trainer.html` — because the Greek track now needs it
-      (below).
   gloss: 'Paper #1: calibration, the measured bias, contamination limits — and what it does and doesn''t
     say about the NT.'
   provenance: bespoke
@@ -1373,7 +1352,7 @@ units:
     content: '`sensitivity/`: scripted perturbation of real collation inputs — local-stemma flips at 5/10/20%
       (stratified: units the editors marked split/uncertain first — their own confidence is your prior),
       connectivity sweeps (absolute and quantile), witness leave-one-out and bootstrap, variation-unit
-      bootstrap. Driver over open-cbgm''s CLI with the SQLite cache.'
+      bootstrap. Driver over [open-cbgm](res:opencbgm)''s CLI with the SQLite cache.'
   - label: Read
     content: Your own Unit-3 flip example (told you to keep it); `exploration/candidates/05` §1 for the
       four wobble metrics; Knight's corrections problem (JBL 2019) for one perturbation mode reviewers
@@ -1400,8 +1379,8 @@ units:
       potential-ancestor rank stability (Kendall τ), (iii) flow-diagram edge stability, (iv) substemma/global-stemma
       stability. One table: *dial turned → what moves, how much*.'
   - label: Read
-    content: Mink's rebuttal once more — perturb through to the substemma/global-stemma layer, because
-      "you tested the wrong module" is the rebuttal you already know is coming.
+    content: '[Mink''s rebuttal](res:carlson) once more — perturb through to the substemma/global-stemma
+      layer, because "you tested the wrong module" is the rebuttal you already know is coming.'
   - label: Concepts
     content: robustness as a *property of specific decisions*, not the method wholesale — expect (and
       want) the result "most decisions are rock-solid; these N are editorially load-bearing."
@@ -1419,9 +1398,9 @@ units:
   title: Scale and scope (conditional)
   rows:
   - label: Build
-    content: 'If INTF said yes (Phase 2 contact): extend to Acts/Mark/Revelation via the Genealogical
-      Queries API data (~17,500 more units); the harness was built for this. If not: deepen 3 John + Catholic
-      Letters (GQ 2.0) and document the constraint honestly.'
+    content: 'If INTF said yes (Phase 2 contact): extend to Acts/Mark/Revelation via the [Genealogical
+      Queries](res:gq) API data (~17,500 more units); the harness was built for this. If not: deepen 3
+      John + Catholic Letters (GQ 2.0) and document the constraint honestly.'
   - label: Read
     content: '`exploration/candidates/04` §3 (the API inventory — endpoints, counts).'
   - label: Milestone
@@ -1456,10 +1435,10 @@ units:
       vocabulary, *before* looking at the editors'. Score yourself with the metrics you'll later apply
       to the model.
   - label: Read
-    content: Royse, *Scribal Habits*, the summary chapter + one papyrus chapter (the $92 pain is worth
-      it; the library may help); Metzger, *Textual Commentary*, 15 entries as worked examples — always
-      committing your own judgment first; Willker's *Textual Commentary* (free) for second opinions; Hixson
-      & Gurry for base-rate sanity.
+    content: '[Royse](res:royse), *Scribal Habits*, the summary chapter + one papyrus chapter (the $92
+      pain is worth it; the library may help); [Metzger](res:metzger), *Textual Commentary*, 15 entries
+      as worked examples — always committing your own judgment first; [Willker](res:willker)''s *Textual
+      Commentary* (free) for second opinions; [Hixson & Gurry](res:myths) for base-rate sanity.'
   - label: Concepts
     content: harmonization, homoioteleuton, itacism, Atticism, *lectio brevior/difficilior* and its modern
       demotion (Royse!), assimilation to parallels; the committee's reasoning genre.
@@ -1468,8 +1447,6 @@ units:
       every disagreement. This number — *your* ε — is the human baseline for Unit 21.'
   - label: Milestone
     content: The annotated 20; you now know from the inside what the LLM is being asked to do.
-  - label: Interactive
-    content: lesson `interactive/lessons/unit-19-transcriptional-probability.md`.
   gloss: Twenty local stemmata built by hand, before looking at the editors' — your own ε, measured.
   provenance: bespoke
 - id: u20
@@ -1529,7 +1506,7 @@ units:
     content: 'Preprint #3; `PROGRAM.md`; update `REVIEW.md` to reflect what the program actually established.
       **Capstone complete.**'
   - label: SQ1 (during Phase 2)
-    content: 'Benchmark schema + annotation manual: encode Cooper Smith''s eight direction-of-dependence
+    content: 'Benchmark schema + annotation manual: encode [Cooper Smith](res:sidequest)''s eight direction-of-dependence
       criteria (JHS 2023, open) as a formal annotation schema; design the disagreement-as-data record
       format (per-scholar attribution). No Hebrew needed.'
   - label: SQ2 (during Phase 3)
@@ -1592,28 +1569,28 @@ materials:
   path: interactive/widgets/coherence-explorer.html
   unit: u2
   blurb: 'Units 2–4. The toy tradition: flip the editors'' local stemmata, watch ancestry move while raw
-    agreement holds still.'
+    agreement holds still. In Unit 2, inspect the agreement pane and ignore the rest.'
 - id: w-flow
   kind: widget
   title: Flow Explorer
   path: interactive/widgets/flow-explorer.html
   unit: u4
   blurb: Unit 4. Textual flow per variation unit with the connectivity dial — same toy data, direction
-    fixed, promiscuity variable.
+    fixed, promiscuity variable; the u3 experiment is the unit in miniature.
 - id: w-transmission
   kind: widget
   title: Transmission Simulator
   path: interactive/widgets/transmission-simulator.html
   unit: u8
-  blurb: Units 8–11. Birth–death copying with loss and contamination — feel the parameter space before
-    you sweep it.
+  blurb: Units 8–11. The browser version of what you just built — birth–death copying with loss and contamination;
+    feel the parameter space before you sweep it.
 - id: q-phase-0
   kind: quiz
   title: Phase 0 Checkpoint
   path: interactive/quizzes/phase-0-checkpoint.html
   phase: p0
-  blurb: 'Nine questions on orientation: what the CBGM takes in, emits, and where the humans sit. Pass
-    before Unit 1.'
+  blurb: 'Nine questions on orientation: what the CBGM takes in, emits, and where the humans sit. Take
+    it after the skim, pass before Unit 1 — it grades the milestone paragraph''s ingredients.'
 - id: q-phase-1
   kind: quiz
   title: Phase 1 Checkpoint
@@ -1646,7 +1623,8 @@ materials:
   grader:
     type: unit-test
     command: python -m unittest test_tei_parser -v
-  blurb: The TEI parser. 12 failing tests; the oracle is unit-02's fixture — same tradition, two encodings.
+  blurb: 'The TEI parser: the toy tradition as TEI, 12 failing tests; the oracle is unit-02''s fixture
+    — same tradition, two encodings, and your parser proves it.'
 - id: x-u02
   kind: exercise
   title: unit-02-starter — the CBGM's two comparisons (13 failing tests)

@@ -49,6 +49,495 @@ course:
   - '**Working with Claude.** This course is built to be worked through with Claude. Triggers like *"teach
     me Unit 5 interactively"* run a Socratic lesson guide; *"quiz me on Phase 1"* draws from the question
     bank. See the end of this file.'
+  resources_intro: 'A reference shelf, not a syllabus — `curriculum.md` says *when* to read what. **Tier
+    1** is the core path: read substantially, these four carry the course. **Tier 2** deepens and offers
+    alternatives, consulted as a unit demands. **Tier 3** is reference & practice — look things up, read
+    source. **Tier 4** is culture & motivation. Every link was checked live in June 2026; entries marked
+    *(added July 2026)* come from the external research review in `REVIEW.md`, itself worth reading as
+    a map of where this project sits in the field.'
+  reading_order:
+  - 'Get the repo running: pip install -r requirements.txt; python -m unittest discover tests — all green'
+  - Skim the Hirjee & Brown 2009 intro and one Pudding piece — know what you're building toward
+  - Play with pronouncing in a REPL and the interactive IPA chart — get the data and the sounds under
+    your fingers
+  - Read phonetics.py and features.py alongside the SLP3 Phonetics chapter
+  - Then open curriculum.md and start Phase 1
+resources:
+- key: jm
+  title: Speech and Language Processing (3rd ed.)
+  url: https://web.stanford.edu/~jurafsky/slp3
+  formats:
+  - TEXT
+  tier: 1
+  cite: Jurafsky & Martin · free draft · Jan 2025 release
+  cost: free
+  free: true
+  links:
+  - - Free draft (Stanford)
+    - https://web.stanford.edu/~jurafsky/slp3
+  why_this_one: '*The* computational-linguistics textbook, written by a computational linguist, and the
+    single best map of the whole field. You already know it from your ML/AI shelf — here you''ll mine
+    specific chapters rather than read cover-to-cover. It supplies the formal backbone for three pillars
+    of rhyme-schemer: the **Phonetics** chapter (articulatory phonetics, the IPA, ARPAbet — exactly what
+    `phonetics.py` and `features.py` encode), the **Minimum Edit Distance** section of Ch. 2 (the alignment
+    algorithm you''ll need to compare vowel skeletons of unequal length), and **Vector Semantics & Embeddings**
+    (Ch. 6), which reframes your feature-distance metric as a baby embedding — the conceptual bridge to
+    your ML interests.'
+  verified_at: 2026-06
+  access_note: Chapter numbers drift between drafts; navigate by title from the index page.
+- key: hb
+  title: Automatic Detection of Internal and Imperfect Rhymes in Rap Lyrics
+  url: https://ismir2009.ismir.net/proceedings/OS8-1.pdf
+  formats:
+  - PAPER
+  tier: 1
+  cite: Hirjee & Brown · ISMIR · 2009
+  cost: free
+  free: true
+  links:
+  - - ISMIR 2009 (PDF)
+    - https://ismir2009.ismir.net/proceedings/OS8-1.pdf
+  - - Hirjee's thesis, Rhyme, Rhythm, and Rhubarb (UWSpace — search the title)
+    - https://uwspace.uwaterloo.ca/items
+  why_this_one: This is rhyme-schemer's prior art — the paper that did this exact task and did it well.
+    They score *imperfect* (slant) rhymes with a phoneme-similarity matrix learned from real rap lyrics,
+    then detect internal and line-final rhymes. Reading it tells you which design decisions in the repo
+    are standard practice (phoneme features, scoring over the rhyming tail) and which are your own simplifications
+    (hand-placed coordinates instead of a learned matrix). It is the benchmark your finished tool should
+    be measured against.
+  covers: 'Deeper companions: *Using Automated Rhyme Detection to Characterize Rhyming Style in Rap Music*
+    (Empirical Musicology Review 5(4):121–145, 2010) and Hirjee''s full thesis *Rhyme, Rhythm, and Rhubarb*
+    expand the method and the evaluation. The thesis''s annotated lyrics were the field''s benchmark —
+    an evaluation resource for Unit 14, and using them makes results directly comparable to the named
+    prior art.'
+  verified_at: 2026-06
+  access_note: 'Field note *(added July 2026)*: their work was never displaced for this task, but it also
+    wasn''t extended — today it is cited mostly as the source of the **rhyme density** metric used to
+    evaluate rap *generation* (e.g. DopeLearning, Malmi et al. KDD 2016: https://arxiv.org/abs/1505.04771).
+    rhyme-schemer is one of very few active successors to their actual detection program.'
+- key: parrish
+  title: Allison Parrish — pronouncing + phonetic-similarity work
+  url: https://pronouncing.readthedocs.io/
+  formats:
+  - CODE
+  - PAPER
+  tier: 1
+  cite: Allison Parrish · library, teaching notes & AAAI 2017 paper
+  cost: free
+  free: true
+  links:
+  - - pronouncing docs
+    - https://pronouncing.readthedocs.io/
+  - - CMUdict teaching notes
+    - https://github.com/aparrish/gen-text-workshop/blob/master/cmu_pronouncing_dictionary_notes.md
+  - - Poetic Sound Similarity Vectors Using Phonetic Features (AAAI 2017, PDF)
+    - https://chuck.stanford.edu/chai/data/aparrish/parrish-2017-aaai.pdf
+  why_this_one: Parrish is the ideal bridge figure for your profile — a programmer-poet who turns phonemes
+    into feature vectors for creative tools, exactly the spirit of this project. Her library is your data
+    layer; her teaching notes are the gentlest possible on-ramp to the rhyming-tail concept — her `rhyming_part()`
+    ("everything from the stressed syllable nearest the end") is *precisely* the vowel-skeleton idea in
+    rhyme-schemer's roadmap, in a few lines of Python; her paper shows where the feature-distance approach
+    goes next (full phonetic word embeddings that handle out-of-vocabulary words). Read the docs and notes
+    early, the paper around Phase 2–3.
+  verified_at: 2026-06
+- key: ipa
+  title: A first look at articulatory phonetics — the IPA, hands-on
+  url: https://www.ipachart.com/
+  formats:
+  - TOOL
+  tier: 1
+  cite: ipachart.com + the Wikipedia reference charts
+  cost: free
+  free: true
+  links:
+  - - Interactive IPA chart with audio
+    - https://www.ipachart.com/
+  - - IPA vowel chart (Wikipedia)
+    - https://en.wikipedia.org/wiki/Vowel#Vowel_chart
+  - - IPA vowel chart with audio (Wikipedia)
+    - https://en.wikipedia.org/wiki/IPA_vowel_chart_with_audio
+  why_this_one: '`features.py` places every vowel on the IPA vowel quadrilateral (height × backness) and
+    every consonant by place × manner. To trust — and tune — those coordinates, you need the articulatory
+    picture in your ear and your mouth, not just on a grid. Spend an hour *making the sounds* while watching
+    where your tongue goes. This is the one place where audio beats text. (The course also ships an interactive
+    vowel-quadrilateral widget built from the repo''s own numbers — see `interactive/widgets/`.)'
+  verified_at: 2026-06
+- key: panphon
+  title: panphon — IPA → articulatory feature vectors
+  url: https://github.com/dmort27/panphon
+  formats:
+  - CODE
+  - PAPER
+  tier: 2
+  cite: Mortensen et al. · COLING · 2016
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/dmort27/panphon
+  - - Paper (COLING 2016)
+    - https://aclanthology.org/C16-1328/
+  - - API reference
+    - https://github.com/dmort27/panphon#api
+  why_this_one: The library `features.py` explicitly names as its future replacement. It maps 5,000+ IPA
+    segments to 21 articulatory features and — crucially — its `Distance` class computes *feature-weighted
+    edit distance*, which is your alignment unit (Unit 8) and your feature unit (Units 2–3) fused into
+    one tool. Read its `Distance` source when you build alignment; consider swapping it in during the
+    capstone.
+  covers: 'API: `Distance`, the feature tables, feature-edit-distance.'
+  verified_at: 2026-06
+- key: epitran
+  title: Epitran — precision grapheme-to-phoneme
+  url: https://github.com/dmort27/epitran
+  formats:
+  - TOOL
+  tier: 2
+  cite: Mortensen et al. · 2018
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/dmort27/epitran
+  why_this_one: For Unit 13 (out-of-vocabulary words). When CMUdict doesn't have a word, you need grapheme-to-phoneme
+    (G2P). Epitran is a solid rule-based G2P.
+  verified_at: 2026-06
+  access_note: 'Currency note *(added July 2026)*: `g2p_en` (https://github.com/Kyubyong/g2p), previously
+    listed as "the neural alternative," is a 2019 artifact and effectively unmaintained. The current neural
+    G2P baseline is byte-level transformers — ByT5 G2P (https://www.isca-archive.org/interspeech_2022/zhu22_interspeech.pdf)
+    and CharsiuG2P (https://github.com/lingjzhu/CharsiuG2P) — with the SIGMORPHON 2020–22 shared tasks
+    (https://aclanthology.org/2020.sigmorphon-1.13.pdf) as the benchmark line. For the *dialect-variant*
+    gap CMUdict leaves (tuning-ledger item 2), the field''s answer is Wiktionary-scraped lexicons: WikiPron
+    (Tier 3).'
+- key: katz
+  title: The phonology of imperfect rhyme — perceptual similarity
+  url: https://www.sciencedirect.com/science/article/abs/pii/S0024384115000492
+  formats:
+  - PAPER
+  tier: 2
+  cite: Katz · Lingua 160 · 2015 — and Kawahara · J. East Asian Linguistics 16 · 2007
+  links:
+  - - Katz 2015, Hip-hop rhymes reiterate phonological typology (Lingua)
+    - https://www.sciencedirect.com/science/article/abs/pii/S0024384115000492
+  - - Katz — open repository copy (cite the Lingua venue)
+    - https://researchrepository.wvu.edu/cgi/viewcontent.cgi?article=2149&context=faculty_publications
+  - - Kawahara 2007, Half rhymes in Japanese rap lyrics (JEAL)
+    - https://link.springer.com/article/10.1007/s10831-007-9009-1
+  why_this_one: 'The deep "why" behind the whole feature-distance bet. These studies find that the imperfect
+    rhymes rappers actually use track **perceptual similarity** between sounds — the empirical justification
+    for modeling rhyme as distance in an articulatory space rather than as exact match. Read when you
+    start tuning weights (Unit 7) and want to know what "correct" even means. (Background: Steriade''s
+    P-map.)'
+  covers: 'Use them as data, not just motivation — but as *consonant* data *(note added July 2026; corrected
+    August 2026)*: verified against the papers, Katz''s method keys rhyme detection on matched vowel quality
+    ("with no reference to consonantal properties"), so his correspondence counts measure **consonant**
+    mismatches (place/voicing/continuancy, by context) with vowels held fixed by construction; Kawahara''s
+    half-rhyme statistics are likewise consonant pairs (in a five-vowel language). What they *can* audit
+    empirically is the **consonant** plane — e.g. Katz finds place mismatches among nasals dramatically
+    cheaper than among oral stops, an asymmetry a flat place axis can''t express. For corpus-derived *vowel*
+    evidence, the sources are Hirjee & Brown''s learned similarity matrix (rap-rhyme-derived) and Bark-scaled
+    formant data (perceptual, not rhyme-specific). What does hold: articulatory adjacency is not perceptual
+    confusability — the IPA chart is a tongue-position diagram, and the standard perceptual embedding
+    is Bark-scaled formant (F1/F2) space. The line of work is alive: McPherson & Ryan (2019) survey musical
+    adaptation as phonological evidence (https://compass.onlinelibrary.wiley.com/doi/10.1111/lnc3.12359),
+    and a 2024 study extends imperfect-rhyme analysis to Chinese hip hop (https://www.degruyterbrill.com/document/doi/10.1515/lingvan-2024-0093/html).'
+  verified_at: 2026-08
+  access_note: Katz's Lingua page is abstract-only; the open repository copy has the text — cite the *Lingua*
+    venue.
+- key: rk
+  title: Unsupervised Discovery of Rhyme Schemes
+  url: https://aclanthology.org/P11-2014/
+  formats:
+  - PAPER
+  tier: 2
+  group: The detection literature after 2010
+  cite: Reddy & Knight · ACL · 2011
+  cost: free
+  free: true
+  links:
+  - - ACL Anthology
+    - https://aclanthology.org/P11-2014/
+  why_this_one: The standard-cited paper for the task this repo calls "grouping." The scheme is a **latent
+    variable** learned by EM from the corpus itself, with *no pronunciation dictionary at all*; its framing
+    (a stanza's scheme as a structured object to infer, not a graph to component-ize) is the principled
+    alternative to connected components. Read alongside Unit 10.
+  covers: 'Group note: none of these three post-2010 lines invalidates the feature-based symbolic approach
+    — they are mostly line-final-only, and Hirjee & Brown remain the only true task-peer for internal
+    rap rhyme — but a research artifact must position itself against the field as it is. These three are
+    the field.'
+  verified_at: 2026-07
+- key: plechac
+  title: A Collocation-Driven Method of Discovering Rhymes
+  url: https://www.researchgate.net/publication/328847558
+  formats:
+  - PAPER
+  - CODE
+  tier: 2
+  group: The detection literature after 2010
+  cite: Plecháč · 2018
+  cost: free
+  free: true
+  links:
+  - - Paper (ResearchGate)
+    - https://www.researchgate.net/publication/328847558
+  - - rhymetagger (GitHub)
+    - https://github.com/versotym/rhymetagger
+  - - 2026 training-size study (arXiv)
+    - https://arxiv.org/abs/2604.08156
+  why_this_one: Bootstraps rhyme pairs from end-of-line co-occurrence statistics, then trains on its own
+    output; F ≈ 0.90–0.95 across seven languages, and still an active line (see the 2026 training-size
+    study).
+  verified_at: 2026-07
+- key: haider
+  title: Supervised Rhyme Detection with Siamese Recurrent Networks
+  url: https://aclanthology.org/W18-4509/
+  formats:
+  - PAPER
+  tier: 2
+  group: The detection literature after 2010
+  cite: Haider & Kuhn · 2018
+  cost: free
+  free: true
+  links:
+  - - ACL Anthology
+    - https://aclanthology.org/W18-4509/
+  why_this_one: '~97% pair-classification accuracy from raw *character* sequences, no phonetic features
+    at all, evaluated partly on **hip-hop lyrics annotated for rhyme and assonance**. Doubly relevant:
+    the neural baseline a symbolic pipeline should beat or match, and an existing annotation effort for
+    Unit 14.'
+  covers: Their rhyme gold standard includes a hip-hop set annotated for rhyme *and* assonance — directly
+    matching the project's north star; one of Unit 14's three external corpora.
+  verified_at: 2026-07
+- key: aline
+  title: Kondrak's ALINE — the phonetic-alignment prior art
+  url: https://webdocs.cs.ualberta.ca/~kondrak/papers/chum.pdf
+  formats:
+  - PAPER
+  tier: 2
+  cite: Kondrak · NAACL · 2000
+  cost: free
+  free: true
+  links:
+  - - A New Algorithm for the Alignment of Phonetic Sequences (PDF)
+    - https://webdocs.cs.ualberta.ca/~kondrak/papers/chum.pdf
+  why_this_one: 'Unit 8''s Needleman–Wunsch over vowel skeletons with feature-decomposed substitution
+    costs is, almost exactly, ALINE — the standard phonetic-alignment algorithm for 25 years. Reinventing
+    it was the right pedagogical call; read it afterward for credit and for the design answers it already
+    worked out: per-feature **salience weights**, separate vowel/consonant treatment, and expansions/compressions
+    for diphthongs — several questions the repo currently answers ad hoc.'
+  verified_at: 2026-07
+- key: mcflow
+  title: 'MCFlow: A Digital Corpus of Rap Transcriptions'
+  url: https://emusicology.org/article/id/4737/
+  formats:
+  - PAPER
+  - DATA
+  tier: 2
+  group: Evaluation corpora & the beat grid
+  cite: Condit-Schultz · Empirical Musicology Review 11(2) · 2016
+  cost: free
+  free: true
+  links:
+  - - Paper + corpus (Empirical Musicology Review)
+    - https://emusicology.org/article/id/4737/
+  why_this_one: 124 rap songs, 374 verses, ~6k measures, freely available, with rhythmic, prosodic, phonetic
+    **and rhyme** annotations *including metric placement*. One dataset addresses both the Unit 14 evaluation
+    gap and the prosody frontier (ledger items 5–6); its observed stress placements could even validate
+    the scanner's inferred anchors directly.
+  covers: Unit 14 ground truth + beat-grid data.
+  verified_at: 2026-07
+  access_note: 'Content-safety caveat: the repo''s fixture rule (no multi-line commercial lyrics) is in
+    tension with evaluating on corpora of commercial rap. Evaluate locally against downloaded corpora;
+    the harness should store **song IDs + offsets, never lyric text**.'
+- key: adams
+  title: On the Metrical Techniques of Flow in Rap Music
+  url: https://mtosmt.org/issues/mto.09.15.5/mto.09.15.5.adams.html
+  formats:
+  - PAPER
+  tier: 2
+  group: Evaluation corpora & the beat grid
+  cite: Adams · Music Theory Online 15(5) · 2009
+  cost: free
+  free: true
+  links:
+  - - Music Theory Online
+    - https://mtosmt.org/issues/mto.09.15.5/mto.09.15.5.adams.html
+  why_this_one: The music-theory side of the "performance context carries information a segment-only scanner
+    cannot see" diagnosis.
+  verified_at: 2026-07
+- key: ohriner
+  title: 'Flow: The Rhythmic Voice in Rap Music'
+  url: https://global.oup.com/academic/product/flow-9780190670412
+  formats:
+  - TEXT
+  tier: 2
+  group: Evaluation corpora & the beat grid
+  cite: Ohriner · Oxford UP · 2019
+  links:
+  - - Oxford UP
+    - https://global.oup.com/academic/product/flow-9780190670412
+  why_this_one: The book-length computational treatment of rap prosody, including rhyme's interaction
+    with meter. The prosody & flow frontier, anchored to names.
+  verified_at: 2026-07
+- key: llmphon
+  title: LLMs and phonology — why a symbolic scanner matters in 2026
+  url: https://arxiv.org/html/2404.02456v2
+  formats:
+  - PAPER
+  tier: 2
+  cite: Suvarna et al. · 2024 — and the 2026 Greek rhyme hybrid
+  cost: free
+  free: true
+  links:
+  - - PhonologyBench (Suvarna et al. 2024)
+    - https://arxiv.org/html/2404.02456v2
+  - - Greek rhyme-detection/generation hybrid (2026)
+    - https://arxiv.org/pdf/2601.09631
+  why_this_one: PhonologyBench shows LLMs working from orthographic tokens are *weak* at exactly the phoneme-level
+    skills this pipeline implements symbolically; the hybrid systems show the emerging pattern — LLM fluency
+    filtered through phonological machinery like this repo's. Together, the positioning claim in the README's
+    "Where this sits in the field" section, with receipts.
+  verified_at: 2026-07
+- key: wiki
+  title: Wikipedia, used well
+  url: https://en.wikipedia.org/wiki/Sonority_Sequencing_Principle
+  formats:
+  - TEXT
+  tier: 2
+  cite: the phonology articles
+  cost: free
+  free: true
+  links:
+  - - Sonority Sequencing Principle
+    - https://en.wikipedia.org/wiki/Sonority_Sequencing_Principle
+  - - Phonotactics
+    - https://en.wikipedia.org/wiki/Phonotactics
+  - - Syllable
+    - https://en.wikipedia.org/wiki/Syllable
+  - - ARPABET
+    - https://en.wikipedia.org/wiki/ARPABET
+  why_this_one: Fast, accurate orientation for the phonology concepts the repo leans on (MOP, legal onsets,
+    onset/nucleus/coda). Good enough for an engineer who needs the working idea, not a linguistics degree.
+  verified_at: 2026-06
+- key: cmudict
+  title: CMU Pronouncing Dictionary
+  url: http://www.speech.cs.cmu.edu/cgi-bin/cmudict
+  formats:
+  - DATA
+  tier: 3
+  cost: free
+  free: true
+  links:
+  - - Lookup form
+    - http://www.speech.cs.cmu.edu/cgi-bin/cmudict
+  why_this_one: The pronunciation data under everything; look up entries, see variants. *Know its limits:*
+    North American citation pronunciation, informally maintained, no dialect coverage, inconsistent variants
+    — the README names it as a threat to validity.
+  verified_at: 2026-06
+- key: wikipron
+  title: WikiPron
+  url: https://aclanthology.org/2020.lrec-1.521/
+  formats:
+  - DATA
+  tier: 3
+  cite: Lee et al. · LREC · 2020
+  cost: free
+  free: true
+  links:
+  - - Paper (LREC 2020)
+    - https://aclanthology.org/2020.lrec-1.521/
+  why_this_one: Wiktionary-scraped pronunciation lexicons — the candidate source for the dialect variants
+    ledger item 2 needs.
+  verified_at: 2026-07
+- key: pronouncing
+  title: pronouncing API reference
+  url: https://pronouncing.readthedocs.io/en/latest/pronouncing.html
+  formats:
+  - CODE
+  tier: 3
+  cost: free
+  free: true
+  links:
+  - - API reference
+    - https://pronouncing.readthedocs.io/en/latest/pronouncing.html
+  why_this_one: '`phones_for_word`, `rhymes`, `rhyming_part`, `stresses`.'
+  verified_at: 2026-06
+- key: rhymeanalyzer
+  title: Hirjee & Brown's Rhyme Analyzer
+  url: https://www.semanticscholar.org/paper/edd32747cc8ac12fa3bf82f3aa19cae19933a88b
+  formats:
+  - TOOL
+  tier: 3
+  cost: free
+  free: true
+  links:
+  - - Semantic Scholar
+    - https://www.semanticscholar.org/paper/edd32747cc8ac12fa3bf82f3aa19cae19933a88b
+  why_this_one: A reference UI for visualizing detected rhymes (Unit 12).
+  verified_at: 2026-06
+- key: rapanalysis
+  title: 'Prior-art repos to read: RapAnalysis'
+  url: https://github.com/alexmarozick/RapAnalysis
+  formats:
+  - CODE
+  tier: 3
+  cost: free
+  free: true
+  links:
+  - - GitHub
+    - https://github.com/alexmarozick/RapAnalysis
+  why_this_one: How others structured the same pipeline (read critically).
+  verified_at: 2026-06
+- key: pudding
+  title: The Pudding — hip-hop lyric visualizations
+  url: https://pudding.cool/projects/vocabulary/
+  formats:
+  - TOOL
+  tier: 4
+  cite: Matt Daniels · The Pudding
+  cost: free
+  free: true
+  links:
+  - - The Largest Vocabulary in Hip-Hop
+    - https://pudding.cool/projects/vocabulary/
+  - - The Language of Hip Hop
+    - https://pudding.cool/2017/09/hip-hop-words/
+  why_this_one: The visual-journalism north star the README points at — the standard for turning lyric
+    data into something a non-specialist *feels*. Keep these open when you design the visualization (Unit
+    12); the bar for "highlight the rhymes" is set here.
+  verified_at: 2026-06
+- key: vox
+  title: 'Rapping, deconstructed: The best rhymers of all time'
+  url: https://www.youtube.com/results?search_query=Rapping+deconstructed+The+best+rhymers+of+all+time+Vox
+  formats:
+  - VIDEO
+  tier: 4
+  cite: Estelle Caswell · Vox, Earworm series
+  cost: free
+  free: true
+  links:
+  - - Search the title on YouTube
+    - https://www.youtube.com/results?search_query=Rapping+deconstructed+The+best+rhymers+of+all+time+Vox
+  why_this_one: The breakdown of multisyllabic and internal rhyme in rap is the clearest motivation for
+    why perfect-rhyme matching is not enough — and previews internal rhyme (Unit 11).
+  verified_at: 2026-06
+  access_note: The shelf links this by title — the link is that YouTube search (Vox, Earworm series).
+resource_tiers:
+- num: 1
+  name: The core path
+  role: Read substantially. These four carry the course.
+  compact: false
+- num: 2
+  name: Deepening & alternatives
+  role: Consult as a unit demands.
+  compact: false
+- num: 3
+  name: Reference & practice
+  role: Look things up; read source.
+  compact: true
+- num: 4
+  name: Culture & motivation
+  role: The "why this is worth building" tier.
+  compact: false
 phases:
 - id: p0
   num: 0
@@ -147,9 +636,9 @@ units:
     content: Nothing yet. `pip install -r requirements.txt`; `python -m unittest discover tests` — all
       green.
   - label: Read
-    content: 'the repo `README.md` (including "Where this sits in the field"); the introduction of Hirjee
-      & Brown (2009); one Pudding piece; skim the external research review in `REVIEW.md` to see how the
-      finished project reads to a researcher. Play in a REPL: `pronouncing.phones_for_word("lincoln")`,
+    content: 'the repo `README.md` (including "Where this sits in the field"); the introduction of [Hirjee
+      & Brown (2009)](res:hb); one [Pudding piece](res:pudding); skim the external research review in
+      `REVIEW.md` to see how the finished project reads to a researcher. Play in a REPL: `pronouncing.phones_for_word("lincoln")`,
       `pronouncing.rhymes("cheese")`.'
   - label: Concepts
     content: the syllable-first pipeline (look up → syllabify → feature-score → rhyme-kernel → group →
@@ -171,7 +660,8 @@ units:
     content: Read `phonetics.py` (`Stress`, `VOWELS`, `strip_stress`, `is_vowel`) and the `pronouncing`/CMUdict
       layer in `syllabify.py` (`pronunciation_for`). Add property-based tests for `strip_stress`/`is_vowel`.
   - label: Read
-    content: SLP3 **Phonetics** chapter (phonemes, IPA, ARPAbet); Parrish's CMUdict notes; ARPABET (Wikipedia).
+    content: '[SLP3](res:jm) **Phonetics** chapter (phonemes, IPA, ARPAbet); [Parrish''s CMUdict notes](res:parrish);
+      [ARPABET (Wikipedia)](res:wiki).'
   - label: Concepts
     content: phoneme vs grapheme; transcription systems (IPA vs ARPAbet); the pronunciation lexicon; lexical
       stress (0/1/2); the out-of-vocabulary (OOV) problem; why CMUdict returns *variants*.
@@ -182,8 +672,6 @@ units:
   - label: Milestone
     content: New passing tests for the phonetics primitives, and a short note listing five OOV words (your
       future Unit-13 test set).
-  - label: Interactive
-    content: '`interactive/lessons/unit-01-phonemes-not-spelling.md`.'
   gloss: Phonemes, ARPAbet, and the CMU lexicon — sound, not spelling.
   provenance: bespoke
 - id: u2
@@ -195,8 +683,8 @@ units:
     content: Read the vowel half of `features.py` (`VowelPoint`, `VowelFeatures`, `VOWEL_FEATURES`, `vowel_distance`).
       Adjust or justify two coordinate choices without breaking the ordering tests.
   - label: Read
-    content: SLP3 Phonetics (vowels); the interactive IPA chart (make the sounds!); the vowel-quadrilateral
-      references.
+    content: '[SLP3](res:jm) Phonetics (vowels); the [interactive IPA chart](res:ipa) (make the sounds!);
+      the [vowel-quadrilateral references](res:ipa).'
   - label: Concepts
     content: the IPA vowel quadrilateral (height × backness); roundedness; the rhotic `ER`; tense/lax
       falling out of position (centralization); **diphthongs as a glide** between two points; distance
@@ -215,14 +703,12 @@ units:
   - label: Caveat to carry forward
     content: articulatory adjacency is not perceptual confusability — the quadrilateral is a tongue-position
       diagram, not a psychoacoustic space (that would be Bark-scaled formant space). Corpus evidence on
-      which vowel pairs rappers *actually* treat as rhymable exists — Hirjee & Brown 2009's learned log-odds
-      matrices, transcribed and rank-compared against this very space in `learning/audits/` (the audit
-      found two systematic biases; tuning-ledger item 11 tells the story, and it's a preview of what Unit
-      14 does at scale). (Katz 2015 and Kawahara 2007, once cited here for this purpose, turn out on verification
-      to be *consonant* data — the corrected note in `learning-resources.md` explains.) Unit 14 makes
-      "refit this space from data" a first-class experiment.
-  - label: Interactive
-    content: widget `vowel-explorer.html`; lesson `unit-02-feature-distance.md`.
+      which vowel pairs rappers *actually* treat as rhymable exists — [Hirjee & Brown 2009](res:hb)'s
+      learned log-odds matrices, transcribed and rank-compared against this very space in `learning/audits/`
+      (the audit found two systematic biases; tuning-ledger item 11 tells the story, and it's a preview
+      of what Unit 14 does at scale). ([Katz 2015 and Kawahara 2007](res:katz), once cited here for this
+      purpose, turn out on verification to be *consonant* data — the corrected note in `learning-resources.md`
+      explains.) Unit 14 makes "refit this space from data" a first-class experiment.
   gloss: The IPA vowel space as coordinates; feature distance as graded similarity.
   provenance: bespoke
 - id: u3
@@ -234,7 +720,7 @@ units:
     content: Read the consonant half of `features.py` (`CONSONANT_FEATURES`, `consonant_distance`). Add
       a near-pair ordering assertion of your own.
   - label: Read
-    content: SLP3 Phonetics (consonants); Sonority Sequencing Principle (Wikipedia).
+    content: '[SLP3](res:jm) Phonetics (consonants); [Sonority Sequencing Principle (Wikipedia)](res:wiki).'
   - label: Concepts
     content: place × manner as the consonant plane; the **sonority hierarchy** (stop → … → glide) and
       why manner is ordered by it; voicing as a small perceptual cue (hence the low `_W_VOICE`); why consonants
@@ -256,7 +742,7 @@ units:
       in `phonetics.py` (`is_legal_onset`), and `syllabify.py` (`_split_consonants`, `syllabify`). Add
       an onset cluster a new word needs.
   - label: Read
-    content: SLP3 Phonetics (syllable structure); Phonotactics & Syllable (Wikipedia).
+    content: '[SLP3](res:jm) Phonetics (syllable structure); [Phonotactics & Syllable (Wikipedia)](res:wiki).'
   - label: Concepts
     content: onset / nucleus / coda / **rime**; phonotactics; the Sonority Sequencing Principle as the
       rule behind legal onsets (and the /s/-cluster exceptions); the **Maximal Onset Principle**; one
@@ -267,8 +753,6 @@ units:
       needed onset cluster to `phonetics.py`, and add a `test_syllabify` case for it.
   - label: Milestone
     content: A new word correctly syllabified, gated by a test you wrote.
-  - label: Interactive
-    content: widget `syllabifier.html`; quiz `interactive/quizzes/phase-1-checkpoint.html`.
   gloss: Syllables and the Maximal Onset Principle.
   provenance: bespoke
 - id: u5
@@ -280,7 +764,8 @@ units:
     content: A new `rhyme_schemer/rhyme.py`. Implement `rhyme_tail(pron) -> tuple[Syllable, ...]` — the
       syllables from the **last primary-stressed** syllable to the end (the perceptual rhyming part).
   - label: Read
-    content: Parrish's `rhyming_part()` notes; Hirjee & Brown §2 (what counts as a rhyme).
+    content: '[Parrish''s `rhyming_part()` notes](res:parrish); [Hirjee & Brown](res:hb) §2 (what counts
+      as a rhyme).'
   - label: Concepts
     content: why rhyme lives in the tail from the last stress (not the last syllable — "lessen"/"strengthen"
       share a final syllable but don't rhyme); the rime; stress as the anchor; reusing `Pronunciation.vowel_skeleton`.
@@ -301,7 +786,7 @@ units:
       nuclei in the tail, with `consonant_similarity` on codas weighted lower and onsets ignored. Calibrate
       so identical tails score `1.0`.'
   - label: Read
-    content: re-skim Hirjee & Brown's scoring section.
+    content: re-skim [Hirjee & Brown](res:hb)'s scoring section.
   - label: Concepts
     content: model the easy case before the hard one; the threshold-`1.0` special case; weighting nuclei
       over codas; ignoring onsets (the README's design).
@@ -321,8 +806,8 @@ units:
     content: 'Turn `rhyme_score` into the graded kernel: expose weights (coda weight, nucleus weight)
       and a threshold; tune so slant rhymes land between perfect and non-rhyme.'
   - label: Read
-    content: the perceptual-similarity phonology paper (why imperfect rhyme tracks perceptual closeness);
-      Hirjee & Brown's imperfect-rhyme results.
+    content: the [perceptual-similarity phonology paper](res:katz) (why imperfect rhyme tracks perceptual
+      closeness); [Hirjee & Brown](res:hb)'s imperfect-rhyme results.
   - label: Concepts
     content: rhyme as graded, not binary; the threshold as a tunable knob; **perceptual similarity** as
       the target your weights approximate; the danger of over-fitting weights to a few examples.
@@ -331,9 +816,6 @@ units:
       stays below. Encode the *ordering* (perfect > slant > none) as tests, not exact magnitudes.
   - label: Milestone
     content: A graded `rhyme_score` that ranks a small battery of pairs the way your ear does.
-  - label: Interactive
-    content: widget `interactive/widgets/rhyme-score-sandbox.html` — two words in, every receipt out (tails,
-      alignment, per-column blend), exactly `rhyme_score()`'s numbers; lesson `unit-07-the-rhyme-kernel.md`.
   gloss: 'Graded slant rhyme: the kernel''s nucleus/coda weighting.'
   provenance: bespoke
 - id: u8
@@ -346,10 +828,11 @@ units:
       implement Needleman–Wunsch over vowel skeletons using `vowel_distance` as substitution cost and
       a tuned gap penalty.'
   - label: Read
-    content: SLP3 Ch. 2 **Minimum Edit Distance** (the algorithm, the backtrace); panphon's `Distance`
-      source (feature-weighted edit distance in the wild); afterward, Kondrak (2000) — what you just built
-      is, almost exactly, **ALINE**, the standard phonetic-alignment algorithm for 25 years, and its salience
-      weights, vowel/consonant split, and diphthong expansions answer questions we handle ad hoc.
+    content: '[SLP3](res:jm) Ch. 2 **Minimum Edit Distance** (the algorithm, the backtrace); [panphon](res:panphon)''s
+      `Distance` source (feature-weighted edit distance in the wild); afterward, [Kondrak (2000)](res:aline)
+      — what you just built is, almost exactly, **ALINE**, the standard phonetic-alignment algorithm for
+      25 years, and its salience weights, vowel/consonant split, and diphthong expansions answer questions
+      we handle ad hoc.'
   - label: Concepts
     content: edit distance / Needleman–Wunsch / DTW; substitution cost from a feature metric; gap penalties;
       alignment as the general case of which equal-length scoring was a special case.
@@ -363,8 +846,6 @@ units:
     content: This is the same dynamic-programming alignment used for spell-check and DNA — you're applying
       a workhorse NLP algorithm to vowels.
     kind: key
-  - label: Interactive
-    content: lesson `unit-08-alignment.md`.
   gloss: 'Needleman-Wunsch over vowel skeletons: unequal-length tails.'
   provenance: bespoke
 - id: u9
@@ -376,7 +857,8 @@ units:
     content: '`pronunciation_for_span(words)` (a span is just a `Pronunciation`); make scoring **variant-aware**
       (best score over CMUdict variants), replacing the current first-variant-only behavior.'
   - label: Read
-    content: '`pronouncing` API (`phones_for_word` returns a list); the README note on multi-word spans.'
+    content: '[`pronouncing` API](res:pronouncing) (`phones_for_word` returns a list); the README note
+      on multi-word spans.'
   - label: Concepts
     content: a multi-word span and a single word are the same downstream object; pronunciation **variants**
       and why rappers exploit them (coercion); taking the max over variants.
@@ -396,9 +878,9 @@ units:
     content: '`group_rhymes(words, threshold)` — build a graph where an edge means "score ≥ threshold,"
       then return connected components as rhyme classes.'
   - label: Read
-    content: SLP3 on clustering basics; any union-find reference; Reddy & Knight (2011) — the standard-cited
-      paper for this task, which makes the *scheme* a latent variable to infer rather than a graph to
-      component-ize.
+    content: '[SLP3](res:jm) on clustering basics; any union-find reference; [Reddy & Knight (2011)](res:rk)
+      — the standard-cited paper for this task, which makes the *scheme* a latent variable to infer rather
+      than a graph to component-ize.'
   - label: Concepts
     content: 'pairwise scores → groups; thresholding; the **non-transitivity of slant rhyme** (A rhymes
       with B, B with C, but not A with C) and why connected components is a deliberate (debatable) choice;
@@ -411,9 +893,6 @@ units:
       your grouping should treat it; encode the decision as a test.
   - label: Milestone
     content: Line-end words of a verse grouped into colored rhyme classes (data, not yet pixels).
-  - label: Interactive
-    content: lesson `unit-10-non-transitivity.md`; quiz `interactive/quizzes/phase-3-checkpoint.html`
-      (build here).
   - label: Key insight
     content: Slant-rhyme grouping isn't an equivalence relation — similarity rarely is. Choosing components
       vs. stricter clustering *is* a modeling decision, and naming it is half of computational linguistics.
@@ -429,7 +908,8 @@ units:
     content: A scanner that slides over syllables (not just line ends) to surface internal and multisyllabic
       rhymes within and across lines.
   - label: Read
-    content: Hirjee & Brown on internal-rhyme detection; the Vox "Rapping, deconstructed" breakdown.
+    content: '[Hirjee & Brown](res:hb) on internal-rhyme detection; the [Vox "Rapping, deconstructed"
+      breakdown](res:vox).'
   - label: Concepts
     content: rhyme is not only line-final; windowing over the syllable stream; ranking candidate matches
       by score and length (longest/nearest, as Hirjee & Brown do).
@@ -454,8 +934,8 @@ units:
     content: A renderer that takes grouped rhymes and emits highlighted output — an HTML page coloring
       each rhyme class (Pudding/Vox style), plus a terminal fallback.
   - label: Read
-    content: the Pudding pieces; Hirjee & Brown's "Rhyme Analyzer" UI (five formatting styles for overlapping
-      rhymes).
+    content: the [Pudding pieces](res:pudding); [Hirjee & Brown's "Rhyme Analyzer" UI](res:rhymeanalyzer)
+      (five formatting styles for overlapping rhymes).
   - label: Concepts
     content: mapping rhyme classes to colors; handling a word in multiple classes (internal + line-final);
       designing for the non-specialist reader.
@@ -474,9 +954,10 @@ units:
     content: 'A G2P fallback for words CMUdict lacks (your Unit-1 list): rule-based first; optionally
       wire in a neural G2P.'
   - label: Read
-    content: Epitran; for the neural side, the current baseline is byte-level transformers (ByT5 G2P,
-      CharsiuG2P) benchmarked in the SIGMORPHON 2020–22 shared tasks — `g2p_en`, once the standard mention,
-      is a 2019 artifact and effectively unmaintained; SLP3 on G2P if present in your draft.
+    content: '[Epitran](res:epitran); for the neural side, the current baseline is byte-level transformers
+      (ByT5 G2P, CharsiuG2P) benchmarked in the SIGMORPHON 2020–22 shared tasks — `g2p_en`, once the standard
+      mention, is a 2019 artifact and effectively unmaintained; [SLP3](res:jm) on G2P if present in your
+      draft.'
   - label: Concepts
     content: 'the OOV problem; **grapheme-to-phoneme** as rule-based vs **neural** (a direct bridge to
       your transformer knowledge); confidence/flagging of guessed pronunciations; dialect respellings
@@ -502,16 +983,17 @@ units:
   rows:
   - label: Build
     content: 'An eval harness, then point it at ground truth that mostly **already exists** — don''t build
-      gold from scratch when the field has it. Three corpora: **MCFlow** (Condit-Schultz 2016 — 124 rap
-      songs transcribed with rhyme annotations *and their metric placement*), **Haider & Kuhn''s** hip-hop
-      set (annotated for rhyme *and assonance* — exactly the north star), and **Hirjee & Brown''s own
-      annotated lyrics** (thesis — makes results directly comparable to the named prior art). In-house
-      annotation only fills gaps, and then with a **second annotator and a reported agreement figure**
-      — otherwise the tuning sweep optimizes toward one person''s ear. Content safety: evaluate locally
-      against downloaded corpora; store song IDs + offsets in the repo, never lyric text.'
+      gold from scratch when the field has it. Three corpora: **[MCFlow](res:mcflow)** (Condit-Schultz
+      2016 — 124 rap songs transcribed with rhyme annotations *and their metric placement*), **[Haider
+      & Kuhn''s](res:haider)** hip-hop set (annotated for rhyme *and assonance* — exactly the north star),
+      and **[Hirjee & Brown''s own annotated lyrics](res:hb)** (thesis — makes results directly comparable
+      to the named prior art). In-house annotation only fills gaps, and then with a **second annotator
+      and a reported agreement figure** — otherwise the tuning sweep optimizes toward one person''s ear.
+      Content safety: evaluate locally against downloaded corpora; store song IDs + offsets in the repo,
+      never lyric text.'
   - label: Read
-    content: SLP3 Ch. 2 on **precision / recall / F-score**; Hirjee & Brown's evaluation methodology;
-      the MCFlow paper; Haider & Kuhn (2018) on their annotation.
+    content: '[SLP3](res:jm) Ch. 2 on **precision / recall / F-score**; [Hirjee & Brown](res:hb)''s evaluation
+      methodology; the [MCFlow paper](res:mcflow); [Haider & Kuhn (2018)](res:haider) on their annotation.'
   - label: Concepts
     content: annotate *groups*, score *pairs* (groups impose transitivity gold shouldn't); **two metric
       families answering different questions** — pairwise link P/R/F vs class-level clustering metrics
@@ -549,20 +1031,20 @@ units:
       G2P, evaluation — and where each lives in the code.'
   - label: Milestone
     content: A demo you'd show someone, plus the writeup that proves the learning, not just the code.
-  - label: Swap in panphon
+  - label: Swap in [panphon](res:panphon)
     content: for the hand-built feature tables; compare detections and re-run your eval.
   - label: Phonetic word embeddings
-    content: '(Parrish 2017): represent whole lines as vectors for fast candidate retrieval before exact
-      scoring.'
+    content: '([Parrish 2017](res:parrish)): represent whole lines as vectors for fast candidate retrieval
+      before exact scoring.'
   - label: Unsupervised rhyme-scheme discovery
-    content: '(Reddy & Knight 2011; also Addanki & Wu 2013): the scheme as a latent variable inferred
-      by EM, no pronunciation dictionary at all — the principled alternative to Unit 10''s components,
+    content: '([Reddy & Knight 2011](res:rk); also Addanki & Wu 2013): the scheme as a latent variable
+      inferred by EM, no pronunciation dictionary at all — the principled alternative to Unit 10''s components,
       and a different answer to the mega-class problem.'
   - label: Prosody & flow
-    content: 'bring stress/meter into scoring, not just segments. This frontier has a literature — Adams
-      (2009) on the metrical techniques of flow, MCFlow''s beat-grid encoding, Ohriner''s *Flow* (2019)
-      — and one concrete experiment: validate the scanner''s *inferred* performed-stress anchors against
-      MCFlow''s *observed* placements.'
+    content: 'bring stress/meter into scoring, not just segments. This frontier has a literature — [Adams
+      (2009)](res:adams) on the metrical techniques of flow, [MCFlow](res:mcflow)''s beat-grid encoding,
+      [Ohriner''s *Flow* (2019)](res:ohriner) — and one concrete experiment: validate the scanner''s *inferred*
+      performed-stress anchors against MCFlow''s *observed* placements.'
   - label: Variant disambiguation
     content: pick the pronunciation that maximizes *whole-verse* rhyme, not per-pair.
   - label: The workshop paper.
@@ -580,99 +1062,142 @@ materials:
   title: Phonemes, not spelling
   path: interactive/lessons/unit-01-phonemes-not-spelling.md
   unit: u1
+  blurb: Say "Lincoln" and "reason" out loud, then look at their spellings — the lesson builds from that
+    mismatch to why rhyme is a relation between sounds, with CMUdict and ARPAbet as the foundation everything
+    else stands on.
 - id: l-u02
   kind: lesson
   title: Feature distance
   path: interactive/lessons/unit-02-feature-distance.md
   unit: u2
+  blurb: Read vowel_distance as distance in a feature space — a hand-built embedding of 15 vowels. Keep
+    the Vowel-Space Explorer open in another tab; every claim in the lesson is clickable there.
 - id: l-u03
   kind: lesson
   title: Consonants
   path: interactive/lessons/unit-03-consonants.md
   unit: u3
+  blurb: 'Walk the consonant half of features.py as a deliberate parallel to the vowel space: place and
+    sonority-ordered manner as the axes, voicing as a small weighted nudge you can feel with a finger
+    on your throat.'
 - id: l-u04
   kind: lesson
   title: Syllables & phonotactics
   path: interactive/lessons/unit-04-syllables-and-phonotactics.md
   unit: u4
+  blurb: Trace how a flat CMUdict phoneme string becomes structured syllables — onset, nucleus, coda —
+    and why the boundary the Maximal Onset Principle draws is a decision, not a discovery.
 - id: l-u05
   kind: lesson
   title: The rhyme tail
   path: interactive/lessons/unit-05-rhyme-tail.md
   unit: u5
+  blurb: Work out why rhyme anchors at the last primary-stressed syllable — "lessen" and "strengthen"
+    share a final syllable and don't rhyme — before you implement rhyme_tail in the exercise.
 - id: l-u06
   kind: lesson
   title: Perfect rhyme first
   path: interactive/lessons/unit-06-perfect-rhyme.md
   unit: u6
+  blurb: 'Derive the equal-length scorer: nucleus and coda blended per syllable, onsets ignored, calibrated
+    so identical tails score exactly 1.0. The floor Units 7 and 8 must reduce to.'
 - id: l-u07
   kind: lesson
   title: The rhyme kernel
   path: interactive/lessons/unit-07-the-rhyme-kernel.md
   unit: u7
+  blurb: Run your Unit 6 scorer on Lincoln/reason and confront the gap between the number and your ear;
+    the lesson turns the score graded, with the weights read as approximations of perceptual similarity.
 - id: l-u08
   kind: lesson
   title: Alignment
   path: interactive/lessons/unit-08-alignment.md
   unit: u8
+  blurb: Build Needleman-Wunsch over vowel skeletons, starting from a DP table you fill in by hand. The
+    hardest unit in the course; go slow, and let a wall fall to a smaller table.
 - id: l-u09
   kind: lesson
   title: Variants and spans
   path: interactive/lessons/unit-09-variants-and-spans.md
   unit: u9
+  blurb: See why a phrase needs no new type — a multi-word span is just a Pronunciation — and how taking
+    the best score over CMUdict variants lets the rapper, not the dictionary, pick the reading.
 - id: l-u10
   kind: lesson
   title: Non-transitivity
   path: interactive/lessons/unit-10-non-transitivity.md
   unit: u10
+  blurb: 'Examine what connected components commit you to when slant rhyme isn''t an equivalence relation:
+    grouping as a real modeling decision, with chaining as its named failure mode.'
 - id: l-u11
   kind: lesson
   title: Scanner walkthrough & tuning ledger
   path: interactive/lessons/unit-11-scanner-walkthrough.md
   unit: u11
+  blurb: Follow one demo verse through every stage of scan.py — candidates, matches, selection, grouping
+    — as documented during the collaborative build, wrong turns included. Also home of the project's living
+    tuning ledger.
 - id: l-u12
   kind: lesson
   title: Rendering
   path: interactive/lessons/unit-12-rendering.md
   unit: u12
+  blurb: 'Separate rendering policy from pixels: why the renderer colors rhyme classes rather than vowels,
+    and how RenderPlan makes every display decision data before the HTML and terminal backends execute
+    it.'
 - id: l-u13
   kind: lesson
   title: G2P
   path: interactive/lessons/unit-13-g2p.md
   unit: u13
+  blurb: Learn the G2P fallback chain — dictionary, hand lexicon, dialect rules, letter-to-sound — why
+    the links run in that order, and why the dialect rules are respectful recovery rather than normalization.
 - id: c-phonetics
   kind: companion
   title: 'How speech works: a phonetics refresher'
   path: interactive/lessons/phonetics-primer.md
   also_units:
   - u1
+  blurb: Rebuild the phonetics the project assumes in about twenty minutes, mostly by making sounds at
+    your desk. Skim the ARPAbet table if your linguistics is fresh; read it all if it's fifteen years
+    cold.
 - id: c-alignment
   kind: companion
   title: The sequence-alignment family
   path: interactive/lessons/sequence-alignment-family.md
   also_units:
   - u8
+  blurb: Place Unit 8's algorithm in its family — global alignment, seed-and-extend, co-linear chaining
+    — and see why the same three ideas keep turning up in this repo. No biology assumed.
 - id: c-graphs
   kind: companion
   title: Graphs, components, and union-find from zero
   path: interactive/lessons/graphs-and-union-find.md
   also_units:
   - u10
+  blurb: Build graphs, connected components, and union-find from nothing, until you can read connected_components
+    in rhyme.py line by line. Assumes no algorithms background.
 - id: w-vowel
   kind: widget
   title: Vowel-Space Explorer
   path: interactive/widgets/vowel-explorer.html
   unit: u2
+  blurb: Click pairs of vowels on the quadrilateral; the distance shown is exactly what vowel_distance()
+    computes from the repo's own coordinates.
 - id: w-consonant
   kind: widget
   title: Consonant-Space Explorer
   path: interactive/widgets/consonant-explorer.html
   unit: u3
+  blurb: Click pairs of consonants on the place-by-manner plane; the distance is exactly consonant_distance()'s
+    number, voicing nudge included.
 - id: w-syllabifier
   kind: widget
   title: Syllabifier
   path: interactive/widgets/syllabifier.html
   unit: u4
+  blurb: Watch the Maximal Onset Principle split a pronunciation into syllables — onset, nucleus, coda
+    — and trace where each consonant lands and why.
 - id: w-sandbox
   kind: widget
   title: Rhyme-Score Sandbox
@@ -680,45 +1205,63 @@ materials:
   unit: u7
   also_units:
   - u9
+  blurb: 'Two words in, every receipt out: tails, alignment, per-column blend, and the final score — exactly
+    the numbers rhyme_score() produces.'
 - id: w-nw
   kind: widget
   title: NW Alignment Explorer
   path: interactive/widgets/nw-alignment.html
   unit: u8
+  blurb: Step through the DP table as it fills, cell by cell, and watch the backtrace recover the alignment
+    of two vowel skeletons, with the real vowel distances as substitution costs.
 - id: w-grouping
   kind: widget
   title: Grouping Explorer
   path: interactive/widgets/grouping-explorer.html
   unit: u10
+  blurb: Slide the threshold over the demo verse's rhyme graph and watch edges appear and components merge
+    — percolation and the cost of one generous edge, live.
 - id: w-annotator
   kind: widget
   title: Gold Annotator
   path: interactive/widgets/gold-annotator.html
   unit: u14
+  blurb: Click words into rhyme groups to annotate a verse by ear; the widget writes the annotation in
+    the tests/gold/ format the eval harness reads.
 - id: q-phase-1
   kind: quiz
   title: Phase 1 checkpoint
   path: interactive/quizzes/phase-1-checkpoint.html
   phase: p1
+  blurb: Six questions on the phonetic foundation (Units 1-4). Click an answer and every option explains
+    why it's right or wrong.
 - id: q-phase-2
   kind: quiz
   title: Phase 2 checkpoint
   path: interactive/quizzes/phase-2-checkpoint.html
   phase: p2
+  blurb: Eight questions on the rhyme kernel (Units 5-8). Click an answer and every option explains why
+    it's right or wrong.
 - id: q-phase-3
   kind: quiz
   title: Phase 3 checkpoint
   path: interactive/quizzes/phase-3-checkpoint.html
   phase: p3
+  blurb: Seven questions on spans, variants, and grouping (Units 9-10). Click an answer and every option
+    explains why it's right or wrong.
 - id: q-phase-4
   kind: quiz
   title: Phase 4 checkpoint
   path: interactive/quizzes/phase-4-checkpoint.html
   phase: p4
+  blurb: Eight questions on rendering, G2P, and the evaluation concepts (Units 12-13). Click an answer
+    and every option explains why it's right or wrong.
 - id: b-questions
   kind: question-bank
   title: Question bank
   path: interactive/quizzes/question-bank.md
+  blurb: The pool "quiz me on Phase N" draws from, organized by phase. Each question carries an answer
+    and a one-line teaching note, so a wrong answer gets a real explanation, not just "no."
 - id: x-u05
   kind: exercise
   title: unit-05-rhyme-tail
@@ -727,6 +1270,8 @@ materials:
   grader:
     type: unit-test
     runner: python-unittest
+  blurb: Implement rhyme_tail — the slice from the last primary-stressed syllable to the end, with fallbacks
+    for stress-less words. Copy the stub into the package and make the suite green.
 - id: x-u08
   kind: exercise
   title: unit-08-alignment
@@ -735,6 +1280,8 @@ materials:
   grader:
     type: unit-test
     runner: python-unittest
+  blurb: Fill in the two holes in alignment.py — the Needleman-Wunsch recurrence plus backtrace, and the
+    gap-aware scorer — after working one small DP table by hand in task.md.
 - id: x-u10
   kind: exercise
   title: unit-10-grouping
@@ -743,6 +1290,8 @@ materials:
   grader:
     type: unit-test
     runner: python-unittest
+  blurb: Implement union-find connected components and the wrapper that turns pairwise scores plus a threshold
+    into rhyme classes; one test makes you sign the modeling decision the unit is about.
 - id: x-u13
   kind: exercise
   title: unit-13-g2p-extension
@@ -751,3 +1300,5 @@ materials:
   grader:
     type: unit-test
     runner: python-unittest
+  blurb: Three words the G2P chain currently gets wrong — "skrrt," "deadass," "boutta." Fix each in the
+    right link of the chain; choosing the link is the exercise.

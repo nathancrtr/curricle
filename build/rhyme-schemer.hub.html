@@ -256,24 +256,24 @@
 <div class="spine" id="phases"></div>
 <h2>Widgets &amp; quizzes <span class="sub">(self-contained — they open right here in the browser)</span></h2>
 <div class="grid">
-<div class="card panel"><h3><a href="interactive/widgets/vowel-explorer.html">Vowel-Space Explorer</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/consonant-explorer.html">Consonant-Space Explorer</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/syllabifier.html">Syllabifier</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/rhyme-score-sandbox.html">Rhyme-Score Sandbox</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/nw-alignment.html">NW Alignment Explorer</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/grouping-explorer.html">Grouping Explorer</a></h3></div>
-<div class="card panel"><h3><a href="interactive/widgets/gold-annotator.html">Gold Annotator</a></h3></div>
-<div class="card panel"><h3><a href="interactive/quizzes/phase-1-checkpoint.html">Phase 1 checkpoint</a></h3></div>
-<div class="card panel"><h3><a href="interactive/quizzes/phase-2-checkpoint.html">Phase 2 checkpoint</a></h3></div>
-<div class="card panel"><h3><a href="interactive/quizzes/phase-3-checkpoint.html">Phase 3 checkpoint</a></h3></div>
-<div class="card panel"><h3><a href="interactive/quizzes/phase-4-checkpoint.html">Phase 4 checkpoint</a></h3></div>
+<div class="card panel"><h3><a href="interactive/widgets/vowel-explorer.html">Vowel-Space Explorer</a></h3><p>Click pairs of vowels on the quadrilateral; the distance shown is exactly what vowel_distance() computes from the repo&#x27;s own coordinates.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/consonant-explorer.html">Consonant-Space Explorer</a></h3><p>Click pairs of consonants on the place-by-manner plane; the distance is exactly consonant_distance()&#x27;s number, voicing nudge included.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/syllabifier.html">Syllabifier</a></h3><p>Watch the Maximal Onset Principle split a pronunciation into syllables — onset, nucleus, coda — and trace where each consonant lands and why.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/rhyme-score-sandbox.html">Rhyme-Score Sandbox</a></h3><p>Two words in, every receipt out: tails, alignment, per-column blend, and the final score — exactly the numbers rhyme_score() produces.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/nw-alignment.html">NW Alignment Explorer</a></h3><p>Step through the DP table as it fills, cell by cell, and watch the backtrace recover the alignment of two vowel skeletons, with the real vowel distances as substitution costs.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/grouping-explorer.html">Grouping Explorer</a></h3><p>Slide the threshold over the demo verse&#x27;s rhyme graph and watch edges appear and components merge — percolation and the cost of one generous edge, live.</p></div>
+<div class="card panel"><h3><a href="interactive/widgets/gold-annotator.html">Gold Annotator</a></h3><p>Click words into rhyme groups to annotate a verse by ear; the widget writes the annotation in the tests/gold/ format the eval harness reads.</p></div>
+<div class="card panel"><h3><a href="interactive/quizzes/phase-1-checkpoint.html">Phase 1 checkpoint</a></h3><p>Six questions on the phonetic foundation (Units 1-4). Click an answer and every option explains why it&#x27;s right or wrong.</p></div>
+<div class="card panel"><h3><a href="interactive/quizzes/phase-2-checkpoint.html">Phase 2 checkpoint</a></h3><p>Eight questions on the rhyme kernel (Units 5-8). Click an answer and every option explains why it&#x27;s right or wrong.</p></div>
+<div class="card panel"><h3><a href="interactive/quizzes/phase-3-checkpoint.html">Phase 3 checkpoint</a></h3><p>Seven questions on spans, variants, and grouping (Units 9-10). Click an answer and every option explains why it&#x27;s right or wrong.</p></div>
+<div class="card panel"><h3><a href="interactive/quizzes/phase-4-checkpoint.html">Phase 4 checkpoint</a></h3><p>Eight questions on rendering, G2P, and the evaluation concepts (Units 12-13). Click an answer and every option explains why it&#x27;s right or wrong.</p></div>
 </div>
 <h2>Exercises <span class="sub">(stub + failing tests; green bar = done — run in a terminal)</span></h2>
 <div class="grid">
-<div class="card panel"><h3>unit-05-rhyme-tail</h3><p></p></div>
-<div class="card panel"><h3>unit-08-alignment</h3><p></p></div>
-<div class="card panel"><h3>unit-10-grouping</h3><p></p></div>
-<div class="card panel"><h3>unit-13-g2p-extension</h3><p></p></div>
+<div class="card panel"><h3>unit-05-rhyme-tail</h3><p>Implement rhyme_tail — the slice from the last primary-stressed syllable to the end, with fallbacks for stress-less words. Copy the stub into the package and make the suite green.</p></div>
+<div class="card panel"><h3>unit-08-alignment</h3><p>Fill in the two holes in alignment.py — the Needleman-Wunsch recurrence plus backtrace, and the gap-aware scorer — after working one small DP table by hand in task.md.</p></div>
+<div class="card panel"><h3>unit-10-grouping</h3><p>Implement union-find connected components and the wrapper that turns pairwise scores plus a threshold into rhyme classes; one test makes you sign the modeling decision the unit is about.</p></div>
+<div class="card panel"><h3>unit-13-g2p-extension</h3><p>Three words the G2P chain currently gets wrong — &quot;skrrt,&quot; &quot;deadass,&quot; &quot;boutta.&quot; Fix each in the right link of the chain; choosing the link is the exercise.</p></div>
 </div>
 <h2>The documents</h2>
 <div class="panel docs-panel"><ul class="docs"><li><a href="curriculum.md">curriculum.md</a> — the whole course: 6 phases, 16 units</li>

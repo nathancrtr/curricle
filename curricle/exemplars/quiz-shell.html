@@ -140,6 +140,11 @@ const QUIZ_DATA = [
     ]},
 ];
 
+// The pass mark is derived, not typed: three quarters of however many
+// questions the page holds. A constant calibrated to today's eight would
+// quietly become a 43% bar the day the quiz is rebuilt with fourteen.
+const PASS_MARK = Math.ceil(QUIZ_DATA.length * 0.75);
+
 const quiz = document.getElementById("quiz");
 let answered = 0, correct = 0;
 const misses = [];
@@ -175,7 +180,7 @@ QUIZ_DATA.forEach((item, qi) => {
         else misses.push(item.q.replace(/<[^>]+>/g, ""));
         document.getElementById("score").textContent =
           `Score: ${correct}/${answered}` + (answered === QUIZ_DATA.length ?
-            (correct >= 6 ? " — checkpoint passed. On to Phase 2." :
+            (correct >= PASS_MARK ? " — checkpoint passed. On to Phase 2." :
              " — reread the misses' explanations, then run the token stream explorer against your own lexer.") : "");
         if (answered === QUIZ_DATA.length) report();
       }

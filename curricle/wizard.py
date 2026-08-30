@@ -702,19 +702,23 @@ def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
 _NUMBERED_KEY = re.compile(r"^(.+)-(\d+)$")
 
 
-def next_key(asserted: list[tuple[str, str]], field: str) -> str:
+def next_key(spent: list[tuple[str, str]], field: str) -> str:
     """The next key for `field`: `{field}-NN`, and NN is never reused.
 
-    The high-water mark is read off the *ledger*, not off the fold: every
-    `{field}-NN` ever asserted counts, including the ones since retracted.
-    Keys are forever in this house, so a number that has ever named a claim
-    has been spent — reusing it would give a deleted claim's identity to a
-    new sentence, and every consumer that remembers a key (the profile page,
-    the MCP tools, an export somebody has already taken) would be wrong about
-    which one it meant.
+    The high-water mark is read off the *ledger*, not off the fold, and off
+    every row in it whatever its kind. A retracted claim has left the fold
+    and its number is still spent; an agent's `propose` on `{field}-NN` —
+    which the MCP tools can write against any identity — has spent that
+    number too, because the accept that follows creates a claim under it
+    with no `assert` row anywhere behind it. Minting over either one would
+    hand a live claim's identity to a new sentence and silently supersede
+    it, and every consumer that remembers a key (the profile page, the MCP
+    tools, an export somebody has already taken) would be wrong about which
+    claim it meant. Keys are forever, so a number that has ever named a
+    claim, or ever been offered as one, has been spent.
     """
     highest = 0
-    for row_field, key in asserted:
+    for row_field, key in spent:
         match = _NUMBERED_KEY.match(key)
         if row_field == field and match and match.group(1) == field:
             highest = max(highest, int(match.group(2)))
@@ -819,16 +823,28 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         believes them, and `profile.validate_profile_event` remains the only
         thing that can refuse one: a refusal arrives as a 422 rather than as
         a second opinion written here.
+
+        Accepted limitation: two tabs posting the same screen at the same
+        instant both read the ledger under READ COMMITTED, so both can mint
+        the same number and the second write supersedes the first. This is a
+        single learner filling in their own profile on a local app, where the
+        race is a person racing themselves; the fix (a serializable read, or
+        a unique index on the minted identity) belongs with multi-tenancy,
+        where two writers are two people.
         """
         if number not in _FORM_FIELDS:
             raise HTTPException(404)
+        # Refuse rather than guess, twice over: a body in another encoding,
+        # and a body that is not text at all, both parse to no boxes — and
+        # no boxes is indistinguishable from a screen the learner cleared,
+        # which is a retract of everything on it.
         if not request.headers.get("content-type", "").startswith(
                 "application/x-www-form-urlencoded"):
-            # Refuse rather than guess: a body in some other encoding would
-            # parse to no boxes at all, which is indistinguishable from a
-            # screen the learner cleared, and clearing is a retract.
             raise HTTPException(415, "the profile forms post urlencoded")
-        form = parse_form(await request.body())
+        try:
+            form = parse_form(await request.body())
+        except UnicodeDecodeError:
+            raise HTTPException(415, "the profile forms post urlencoded")
         with engine.begin() as conn:
             if onboarding.load_state(conn, scope).current_stop() != "profile":
                 # O1 for a write: the fold has closed this screen — a tenant
@@ -838,12 +854,13 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                 raise HTTPException(409, "the profile stop is behind you; "
                                          "edit your claims on /profile")
             state = profile.load_profile(conn, scope)
-            # Every key this tenant has ever asserted, for the minting rule.
-            # The fold cannot answer this question: a retracted claim leaves
-            # the fold entirely and its number must still never come back.
-            asserted = [(r.field, r.key)
-                        for r in conn.execute(scope.profile_select())
-                        if r.kind == "assert"]
+            # Every key this tenant's ledger has ever carried, whatever the
+            # row said — the minting rule's high-water mark. The fold cannot
+            # answer this: a retracted claim has left it and its number must
+            # still never come back, and a proposed one may not have arrived
+            # in it yet.
+            spent = [(r.field, r.key)
+                     for r in conn.execute(scope.profile_select())]
 
             def save(field: str, key: str, claim: profile.Claim | None) -> None:
                 text = submitted(form, f"claim__{field}__{key}")
@@ -866,10 +883,10 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                     for claim in state.field_claims(field):
                         save(field, claim.key, claim)
                     for line in claim_lines(form, field):
-                        key = next_key(asserted, field)
+                        key = next_key(spent, field)
                         # Minted inside the loop and remembered here, so two
                         # new lines in one box get two consecutive numbers.
-                        asserted.append((field, key))
+                        spent.append((field, key))
                         profile.append_profile_event(
                             conn, scope, "assert", field, key,
                             {"text": line, "tier": "attested"})

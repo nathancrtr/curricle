@@ -293,6 +293,12 @@ class ProfileCopyTest(unittest.TestCase):
         asked = {f for _, _, fields in wizard.PROFILE_SCREENS for f in fields}
         self.assertEqual(asked | {"meta"}, set(wizard.FIELD_COPY))
 
+    def test_the_calibration_screen_says_why_those_three_are_the_product(self):
+        # Design §4's own sentence, on the screen it was written for.
+        self.assertIn("the difference between a course that re-explains your "
+                      "degree and one that builds only what you lack",
+                      wizard.form_screen("3", profile.ProfileState()).body)
+
     def test_demonstrated_appears_on_no_form_screen(self):
         # Its absence is the tier system working: that field is written by
         # course activity through the checkpoint→propose pipe, and a box a
@@ -310,11 +316,10 @@ class KeyMintingRuleTest(unittest.TestCase):
         self.assertEqual(wizard.next_key([], "background"), "background-01")
 
     def test_only_this_field_s_own_numbered_keys_count(self):
-        asserted = [("style", "style-07"), ("background", "swe"),
-                    ("background", "background-02"),
-                    ("background", "background-sub-01")]
-        self.assertEqual(wizard.next_key(asserted, "background"),
-                         "background-03")
+        spent = [("style", "style-07"), ("background", "swe"),
+                 ("background", "background-02"),
+                 ("background", "background-sub-01")]
+        self.assertEqual(wizard.next_key(spent, "background"), "background-03")
 
 
 class ProfileFormRoundTripTest(WizardFixture):
@@ -347,6 +352,49 @@ class ProfileFormRoundTripTest(WizardFixture):
         for number in ("5", "0", "review", "welcome"):
             with self.subTest(number=number):
                 self.assertEqual(self.save(number, {}).status_code, 404)
+
+    def test_a_body_this_form_cannot_read_is_refused(self):
+        # Refusing beats guessing: a body in another encoding, or bytes that
+        # are not text at all, both parse to no boxes — and no boxes is
+        # indistinguishable from a screen cleared of every claim on it.
+        json_body = self.client.post("/onboarding/profile/1",
+                                     json={"new__background": "smuggled"},
+                                     follow_redirects=False)
+        self.assertEqual(json_body.status_code, 415)
+        not_text = self.client.post(
+            "/onboarding/profile/1", content=b"new__background=\xff\xfe",
+            headers={"content-type": "application/x-www-form-urlencoded"},
+            follow_redirects=False)
+        self.assertEqual(not_text.status_code, 415)
+        self.assertEqual(self.profile_rows(), [])
+
+
+class ProposedKeyIsSpentTest(WizardFixture):
+    """A number an agent has offered is spent too, accepted or not.
+
+    The MCP tools can propose on any (field, key), and an accepted proposal
+    becomes a claim with no `assert` row anywhere behind it. Minting only
+    over asserts would hand that live claim's identity to a new sentence and
+    supersede it without a word — the failure the "keys are forever" rule
+    exists to prevent, arriving from the other producer.
+    """
+
+    def test_the_form_never_mints_over_an_accepted_proposal(self):
+        for kind, payload in (("propose", {"text": "reaches it through "
+                                                   "failure modes",
+                                           "tier": "thin",
+                                           "source": "tutor/session-3"}),
+                              ("accept", {})):
+            with self.engine.begin() as conn:
+                profile.append_profile_event(conn, self.scope, kind, "style",
+                                             "style-01", payload)
+        self.assertEqual(self.save("2", {"new__style": "learns by "
+                                                       "implementing"})
+                         .status_code, 303)
+        claims = self.profile_state().field_claims("style")
+        self.assertEqual([(c.key, c.text) for c in claims],
+                         [("style-01", "reaches it through failure modes"),
+                          ("style-02", "learns by implementing")])
 
 
 class ClaimEscapingTest(WizardFixture):

@@ -6,6 +6,7 @@ tests must fail against its stub, a widget must be offline) run for real.
 
 import json
 import os
+import re
 import tempfile
 import textwrap
 import unittest
@@ -235,6 +236,98 @@ class ValidatorTest(unittest.TestCase):
         self.assertIn("Phase 2 Checkpoint", out)
         self.assertIn("Question 0?", out)
         self.assertNotIn("'old'", out)
+
+
+# Where each house exemplar came from, relative to tinylang's `interactive/`.
+# Whole copies, so the parity test asserts equality; the bank section is a
+# slice of its source and the quiz shell a dialect rename of its own.
+HOUSE_SOURCES = {
+    "lesson.md": "lessons/unit-01-lexer.md",
+    "widget.html": "widgets/token-stream.html",
+    "exercise/task.md": "exercises/unit-02-starter/task.md",
+    "exercise/pratt.py": "exercises/unit-02-starter/pratt.py",
+    "exercise/test_pratt.py": "exercises/unit-02-starter/test_pratt.py",
+}
+
+# tinylang's checkpoint page names its quiz data `QUESTIONS` and spells an
+# option `{t, ok, why}`; `validate_quiz` emits `{text, correct, why}` and
+# `render_quiz_html` looks for `const QUIZ_DATA`. The house shell is that page
+# with these six renames applied and nothing else changed — recorded here so
+# the parity test can recompute it, which is the drift guard the whole-copy
+# files get from plain equality.
+QUIZ_DIALECT = (
+    (r"\bQUESTIONS\b", "QUIZ_DATA"),
+    (r"\bopts\b", "options"),
+    (r"\bo\.t\b", "o.text"),
+    (r"\bo\.ok\b", "o.correct"),
+    (r"\bt: ", "text: "),
+    (r"\bok: ", "correct: "),
+)
+
+
+def tinylang_material(rel):
+    path = os.path.join(llm.home(), "examples", "tinylang", "learning",
+                        "interactive", rel)
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+class HouseExemplarTest(unittest.TestCase):
+    """The shipped exemplar set: what a course's *first* build is shown.
+
+    Every lookup in `build_phase` reaches for the course's own earlier
+    materials and a new course has none, so each falls back here. Two things
+    have to hold: the set is usable by the code that consumes it (the shell
+    must render, the widget must survive the widget validator), and it has not
+    drifted from the tinylang materials it was curated from.
+    """
+
+    def test_every_kind_returns_text_and_an_unknown_one_refuses(self):
+        for kind in ("lesson", "widget", "quiz", "bank"):
+            self.assertTrue(factory.house_exemplar(kind).strip(), kind)
+        with self.assertRaises(KeyError):
+            factory.house_exemplar("podcast")
+
+    def test_the_exercise_comes_back_in_the_native_blob_format(self):
+        blob = factory.house_exercise_exemplar()
+        for fn in ("pratt.py", "task.md", "test_pratt.py"):
+            self.assertIn(f"--- {fn} ---", blob)
+        self.assertIn("NotImplementedError", blob)       # it ships red, as tinylang's does
+
+    def test_the_quiz_shell_is_a_shell_the_renderer_can_swap(self):
+        shell = factory.house_exemplar("quiz")
+        self.assertIn("const QUIZ_DATA", shell)
+        out = factory.render_quiz_html(shell, json.loads(GOOD_QUIZ), 1, 1)
+        self.assertIn("Question 0?", out)
+        self.assertNotIn("Why are lexing and parsing two stages", out)
+        # And the block the quiz-author is shown is the questions, not the page.
+        self.assertIn("const QUIZ_DATA", factory._quiz_exemplar(shell))
+
+    def test_the_widget_would_survive_its_own_validator(self):
+        widget = factory.house_exemplar("widget")
+        # An exemplar the widget validator would refuse is an exemplar that
+        # teaches the role to write refusable widgets.
+        self.assertIsNone(factory.EXTERNAL_REF_RE.search(widget))
+        self.assertTrue(factory.validate_widget(widget))
+
+    def test_the_bank_section_is_one_section(self):
+        section = factory.house_exemplar("bank")
+        self.assertTrue(section.startswith("## "))
+        self.assertEqual(section.count("\n## "), 0)
+
+    def test_nothing_has_drifted_from_tinylang(self):
+        for name, source in HOUSE_SOURCES.items():
+            with open(os.path.join(factory.EXEMPLARS_DIR, name),
+                      encoding="utf-8") as f:
+                self.assertEqual(f.read(), tinylang_material(source), name)
+
+        bank = tinylang_material("quizzes/question-bank.md")
+        self.assertIn(factory.house_exemplar("bank"), bank)
+
+        renamed = tinylang_material("quizzes/phase-1-checkpoint.html")
+        for pattern, replacement in QUIZ_DIALECT:
+            renamed = re.sub(pattern, replacement, renamed)
+        self.assertEqual(factory.house_exemplar("quiz"), renamed)
 
 
 class ConfigLocationTest(unittest.TestCase):
@@ -863,6 +956,198 @@ class BuildPhaseTest(unittest.TestCase):
                 self.assertIn("Question 0?", f.read())
             self.assertTrue(os.path.exists(os.path.join(
                 report.draft_dir, "exercises/unit-03-bpe/task.md")))
+
+
+GOOD_LESSON = "# Lesson\n" + "context " * 400 + "\n> PAUSE.\nmore"
+GOOD_WIDGET = ("<!DOCTYPE html><html><body><script>let x=1;</script>"
+               "</body></html>")
+GOOD_BANK = ("## Module 3 — Tokenization\n\n**3.1 (R)** What is BPE?\n"
+             "**Answer:** Byte-pair encoding.\n**Note:** Merges by frequency.")
+
+BUILD_RESPONSES = {
+    "lesson-writer": GOOD_LESSON,
+    "widget-builder": GOOD_WIDGET,
+    "exercise-author": GOOD_EXERCISE,
+    "quiz-author": GOOD_QUIZ,
+    "bank-author": GOOD_BANK,
+}
+
+
+class FakeBuildSend:
+    """A scripted transport for the five build roles, routed by prompt tag.
+
+    By tag rather than by the contract's wording, for the same reason
+    `FakeOutlineSend` does it: the prompt assembly is what these tests pin,
+    and each role is handed exactly one exemplar section of its own.
+    """
+
+    TAGS = (("<exemplar_lesson>", "lesson-writer"),
+            ("<exemplar_widget>", "widget-builder"),
+            ("<exemplar_exercise>", "exercise-author"),
+            ("<exemplar_questions>", "quiz-author"),
+            ("<existing_bank>", "bank-author"))
+
+    def __init__(self):
+        self.calls: list[tuple[str, str]] = []
+
+    def __call__(self, model, system, prompt, max_tokens):
+        role = next(r for tag, r in self.TAGS if tag in prompt)
+        self.calls.append((role, prompt))
+        return BUILD_RESPONSES[role], {"input_tokens": 10, "output_tokens": 10,
+                                       "cache_write_tokens": 0,
+                                       "cache_read_tokens": 0}
+
+    def prompt(self, role):
+        return next(p for r, p in self.calls if r == role)
+
+
+# The tiny demo course again, this time declaring one material of every kind
+# the build looks for — the phase-2-and-later case, where the course's own
+# earlier work is the exemplar and the house set must stay out of the way.
+NATIVE_MATERIALS = """
+materials:
+- id: l-u01
+  kind: lesson
+  title: Native lesson
+  path: interactive/lessons/unit-01-lesson.md
+  unit: u1
+- id: w-native
+  kind: widget
+  title: Native widget
+  path: interactive/widgets/native.html
+  unit: u1
+- id: x-u01
+  kind: exercise
+  title: unit-01-native
+  path: interactive/exercises/unit-01-native
+  unit: u1
+  grader: {type: unit-test, runner: python-unittest, command: python test_native.py}
+- id: q-phase-1
+  kind: quiz
+  title: Phase 1 checkpoint
+  path: interactive/quizzes/phase-1-checkpoint.html
+  phase_num: 1
+- id: bank
+  kind: question-bank
+  title: Question bank
+  path: interactive/quizzes/question-bank.md
+"""
+
+NATIVE_FILES = {
+    "lessons/unit-01-lesson.md": "# Native lesson\nNATIVE-LESSON.\n> PAUSE.\n",
+    "widgets/native.html": ("<!DOCTYPE html><html><body>NATIVE-WIDGET"
+                            "<script>let x=1;</script></body></html>\n"),
+    "exercises/unit-01-native/task.md": "# Native task\nNATIVE-EXERCISE.\n",
+    "quizzes/phase-1-checkpoint.html": (
+        "<title>Phase 1 Checkpoint</title>\n<script>\n"
+        "const QUIZ_DATA = [\n  {q: 'NATIVE-QUIZ'}\n];\n</script>\n"),
+    "quizzes/question-bank.md": "# Bank\n\n## Unit 1\nNATIVE-BANK.\n",
+}
+
+FULL_SPEC = factory.BuildSpec(phase_id="p1", lesson_unit="u1",
+                              widget_unit="u2", widget_concept="refusal",
+                              exercise_unit="u2", quiz=True, bank=True)
+
+
+class HouseFallbackBuildTest(unittest.TestCase):
+    """The fallback, where it is decided: prompt assembly, not the course tree.
+
+    A brand-new course has no materials at all, so every exemplar lookup in
+    `build_phase` comes up empty and every one of them falls back to the
+    shipped set. Nothing about the fallback is written down — it is recomputed
+    per call — so what these tests read is the prompt each role received.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = test_engine()
+
+    def setUp(self):
+        with self.engine.begin() as conn:
+            self.tenant = db.create_tenant(conn, f"house-{self.id()}")
+        self.scope = db.for_tenant(self.tenant)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def course(self, sidecar, files=()):
+        """A compiled tiny-demo course on disk, and its content root."""
+        root = os.path.join(self.tmp.name, "course")
+        os.makedirs(os.path.join(root, "learning"))
+        for rel, body in zip(factory.OUTLINE_FILES,
+                             (GOOD_CURRICULUM, sidecar, GOOD_SHELF)):
+            with open(os.path.join(root, rel), "w", encoding="utf-8") as f:
+                f.write(body)
+        for rel, body in dict(files).items():
+            path = os.path.join(root, "learning", "interactive", rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(body)
+        manifest, issues = compile_draft(root)
+        self.assertIsNotNone(manifest, [str(i) for i in issues])
+        return manifest, os.path.join(root, "learning")
+
+    def build(self, manifest, content_root):
+        send = FakeBuildSend()
+        report = factory.build_phase(Runner(self.engine, self.scope, send=send),
+                                     manifest, profile.ProfileState(),
+                                     content_root, FULL_SPEC)
+        return send, report
+
+    def test_an_empty_course_is_built_against_the_house_set(self):
+        manifest, _ = self.course(GOOD_SIDECAR)
+        # Not the course's own tree: a first build has nothing in it, and the
+        # fallback must never put anything there either.
+        content_root = os.path.join(self.tmp.name, "empty")
+        send, report = self.build(manifest, content_root)
+
+        self.assertEqual({a.role for a in report.artifacts},
+                         {"lesson-writer", "widget-builder", "exercise-author",
+                          "quiz-author", "bank-author"})
+        self.assertIn(factory.house_exemplar("lesson"),
+                      send.prompt("lesson-writer"))
+        self.assertIn(factory.house_exemplar("widget"),
+                      send.prompt("widget-builder"))
+        self.assertIn(factory.house_exercise_exemplar(),
+                      send.prompt("exercise-author"))
+        self.assertIn(factory._quiz_exemplar(factory.house_exemplar("quiz")),
+                      send.prompt("quiz-author"))
+        self.assertIn(factory.house_exemplar("bank"),
+                      send.prompt("bank-author"))
+
+        # The quiz path is the one that used to refuse outright. It now renders
+        # into the house shell — whose "Phase 1" strings are what `old_phase`
+        # already defaults to.
+        with open(os.path.join(report.draft_dir,
+                               "quizzes/phase-1-checkpoint.html")) as f:
+            html = f.read()
+        self.assertIn("Question 0?", html)
+        self.assertIn("Phase 1 Checkpoint", html)
+        self.assertNotIn("Why are lexing and parsing two stages", html)
+
+        # The course tree stays honest: only the draft was written to, and
+        # nothing under it came from `curricle/exemplars/`.
+        self.assertEqual(os.listdir(os.path.join(content_root, "interactive")),
+                         [".draft-p1"])
+
+    def test_a_course_with_its_own_materials_keeps_using_them(self):
+        manifest, content_root = self.course(GOOD_SIDECAR + NATIVE_MATERIALS,
+                                             NATIVE_FILES)
+        send, _ = self.build(manifest, content_root)
+
+        for role, marker in (("lesson-writer", "NATIVE-LESSON"),
+                             ("widget-builder", "NATIVE-WIDGET"),
+                             ("exercise-author", "NATIVE-EXERCISE"),
+                             ("quiz-author", "NATIVE-QUIZ"),
+                             ("bank-author", "NATIVE-BANK")):
+            self.assertIn(marker, send.prompt(role), role)
+        for role, kind in (("lesson-writer", "lesson"),
+                           ("widget-builder", "widget"),
+                           ("bank-author", "bank")):
+            self.assertNotIn(factory.house_exemplar(kind), send.prompt(role))
+        self.assertNotIn(factory.house_exercise_exemplar(),
+                         send.prompt("exercise-author"))
+        self.assertNotIn("Why are lexing and parsing two stages",
+                         send.prompt("quiz-author"))
 
 
 if __name__ == "__main__":

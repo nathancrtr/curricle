@@ -10,6 +10,15 @@ link inside the pages resolves unchanged, and course content under
 T1 in practice: the app is configured with a tenant slug and resolves it to
 a real row at startup. No slug, no app — there is no default tenant.
 
+Courses arrive from two places: the `--course` roots this app is built with,
+and the managed courses home (`coursehome`), which is re-read while the app
+runs so a course created after startup can be served without a restart.
+Registration is pull-based because `serve` and the factory worker share only
+the database and the filesystem — nothing can call into this process — so a
+route miss and each front-door render consult the home and load what is new.
+Every one of those paths goes through `load_course`, so the startup rule
+holds unchanged: a course that does not compile is an absence, never a page.
+
 The front door (`/`) is the one page this module draws itself rather than
 delegating to a renderer, and it draws it on the same design system (see
 theme.py): wordmark, a greeting off the clock, and one panel per course
@@ -26,6 +35,8 @@ import datetime
 import html as html_mod
 import mimetypes
 import os
+import sys
+import threading
 from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, Request
@@ -33,14 +44,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 
 import posixpath
 
-from . import db, profile, progress, theme
+from . import coursehome, db, profile, progress, theme
 from .compiler import compile_course
 from .currender import render_curriculum
 from .hubrender import render_hub
 from . import refs
 from .profilerender import render_profile_page
 from .resrender import render_resources
-from .schema import Manifest
+from .schema import Manifest, SchemaError
 from .sidecar import load_sidecar
 from .unitrender import render_reader, render_unit
 
@@ -78,6 +89,17 @@ def load_course(root: str) -> CourseHandle:
         slug=manifest.course.id, root=root,
         content_root=os.path.join(root, os.path.dirname(curriculum_rel)),
         manifest=manifest, repo_paths=repo_paths)
+
+
+# The two ways a course root is refused rather than served: the compile came
+# back dirty (load_course raises RuntimeError) or the sidecar violates the
+# contract (SchemaError, out of the strict loader — what a half-written or
+# hand-edited course.yaml in the courses home looks like). Both mean "not a
+# servable course", which the lazy registration paths turn into absence.
+# Anything else — a TypeError out of the compiler, say — is a bug in this
+# repository, and a bug that manifests as courses quietly disappearing is a
+# bug nobody finds.
+REFUSALS = (RuntimeError, SchemaError)
 
 
 # --------------------------------------------------------------------------
@@ -195,24 +217,105 @@ MATERIAL_JS = """\
 
 
 def create_app(course_roots: list[str], tenant_slug: str,
-               database_url: str | None = None) -> FastAPI:
+               database_url: str | None = None,
+               courses_dir: str | None = None) -> FastAPI:
     engine = db.make_engine(database_url)
     with engine.begin() as conn:
         tenant_id = db.tenant_id_for(conn, tenant_slug)   # fail at startup, T1
     scope = db.for_tenant(tenant_id)
-    courses = {h.slug: h for h in (load_course(r) for r in course_roots)}
+    courses: dict[str, CourseHandle] = {}
+    # Registration happens on request threads now, and uvicorn runs the sync
+    # routes in a threadpool: two requests that miss on the same new course
+    # would otherwise both compile it and race the collision check, which is
+    # a check that only means anything if check-and-insert is one step. The
+    # lock is held across the compile too — the simpler correct shape, and
+    # contention here is two threads at the moment a course first appears.
+    registration = threading.Lock()
+
+    def register_course(root: str) -> CourseHandle:
+        """Compile one course root and add it to the served map.
+
+        The single insertion point — startup and both lazy paths arrive here
+        — so "never serve a course that does not compile" stays one rule in
+        one place: `load_course` raises on a dirty compile and this does not
+        catch it. Callers decide what a refusal means (a failure to start,
+        or a 404); none of them may decide it means a half-loaded handle.
+
+        Two roots claiming one course id is refused rather than resolved.
+        Which of them wins would otherwise depend on load order, and a
+        served course whose identity depends on argument order is exactly
+        the guess this codebase does not make. Sameness is realpath: one
+        directory reached twice, once through a symlink, is one root.
+        """
+        with registration:
+            h = load_course(root)
+            prior = courses.get(h.slug)
+            if prior is not None and (os.path.realpath(prior.root)
+                                      != os.path.realpath(h.root)):
+                raise RuntimeError(
+                    f"two course roots claim the id {h.slug!r}: {prior.root} "
+                    f"and {h.root} — refusing to guess which one to serve")
+            courses[h.slug] = h
+            return h
+
+    for root in course_roots:
+        register_course(root)
+    for root in (coursehome.course_roots(courses_dir) if courses_dir else ()):
+        register_course(root)
+
+    def register_from_home(slug: str) -> CourseHandle | None:
+        """Try the courses home for a slug this app has not loaded.
+
+        A miss is a miss, whatever caused it: no home configured, no such
+        directory, a directory that is not a course yet, a course that does
+        not compile. The caller gets None and the learner gets a 404 — the
+        wizard's own ledger is where a failed build explains itself, not a
+        page served to whoever guessed the URL.
+
+        The lookup is by directory name and the answer is by course id, and
+        those are not the same thing: a directory whose sidecar declares
+        some other id registers under that id and is *not* returned here.
+        Serving it under the name in the URL would publish a course under a
+        slug it never claimed, and every link inside the page would then
+        disagree with the address bar. (Minting is what keeps the two equal
+        for wizard-created courses; this is what happens when they aren't.)
+        """
+        if not courses_dir:
+            return None
+        root = os.path.join(os.path.abspath(os.path.expanduser(courses_dir)),
+                            slug)
+        if root not in coursehome.course_roots(courses_dir):
+            return None
+        try:
+            register_course(root)
+        except REFUSALS as exc:
+            print(f"courses: {root} not registered: {exc}", file=sys.stderr)
+            return None
+        return courses.get(slug)
 
     app = FastAPI(title="curricle", docs_url=None, redoc_url=None)
 
     def handle(slug: str) -> CourseHandle:
-        try:
-            return courses[slug]
-        except KeyError:
+        h = courses.get(slug) or register_from_home(slug)
+        if h is None:
             raise HTTPException(404)
+        return h
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> str:
         e = html_mod.escape
+        # The front door is where a course finished since the last request
+        # first appears, so it rescans the home before drawing. Only unknown
+        # directories are compiled — a loaded course is never recompiled to
+        # render a card — and a compile that fails simply leaves the course
+        # off the page, as it was off it a moment ago.
+        for root in (coursehome.course_roots(courses_dir) if courses_dir else ()):
+            if os.path.basename(root) not in courses:
+                try:
+                    register_course(root)
+                except REFUSALS as exc:
+                    print(f"courses: {root} not registered: {exc}",
+                          file=sys.stderr)
         cards = []
         for h in courses.values():
             # One transaction per course. Honest at two, a smell at twenty —
@@ -266,7 +369,9 @@ def create_app(course_roots: list[str], tenant_slug: str,
         if not cards:
             cards.append('<p class="lede">No courses are configured yet — '
                          "start the server with <code>--course</code> "
-                         "pointing at a course repo.</p>")
+                         "pointing at a course repo, or set "
+                         f"<code>{coursehome.ENV_DIR}</code> to a directory "
+                         "of courses.</p>")
             lede = ""
         return f"""<!DOCTYPE html>
 <html lang="en">

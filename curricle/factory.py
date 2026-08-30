@@ -6,6 +6,12 @@ strictly (a quiz missing a `why` fails generation, not review), land in a
 draft directory, and reach the course only through an explicit promote —
 generated content is proposed, the human publishes.
 
+One stage earlier, `build_outline` drafts the course itself — curriculum,
+sidecar, resource shelf — and there the validator is the compiler: the draft
+is compiled where it stands and its error-level issues are the findings the
+roles get one rewrite from. A generated course artifact that does not
+compile clean was not generated.
+
 Calibration is the point: every prompt carries the learner profile — the
 *derived* projection from the evidence ledger, not a hand-written blurb —
 plus exemplars from the course's own earlier phases, so the factory writes
@@ -20,11 +26,16 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from decimal import Decimal
 
-from .llm import Runner
+import yaml
+
+from .compiler import Issue, compile_course
+from .llm import FactoryConfigMissing, ModelsConfig, Runner, home
 from .profile import ProfileState
 from .profilerender import render_skill_md
-from .schema import Manifest, Phase, Unit
+from .schema import Manifest, Phase, Resource, SchemaError, Unit
+from .sidecar import load_sidecar
 
 
 class ValidationFailed(ValueError):
@@ -250,6 +261,414 @@ def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
     if replaced == shell:
         raise ValidationFailed("quiz shell has no QUIZ_DATA block to replace")
     return replaced.replace(f"Phase {old_phase_num}", f"Phase {phase_num}")
+
+
+# ---------------------------------------------------------------------------
+# The outline: curriculum + sidecar + shelf, validated by the compiler itself
+# ---------------------------------------------------------------------------
+
+OUTLINE_FILES = ("learning/curriculum.md", "learning/course.yaml",
+                 "learning/learning-resources.md")
+
+EXEMPLAR_COURSE = "tinylang"
+
+
+class OutlineFailed(ValueError):
+    """The outline stage kept nothing.
+
+    `reason` is the machine value the onboarding ledger records (and the
+    wizard maps to a human sentence); `detail` is operator-facing — the
+    compiler's findings, a parse error — and is never screen copy.
+    """
+
+    def __init__(self, reason: str, detail: str):
+        super().__init__(f"{reason}: {detail}")
+        self.reason = reason
+        self.detail = detail
+
+
+@dataclass
+class OutlineReport:
+    draft_dir: str
+    files: list[str] = field(default_factory=list)     # relative paths written
+    costs: dict[str, str] = field(default_factory=dict)
+    retried: tuple[str, ...] = ()                      # roles given the rewrite
+
+
+def _exemplar_file(name: str) -> str:
+    """One of the exemplar course's outline files, read from the checkout.
+
+    tinylang is the schema's reference instance — the one course that
+    exercises every part of the manifest and compiles clean — so it is what
+    the two outline roles are shown. Reading it from `llm.home()` makes the
+    outline stage a checkout-mode feature exactly as the roles are.
+    """
+    path = os.path.join(home(), "examples", EXEMPLAR_COURSE, "learning", name)
+    if not os.path.isfile(path):
+        raise FactoryConfigMissing.for_path(
+            path, f"the {EXEMPLAR_COURSE} exemplar's {name}")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def outline_exemplar() -> str:
+    """The exemplar's curriculum and sidecar, in one blob the designer reads."""
+    return "\n\n".join(
+        f"--- file: learning/{name} ---\n{_exemplar_file(name)}"
+        for name in ("curriculum.md", "course.yaml"))
+
+
+# The shelf the learner reviews is the curator's markdown; the shelf the
+# compiler resolves `res:` against is the sidecar's. Nothing else checks that
+# they are the same shelf, so this does — and it checks by *exact* title and
+# URL, because the curator is handed both in `<resource_shelf>`. A matcher
+# that guessed would be a matcher that could be talked around: a fabricated
+# "…: The Video Series" entry pointing somewhere else is precisely the
+# disagreement worth catching, and a fuzzy pass would call it a match.
+SHELF_ENTRY_RE = re.compile(r"^###\s+(.+?)\s*$", re.M)
+URL_IN_TEXT_RE = re.compile(r"https?://[^\s<>()\[\]]+")
+
+
+def _shelf_entries(md: str) -> list[tuple[str, str]]:
+    marks = list(SHELF_ENTRY_RE.finditer(md))
+    entries = []
+    for i, m in enumerate(marks):
+        end = marks[i + 1].start() if i + 1 < len(marks) else len(md)
+        closing = md.find("\n## ", m.end(), end)     # a new tier closes a section
+        entries.append((m.group(1).strip(),
+                        md[m.end():closing if closing != -1 else end]))
+    return entries
+
+
+def _shelf_name(text: str) -> str:
+    """A title's identity, modulo typography the two files spell differently:
+    markdown emphasis, quote style, `&` for `and`, whitespace, a full stop."""
+    text = re.sub(r"[`*_“”‘’\"']", "", text)
+    text = text.replace("&", " and ")
+    return re.sub(r"\s+", " ", text).strip().strip(".").lower()
+
+
+def _same_url(a: str, b: str) -> bool:
+    return a.strip().rstrip("/") == b.strip().rstrip("/")
+
+
+def _entry_urls(heading: str, body: str) -> list[str]:
+    return [u.rstrip(".,;>)") for u in URL_IN_TEXT_RE.findall(heading + body)]
+
+
+def shelf_findings(resources: tuple[Resource, ...], md: str) -> list[Issue]:
+    """Compiler-style findings for a shelf that disagrees with the sidecar.
+
+    One `###` entry per resource, its heading the listed title verbatim and
+    its link the listed URL. Three ways to disagree, all findings: a key with
+    no entry, an entry naming no key, and a pair whose URLs differ — the last
+    is how a real title acquires a fabricated destination.
+    """
+    where = OUTLINE_FILES[2]
+    entries = _shelf_entries(md)
+    by_name: dict[str, list[int]] = {}
+    for i, (heading, _) in enumerate(entries):
+        by_name.setdefault(_shelf_name(heading), []).append(i)
+
+    claimed: set[int] = set()
+    findings: list[Issue] = []
+    for res in resources:
+        hit = next((i for i in by_name.get(_shelf_name(res.title), [])
+                    if i not in claimed), None)
+        if hit is None:
+            findings.append(Issue(
+                "error", where,
+                f"resource key '{res.key}' has no '###' entry titled "
+                f"{res.title!r} — the shelf reproduces each listed title "
+                f"exactly, and it is the shelf the learner reads"))
+            continue
+        claimed.add(hit)
+        found = _entry_urls(*entries[hit])
+        wanted = [u for u in (res.url, *(u for _, u in res.links)) if u]
+        if not any(_same_url(f, w) for f in found for w in wanted):
+            findings.append(Issue(
+                "error", where,
+                f"the entry for '{res.key}' links "
+                f"{found[0] if found else 'nothing'}; course.yaml lists "
+                f"{res.url} — one resource, one destination"))
+    for i, (heading, _) in enumerate(entries):
+        if i not in claimed:
+            findings.append(Issue(
+                "error", where,
+                f"shelf entry '{heading}' matches no resource in course.yaml — "
+                f"the listed keys are the whole shelf, so drop it"))
+    return findings
+
+
+def resource_shelf_lines(course_yaml: str) -> str:
+    """The designer's resource entries as `key — title — url`, one per line.
+
+    The curator writes the shelf the learner reads, and the sidecar is the
+    shelf the compiler resolves `res:` against; handing over the exact titles
+    and URLs is what makes agreement between the two checkable rather than
+    guessable. Read leniently — a sidecar too broken to read here is about to
+    become a finding of its own, and an empty list is not worth crashing on.
+    """
+    try:
+        entries = yaml.safe_load(course_yaml)["resources"] or []
+    except (yaml.YAMLError, AttributeError, TypeError, KeyError, IndexError):
+        return ""
+    lines = []
+    for entry in entries:
+        try:
+            url = entry.get("url") or entry["links"][0][1]
+            lines.append(f"{entry['key']} — {entry['title']} — {url}")
+        except (AttributeError, TypeError, KeyError, IndexError):
+            continue
+    return "\n".join(lines)
+
+
+def _outline_envelope(text: str) -> tuple[str, str]:
+    """The designer's JSON envelope. Malformed is a refusal, not a rewrite:
+    an envelope the compiler never sees is not a compiler finding."""
+    try:
+        data = json.loads(_strip_fence(text))
+    except json.JSONDecodeError as exc:
+        raise OutlineFailed("validation_failed",
+                            f"curriculum-designer did not return JSON: {exc}")
+    if not isinstance(data, dict):
+        raise OutlineFailed("validation_failed",
+                            "curriculum-designer returned a JSON "
+                            f"{type(data).__name__}, not an object")
+    missing = [k for k in ("curriculum_md", "course_yaml")
+               if not str(data.get(k) or "").strip()]
+    if missing:
+        raise OutlineFailed("validation_failed",
+                            f"curriculum-designer envelope is missing "
+                            f"{', '.join(missing)}")
+    return str(data["curriculum_md"]), str(data["course_yaml"])
+
+
+def _course_id_findings(course_yaml: str, course_id: str) -> list[Issue]:
+    """A wrong course id is a finding, never a fixup: the id is minted
+    upstream and the sidecar is the model's to get right."""
+    try:
+        found = yaml.safe_load(course_yaml)["course"]["id"]
+    except (yaml.YAMLError, AttributeError, TypeError, KeyError, IndexError):
+        return []            # the load path below names this better than we can
+    if found != course_id:
+        return [Issue("error", OUTLINE_FILES[1],
+                      f"course.id is {found!r}; the minted id is {course_id!r} "
+                      f"and is used verbatim")]
+    return []
+
+
+def _outline_findings(draft_dir: str, course_yaml: str, resources_md: str,
+                      course_id: str) -> list[Issue]:
+    """Compile the draft in place and collect everything that blocks it.
+
+    Warnings never block — errors block emission, warnings print, the same
+    deal a human author gets. The load path is wrapped because the sidecar
+    loader guards what it can and raises through what it can't (a scalar
+    where it subscripts a pair is a TypeError, not a where-bearing Issue):
+    either way the role gets a finding it can act on rather than the stage
+    getting a traceback.
+    """
+    findings = _course_id_findings(course_yaml, course_id)
+    try:
+        sidecar = load_sidecar(os.path.join(draft_dir, OUTLINE_FILES[1]))
+        _, issues = compile_course(draft_dir, sidecar)
+    except (SchemaError, TypeError, ValueError, yaml.YAMLError) as exc:
+        findings.append(Issue("error", OUTLINE_FILES[1],
+                              f"the sidecar could not be loaded — "
+                              f"{type(exc).__name__}: {exc}"))
+        return findings
+    findings.extend(i for i in issues if i.level == "error")
+    findings.extend(shelf_findings(sidecar.resources, resources_md))
+    return findings
+
+
+def _implicated(findings: list[Issue]) -> tuple[str, ...]:
+    """Attribution by `where`: the shelf is the curator's, everything else
+    the designer's. Roles come back in run order — a rewritten curriculum is
+    what the curator's rewrite is curating against."""
+    roles = []
+    if any("learning-resources" not in f.where for f in findings):
+        roles.append("curriculum-designer")
+    if any("learning-resources" in f.where for f in findings):
+        roles.append("resource-curator")
+    return tuple(roles)
+
+
+def build_outline(runner: Runner, profile: ProfileState, course_id: str,
+                  scope_payload: dict, draft_dir: str,
+                  note: str | None = None) -> OutlineReport:
+    """Draft a whole course outline into `draft_dir`, compiler-validated.
+
+    Two roles in one order that matters: the designer writes `curriculum.md`
+    and the full `course.yaml` — resource keys included, because `res:` links
+    resolve against the sidecar — and the curator then writes the
+    human-facing shelf for exactly those keys.
+
+    The validator is the compiler. The draft is compiled where it stands, in
+    a tree whose layout is the course layout, and its error-level issues are
+    the findings the implicated roles get one rewrite from. A second failure
+    keeps nothing: the three files are deleted so a retry starts clean.
+    `BudgetExceeded` propagates — a spent stage is the runner's refusal to
+    report, not ours to swallow.
+    """
+    profile_md = render_skill_md(profile)
+    scope_md = yaml.safe_dump(scope_payload, sort_keys=False,
+                              allow_unicode=True)
+    report = OutlineReport(draft_dir=draft_dir, files=list(OUTLINE_FILES))
+    spend: dict[str, list] = {}
+
+    def run(role: str, sections: list[tuple[str, str]],
+            max_tokens: int = 32000) -> str:
+        result = runner.run_role(role, _prompt(profile_md, sections), max_tokens)
+        # A rewrite is the same stage spending more: one line per role, the
+        # build's format, totals rather than the last call's numbers.
+        acc = spend.setdefault(role, [result.model, 0, 0, Decimal(0)])
+        acc[1] += result.input_tokens
+        acc[2] += result.output_tokens
+        acc[3] += result.cost_usd
+        report.costs[role] = f"${acc[3]:.4f} ({acc[0]}, {acc[1]}in/{acc[2]}out)"
+        return result.text
+
+    def designer(findings: str = "") -> str:
+        sections = [("scope", scope_md), ("course_id", course_id),
+                    ("exemplar_course", outline_exemplar())]
+        if findings:
+            sections.append(("compiler_findings", findings))
+        if note:
+            sections.append(("reviewer_note", note))
+        # Two complete files in one envelope: a truncated response is a
+        # malformed envelope, and a malformed envelope gets no rewrite.
+        return run("curriculum-designer", sections, max_tokens=64000)
+
+    def curator(curriculum_md: str, course_yaml: str,
+                findings: str = "") -> str:
+        # The shelf list, not the sidecar: the curator needs the keys, titles
+        # and URLs it must reproduce, and nothing else in course.yaml is its
+        # business.
+        sections = [("scope", scope_md), ("curriculum_md", curriculum_md),
+                    ("resource_shelf", resource_shelf_lines(course_yaml)),
+                    ("exemplar_resources", _exemplar_file("learning-resources.md"))]
+        if findings:
+            sections.append(("compiler_findings", findings))
+        if note:
+            sections.append(("reviewer_note", note))
+        text = _strip_fence(run("resource-curator", sections))
+        if not text.strip():
+            raise OutlineFailed("validation_failed",
+                                "resource-curator returned an empty document")
+        return text
+
+    def write(curriculum_md: str, course_yaml: str, resources_md: str) -> None:
+        os.makedirs(os.path.join(draft_dir, "learning"), exist_ok=True)
+        for rel, body in zip(OUTLINE_FILES,
+                             (curriculum_md, course_yaml, resources_md)):
+            with open(os.path.join(draft_dir, rel), "w", encoding="utf-8") as f:
+                f.write(body if body.endswith("\n") else body + "\n")
+
+    def discard() -> None:
+        for rel in OUTLINE_FILES:
+            path = os.path.join(draft_dir, rel)
+            if os.path.exists(path):
+                os.remove(path)
+
+    curriculum_md, course_yaml = _outline_envelope(designer())
+    resources_md = curator(curriculum_md, course_yaml)
+    write(curriculum_md, course_yaml, resources_md)
+
+    findings = _outline_findings(draft_dir, course_yaml, resources_md, course_id)
+    if findings:
+        # One rewrite round, for the implicated roles only — a role nothing
+        # names keeps its first output. A designer rewrite that moved the
+        # resource keys therefore leaves the shelf disagreeing, and the second
+        # check refuses it; the learner retries against a clean draft.
+        report.retried = _implicated(findings)
+        text = "\n".join(str(f) for f in findings)
+        kept = False
+        try:
+            if "curriculum-designer" in report.retried:
+                curriculum_md, course_yaml = _outline_envelope(designer(text))
+            if "resource-curator" in report.retried:
+                resources_md = curator(curriculum_md, course_yaml, text)
+            write(curriculum_md, course_yaml, resources_md)
+            findings = _outline_findings(draft_dir, course_yaml, resources_md,
+                                         course_id)
+            if findings:
+                raise OutlineFailed("compile_failed",
+                                    "\n".join(str(f) for f in findings))
+            kept = True
+        finally:
+            # Every way out but success — a refusal, a spent budget, anything
+            # the runner raises mid-rewrite — leaves nothing partial behind.
+            if not kept:
+                discard()
+    return report
+
+
+# ---------------------------------------------------------------------------
+# The build plan and what it will cost
+# ---------------------------------------------------------------------------
+
+def default_build_plan(manifest: Manifest) -> dict:
+    """What phase 1 gets built, derived from the outline rather than asked for.
+
+    A lesson on the phase's first unit, a widget on its second, an exercise
+    on its last, the checkpoint quiz and a bank section. Deterministic beats
+    another model call: the learner reads the plan at the gate and can
+    regenerate the phase if it is wrong.
+
+    The keys are `BuildSpec`'s field names, so an approved plan reaches the
+    build as `BuildSpec(**plan)` with nothing in between to mistranslate.
+    """
+    phase = next((p for p in manifest.phases if p.num == 1), None)
+    if phase is None:
+        raise ValueError(f"{manifest.course.id} has no phase 1 to build")
+    units = {u.id: u for u in manifest.units}
+    entries = [units[e] for e in phase.entries if e in units]
+    if not entries:
+        raise ValueError(f"phase {phase.id} has no units to build against")
+    widget = entries[1] if len(entries) > 1 else None
+    return {
+        "phase_id": phase.id,
+        "lesson_unit": entries[0].id,
+        "widget_unit": widget.id if widget else None,
+        "widget_concept": (widget.gloss or widget.title) if widget else None,
+        "exercise_unit": entries[-1].id,
+        "quiz": True,
+        "bank": True,
+    }
+
+
+# Assumed tokens per artifact, priced at real models.yaml rates. Honest rough
+# numbers: the ceiling the learner also sees is the per-stage budget, and
+# this is the expectation — that is the guarantee.
+ESTIMATE_TOKENS = {
+    "lesson-writer":   (12_000, 12_000),   # (input, output)
+    "widget-builder":  (12_000, 30_000),
+    "exercise-author": (12_000, 8_000),
+    "quiz-author":     (14_000, 8_000),
+    "bank-author":     (14_000, 6_000),
+}
+
+PLAN_ROLES = (
+    ("lesson_unit", "lesson-writer"),
+    ("widget_unit", "widget-builder"),
+    ("exercise_unit", "exercise-author"),
+    ("quiz", "quiz-author"),
+    ("bank", "bank-author"),
+)
+
+
+def estimate_build_cost(config: ModelsConfig, plan: dict) -> Decimal:
+    """What the plan is expected to cost, at today's prices."""
+    total = Decimal(0)
+    for key, role in PLAN_ROLES:
+        if not plan.get(key):
+            continue
+        input_tokens, output_tokens = ESTIMATE_TOKENS[role]
+        total += config.cost(config.model_for_role(role),
+                             input_tokens, output_tokens)
+    return total
 
 
 # ---------------------------------------------------------------------------

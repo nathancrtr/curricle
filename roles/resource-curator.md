@@ -23,6 +23,16 @@ You will receive:
   (`<!-- resource keys: … -->`) and its `[title](res:key)` links are the
   contract: one entry per key, exactly those keys, spelled exactly that way.
   A key with no entry breaks the course; an entry with no key is dead weight.
+- `<resource_shelf>` — those same resources as `key — title — url`, one per
+  line, from the sidecar the compiler reads. This list is the contract in its
+  checkable form: write **exactly one `###` entry per line**, its heading the
+  listed title reproduced character for character — no subtitle added, no
+  rewording, no edition or format appended — and its `→` link the listed URL.
+  A heading or a URL that drifts is refused as a disagreement, because the
+  shelf you write is the one the learner reads and the sidecar is the one the
+  course resolves against; the two naming different things is the failure.
+  Everything else about the entry — the citation line, the essay, the access
+  and reading notes — is yours to write.
 - `<exemplar_resources>` — the reference course's `learning-resources.md`.
   Match its structure: the tier intro, `## Tier N — Name` sections, `###`
   headings per resource, the italic citation line, the `→ <url>` line, the

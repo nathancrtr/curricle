@@ -42,8 +42,12 @@ def main(argv: list[str] | None = None) -> int:
     tc.add_argument("slug")
 
     s = sub.add_parser("serve", help="run the web app over the progress service")
-    s.add_argument("--course", action="append", required=True, dest="courses",
-                   help="course repo root (repeatable)")
+    # Optional: an instance whose courses all live in CURRICLE_COURSES_DIR —
+    # and an instance with no courses at all, waiting for the first one to be
+    # created — are both legitimate. The flag stays for checkout-mode users
+    # and courses that live in their own repos.
+    s.add_argument("--course", action="append", required=False, dest="courses",
+                   default=[], help="course repo root (repeatable)")
     s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
     s.add_argument("--port", type=int, default=8765)
 
@@ -290,8 +294,10 @@ def _factory(args) -> int:
 
 def _serve(args) -> int:
     import uvicorn
+    from . import coursehome
     from .webapp import create_app
-    app = create_app(args.courses, tenant_slug=args.tenant)
+    app = create_app(args.courses or [], tenant_slug=args.tenant,
+                     courses_dir=coursehome.maybe_courses_dir())
     print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0

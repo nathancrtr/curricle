@@ -480,4 +480,10 @@ materials:
   title: Phase 1 checkpoint quiz
   path: interactive/quizzes/phase-1-checkpoint.html
   phase: p1
-  blurb: Ten questions on lexing and parsing, each with the reasoning shown after you answer.
+  blurb: Eight questions on lexing and parsing, each with the reasoning shown after you answer.
+- id: bank
+  kind: question-bank
+  title: Question Bank
+  path: interactive/quizzes/question-bank.md
+  blurb: The pool live quizzing draws from — recall, application, and explain-why, each with a teaching
+    note.

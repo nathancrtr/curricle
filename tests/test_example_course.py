@@ -52,7 +52,7 @@ class ExampleCourseTest(unittest.TestCase):
     def test_shape(self):
         self.assertEqual(len(self.manifest.phases), 3)
         self.assertEqual(len(self.manifest.units), 5)
-        self.assertEqual(len(self.manifest.materials), 4)
+        self.assertEqual(len(self.manifest.materials), 5)
         self.assertEqual(len(self.manifest.resources), 5)
         self.assertEqual(len(self.manifest.milestones), 1)
         self.assertEqual(len(self.manifest.tracks), 1)
@@ -77,7 +77,8 @@ class ExampleCourseTest(unittest.TestCase):
         # The example earns its place by being copyable, which means covering
         # the kinds someone will want an instance of to crib from.
         kinds = {m.kind for m in self.manifest.materials}
-        self.assertEqual(kinds, {"lesson", "widget", "exercise", "quiz"})
+        self.assertEqual(kinds, {"lesson", "widget", "exercise", "quiz",
+                                 "question-bank"})
 
     def test_every_material_file_exists(self):
         content_root = os.path.join(COURSE_ROOT, "learning")

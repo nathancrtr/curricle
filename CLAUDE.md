@@ -155,6 +155,25 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - `DIRECTION.md` at the repo root is the design rationale — the gesture, the
   judgment calls, the contrast provenance, what was rejected and why.
 
+## The tutor export (Phase 4)
+
+- `mcpserver.py` is the MCP server (`python -m curricle mcp --course …
+  --tenant nathan`, stdio): read tools serve context (course, profile
+  projection, progress, lesson guides, question bank), the trigger-phrase
+  tools compose it (`teach_unit`, `quiz_me`, `review_exercise`,
+  `whats_next`), and the two write tools go through the same validation as
+  the web routes — `record_progress_event` (checkpoint results still
+  auto-propose evidence) and `propose_profile_evidence`, which must name a
+  source, may not claim `demonstrated`, and waits on /profile like every
+  proposal.
+- L1 applies here exactly as to the web app: the module never imports the
+  model runner (guard test in `tests/test_mcp.py`); the learner's own
+  assistant does the thinking, at their own inference cost (L3).
+- The transport is stdlib-only newline-delimited JSON-RPC — no MCP SDK
+  dependency; don't add one for a protocol this small.
+- Content leaves through `refs.resolve_markdown` (the plain-markdown
+  medium): `res:` links become their verified URLs, never `res:` hrefs.
+
 ## What this repo is not (yet)
 
 No auth, no multi-tenant serving (single tenant per app instance, resolved

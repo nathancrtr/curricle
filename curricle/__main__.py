@@ -47,6 +47,12 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
     s.add_argument("--port", type=int, default=8765)
 
+    m = sub.add_parser("mcp", help="the tutor export: an MCP server (stdio) "
+                       "over manifest + profile + progress")
+    m.add_argument("--course", action="append", required=True, dest="courses",
+                   help="course repo root (repeatable)")
+    m.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
+
     imp = sub.add_parser("import-progress",
                          help="import browser localStorage state as ledger events")
     imp.add_argument("course_root", help="path to the course repo root")
@@ -102,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         return _factory(args)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "mcp":
+        return _mcp(args)
     if args.command == "import-progress":
         return _import_progress(args)
 
@@ -287,6 +295,15 @@ def _serve(args) -> int:
     print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0
+
+
+def _mcp(args) -> int:
+    from .mcpserver import build_server, serve_stdio
+    server = build_server(args.courses, tenant_slug=args.tenant)
+    # stdout belongs to the protocol; the greeting goes to stderr.
+    print(f"curricle tutor export: tenant {args.tenant!r}, courses "
+          f"{sorted(server.courses)} (stdio)", file=sys.stderr)
+    return serve_stdio(server)
 
 
 def _import_progress(args) -> int:

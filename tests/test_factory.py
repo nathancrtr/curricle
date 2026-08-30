@@ -176,6 +176,51 @@ class ConfigLocationTest(unittest.TestCase):
         self.assertIn("quiz-author", str(caught.exception))
 
 
+class OutlineRolesTest(unittest.TestCase):
+    """The two outline roles, and the tags their prompts are assembled from.
+
+    `curriculum-designer` and `resource-curator` are read by the outline
+    build, which interpolates the sections named here by name. The tag
+    assertions are a cheap drift guard in both directions: rename a section in
+    the prompt assembly without rewording the contract (or the reverse) and
+    the model is briefed on inputs it never receives.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.config = load_models_config()
+
+    def test_contracts_load(self):
+        for name in ("curriculum-designer", "resource-curator"):
+            role = load_role(name)
+            self.assertEqual(role.name, name)
+            self.assertTrue(role.system)
+
+    def test_they_run_on_the_top_tier_at_the_default_budget(self):
+        top = self.config.tiers["premium"]
+        default = Decimal(str(self.config.budgets["default"]))
+        for name in ("curriculum-designer", "resource-curator"):
+            self.assertEqual(self.config.model_for_role(name), top)
+            self.assertEqual(self.config.budget_for_stage(name), default)
+            # The tier mapping lives in models.yaml alone; a contract that
+            # named a model or a price would be a second place to change.
+            body = load_role(name).system
+            for leak in (*self.config.tiers.values(), *self.config.prices):
+                self.assertNotIn(leak, body)
+
+    def test_bodies_name_their_prompt_sections(self):
+        designer = load_role("curriculum-designer").system
+        curator = load_role("resource-curator").system
+        for tag in ("<learner_profile>", "<scope>", "<compiler_findings>",
+                    "<reviewer_note>"):
+            self.assertIn(tag, designer)
+            self.assertIn(tag, curator)
+        for tag in ("<course_id>", "<exemplar_course>"):
+            self.assertIn(tag, designer)
+        for tag in ("<curriculum_md>", "<exemplar_resources>"):
+            self.assertIn(tag, curator)
+
+
 class RunnerTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

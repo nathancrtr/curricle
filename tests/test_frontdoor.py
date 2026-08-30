@@ -17,6 +17,7 @@ Python side is exercised against a real course at zero progress, mid course
 and complete, and the JS statement it mirrors is pinned beside it.
 """
 
+import os
 import re
 import unittest
 
@@ -295,13 +296,25 @@ class WordmarkTest(unittest.TestCase):
         self.assertEqual(float(self.lit["height"]), float(h))
 
 
+# Every module on a request path. L1 is a property of the serving process
+# rather than of one file, so this list grows by one line each time `serve`
+# gains a module — the wizard joins it here.
+GUARDED_MODULES = ("webapp.py",)
+
+
 class InvariantL1Test(unittest.TestCase):
-    def test_the_web_app_cannot_reach_the_model(self):
+    def test_the_request_path_cannot_reach_the_model(self):
         # L1: no LLM on a request path, ever. The front door made this module
-        # bigger; it did not make it a caller.
-        with open(webapp.__file__, encoding="utf-8") as f:
-            source = f.read()
-        self.assertNotIn("llm", source)
+        # bigger; it did not make it a caller. `factory` is guarded beside
+        # `llm` because the generation stages reach the model through it, and
+        # both of them now belong to the worker process instead.
+        pkg = os.path.dirname(webapp.__file__)
+        for name in GUARDED_MODULES:
+            with open(os.path.join(pkg, name), encoding="utf-8") as f:
+                source = f.read()
+            for forbidden in ("llm", "factory"):
+                with self.subTest(module=name, forbidden=forbidden):
+                    self.assertNotIn(forbidden, source)
 
 
 if __name__ == "__main__":

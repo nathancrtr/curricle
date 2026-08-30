@@ -288,6 +288,12 @@ def fold(events) -> OnboardingState:
             # Straight to promote, pending: the worker enqueues it with no
             # human turn between (design §4 rejected a second gate).
             _at(flow, "promote", "pending")
+        elif kind == "promote_requested":
+            # The retry of a failed promotion — the only way a flow leaves
+            # promote/failed, exactly as outline_requested and
+            # build_requested are for their stages. Without it the wizard
+            # would keep showing "failed" over a run that is already going.
+            _at(flow, "promote", "pending")
         elif kind == "promote_failed":
             _at(flow, "promote", "failed", payload.get("reason"))
         elif kind == "promoted":

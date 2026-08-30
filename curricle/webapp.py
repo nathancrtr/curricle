@@ -13,7 +13,7 @@ a real row at startup. No slug, no app — there is no default tenant.
 Courses arrive from two places: the `--course` roots this app is built with,
 and the managed courses home (`coursehome`), which is re-read while the app
 runs so a course created after startup can be served without a restart.
-Registration is pull-based because `serve` and the factory worker share only
+Registration is pull-based because `serve` and the worker process share only
 the database and the filesystem — nothing can call into this process — so a
 route miss and each front-door render consult the home and load what is new.
 Every one of those paths goes through `load_course`, so the startup rule

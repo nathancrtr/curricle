@@ -75,6 +75,15 @@ def compile_ok(root: str, sidecar: Sidecar):
     return mf
 
 
+class TestResourceFormats(unittest.TestCase):
+    def test_formats_are_an_enumerated_vocabulary(self):
+        from curricle.schema import SchemaError
+        Resource(key="ok", title="T", url="https://x", formats=("TEXT", "TOOL"))
+        with self.assertRaises(SchemaError):
+            Resource(key="bad", title="T", url="https://x",
+                     formats=("INTERACTIVE",))
+
+
 class TestFindRefs(unittest.TestCase):
     def test_finds_only_linked_refs(self):
         text = ("See [W&G](res:wg) and [Unit 8](unit:u8); bare res:loose "

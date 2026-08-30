@@ -43,7 +43,7 @@ DOCS = Docs(readme="learning/README.md",
 
 SHELF = (Resource(key="r1", title="A book worth reading",
                   url="https://example.org/book", tier=1,
-                  formats=("text",), free=True,
+                  formats=("TEXT",), free=True,
                   why_this_one="It is the one that covers the whole path."),)
 TIERS = (ResourceTier(num=1, name="The core path",
                       role="Worked through substantially, in course order."),)

@@ -84,14 +84,25 @@ class FactoryRunsTest(unittest.TestCase):
         self.assertIsNone(rows[0].claimed_at)
 
     def test_finished_runs_are_not_pending(self):
+        # A claimed run is the control: pending spans queued *and* running,
+        # because a run the worker is holding is exactly the one the wizard
+        # has to show as "a machine's turn".
         scope = db.for_tenant(self.a)
         with self.engine.begin() as conn:
             conn.execute(scope.runs_insert("done-course", "noop", {}))
+            conn.execute(scope.runs_insert("done-course", "outline", {}))
             conn.execute(sa.update(db.factory_runs)
-                         .where(db.factory_runs.c.course == "done-course")
+                         .where(db.factory_runs.c.course == "done-course",
+                                db.factory_runs.c.stage == "noop")
                          .values(status="done", finished_at=sa.func.now()))
+            conn.execute(sa.update(db.factory_runs)
+                         .where(db.factory_runs.c.course == "done-course",
+                                db.factory_runs.c.stage == "outline")
+                         .values(status="running", claimed_at=sa.func.now()))
             rows = conn.execute(scope.runs_pending("done-course")).all()
-        self.assertEqual(rows, [])
+        self.assertEqual([(r.stage, r.status) for r in rows],
+                         [("outline", "running")])
+        self.assertIsNotNone(rows[0].claimed_at)
 
     def test_unknown_stage_and_status_are_refused_by_the_database(self):
         with self.engine.connect() as conn:

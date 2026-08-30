@@ -46,16 +46,19 @@ EVENT_KINDS = (
 PROFILE_EVENT_KINDS = ("assert", "propose", "accept", "reject", "retract")
 
 # The onboarding vocabulary (onboarding-design.md §5): request/outcome pairs
-# for the two worker stages, the human's verbs around the outline gate, and
-# the terminal `promoted`. `promote_failed` completes the design doc's list
-# rather than changing it — the promote stage ends in a compile gate that can
-# refuse, and ledger discipline says a failure is a row like any other.
+# for the three worker stages, the human's verbs around the outline gate, and
+# the terminal `promoted`. `promote_failed` and `promote_requested` complete
+# the design doc's list rather than changing it — the promote stage ends in a
+# compile gate that can refuse, ledger discipline says a failure is a row like
+# any other, and a stage that can fail is a stage that can be asked for again.
+# Without the request row, a retried promotion has nothing to move the flow
+# off "failed", and the wizard would show a live run as a dead one (O1).
 ONBOARDING_EVENT_KINDS = (
     "profile_published", "scope_saved",
     "outline_requested", "outline_ready", "outline_failed",
     "outline_approved", "outline_rejected",
     "build_requested", "build_ready", "build_failed",
-    "promote_failed", "promoted",
+    "promote_requested", "promote_failed", "promoted",
 )
 
 # What a queued run can ask for, and where it can be. `noop` is a real stage:
@@ -351,6 +354,121 @@ def for_tenant(tenant_id: int) -> TenantScope:
     if not isinstance(tenant_id, int):
         raise TypeError(f"tenant_id must be an int, got {tenant_id!r}")
     return TenantScope(tenant_id=tenant_id)
+
+
+# ---------------------------------------------------------------------------
+# The worker's queue, and the liveness other processes can see
+# ---------------------------------------------------------------------------
+#
+# These are module-level rather than TenantScope methods because the worker
+# has no tenant until it has a row: claiming is the one operation that
+# *discovers* a tenant instead of being told one. T1 survives intact — the
+# claimed row's `tenant_id` is an explicit value the caller then builds a
+# scope from, and everything the stage touches afterwards goes through that
+# scope. Nothing here reads a tenant from the environment or defaults one.
+
+# `pg_advisory_lock(7231, 1)`: "one worker per database". Liveness is this
+# lock and not a heartbeat table — it needs no schema, has no staleness
+# window to tune, and dies with the process that held it, which is the only
+# definition of "the worker is running" a welcome screen can trust.
+WORKER_LOCK = (7231, 1)
+
+
+def try_worker_lock(conn: sa.Connection) -> bool:
+    """Take the worker lock, or report that somebody else holds it.
+
+    Session-scoped: the lock outlives the transaction and is released when
+    the connection's session ends, so the caller must hold this connection
+    open for the worker's lifetime (and it must be a real session, not one
+    handed back to a pool still holding the lock).
+    """
+    classid, objid = WORKER_LOCK
+    return bool(conn.execute(
+        sa.select(sa.func.pg_try_advisory_lock(classid, objid))).scalar())
+
+
+def worker_alive(conn: sa.Connection) -> bool:
+    """Is a worker holding the lock right now? The welcome screen's question.
+
+    `pg_locks` is cluster-wide and lists waiters beside holders, so both
+    predicates past the lock's identity are load-bearing: `granted` excludes
+    a session queued behind the lock, and the `database` term excludes a
+    worker serving a *different* database in the same cluster — a staging
+    instance next to production would otherwise report a live worker into a
+    database that has none. NB the test fixture is a single database, so it
+    can prove the `granted` half and not the `database` half; the latter is
+    argued here rather than pinned.
+    """
+    classid, objid = WORKER_LOCK
+    held = conn.execute(
+        sa.text("SELECT count(*) FROM pg_locks WHERE locktype = 'advisory' "
+                "AND classid = cast(:classid AS oid) "
+                "AND objid = cast(:objid AS oid) "
+                "AND granted "
+                "AND database = (SELECT oid FROM pg_database "
+                "                WHERE datname = current_database())"),
+        {"classid": classid, "objid": objid},
+    ).scalar()
+    return bool(held)
+
+
+def claim_next_run(conn: sa.Connection) -> sa.Row | None:
+    """Take the oldest queued run, marking it running. None when idle.
+
+    `FOR UPDATE SKIP LOCKED` is what makes the claim a claim: a row another
+    session is already holding is passed over rather than waited on, so two
+    claimers racing can never be handed the same run. It takes a connection
+    rather than an engine because the select and the update belong to one
+    transaction — the caller commits it immediately, so the claim is a fact
+    before the stage starts rather than something a later rollback could
+    undo (which is how a failing stage would otherwise be re-claimed
+    forever).
+    """
+    row = conn.execute(
+        sa.select(factory_runs.c.id, factory_runs.c.tenant_id,
+                  factory_runs.c.course, factory_runs.c.stage,
+                  factory_runs.c.payload)
+        .where(factory_runs.c.status == "queued")
+        .order_by(factory_runs.c.id)
+        .with_for_update(skip_locked=True)
+        .limit(1)
+    ).one_or_none()
+    if row is None:
+        return None
+    conn.execute(
+        sa.update(factory_runs).where(factory_runs.c.id == row.id)
+        .values(status="running", claimed_at=sa.func.now())
+    )
+    return row
+
+
+def stale_runs(conn: sa.Connection) -> list[sa.Row]:
+    """Every run left `running`, oldest first.
+
+    Meaningful only to a caller that knows no worker is alive — one worker
+    at a time is the whole design, so a `running` row read at startup is the
+    wreckage of a process that died mid-stage, and read at any other moment
+    it is somebody's live claim.
+    """
+    return list(conn.execute(
+        sa.select(factory_runs.c.id, factory_runs.c.tenant_id,
+                  factory_runs.c.course, factory_runs.c.stage,
+                  factory_runs.c.payload)
+        .where(factory_runs.c.status == "running")
+        .order_by(factory_runs.c.id)
+    ).all())
+
+
+def finish_run(conn: sa.Connection, run_id: int, status: str,
+               reason: str | None = None) -> None:
+    """End a claimed run. `reason` is a machine key, never a sentence."""
+    assert status in ("done", "failed"), (
+        f"a run finishes done or failed, not {status!r} — the queued/running "
+        "states belong to the claim, not to its outcome")
+    conn.execute(
+        sa.update(factory_runs).where(factory_runs.c.id == run_id)
+        .values(status=status, finished_at=sa.func.now(), reason=reason)
+    )
 
 
 # ---------------------------------------------------------------------------

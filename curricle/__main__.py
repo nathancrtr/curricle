@@ -51,6 +51,14 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
     s.add_argument("--port", type=int, default=8765)
 
+    # No --tenant: the worker serves every tenant and has none of its own.
+    # Each queued run carries the tenant it belongs to, and the worker builds
+    # its scope from that row — T1 by explicit value, not by default.
+    w = sub.add_parser("work", help="run queued onboarding stages (the L1 worker)")
+    w.add_argument("--poll", type=float, default=2.0)
+    w.add_argument("--once", action="store_true",
+                   help="process at most one run, then exit")
+
     m = sub.add_parser("mcp", help="the tutor export: an MCP server (stdio) "
                        "over manifest + profile + progress")
     m.add_argument("--course", action="append", required=True, dest="courses",
@@ -112,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
         return _factory(args)
     if args.command == "serve":
         return _serve(args)
+    if args.command == "work":
+        return _work(args)
     if args.command == "mcp":
         return _mcp(args)
     if args.command == "import-progress":
@@ -301,6 +311,13 @@ def _serve(args) -> int:
     print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0
+
+
+def _work(args) -> int:
+    from . import db, worker
+    engine = db.make_engine()
+    print("curricle worker: polling for onboarding runs")
+    return worker.main(engine, poll=args.poll, once=args.once)
 
 
 def _mcp(args) -> int:

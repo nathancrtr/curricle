@@ -41,8 +41,12 @@ WORKER_STAGES = frozenset({"outline", "build", "promote"})
 
 # Machine failure reasons. A reason is a key, never prose — the wording table
 # below is the only place a failure becomes English.
+# `interrupted` is the one nobody's code raises: it is written by the next
+# worker to start, over a run whose worker died mid-stage. A crash is not a
+# reason to re-spend a learner's money unasked, so the wreckage becomes an
+# honest failure with a retry button rather than an automatic re-run.
 REASONS = ("budget_exceeded", "validation_failed", "compile_failed",
-           "unapproved", "unknown_stage", "worker_error")
+           "unapproved", "unknown_stage", "worker_error", "interrupted")
 
 # O2: one human sentence per (worker stage, reason), the full cross product.
 # The completeness test cannot miss a pair because there is no pair it is
@@ -67,6 +71,9 @@ WORDING: dict[tuple[str, str], str] = {
     ("outline", "worker_error"):
         "The worker stopped partway through the outline build. Nothing "
         "partial was kept, so retrying is safe.",
+    ("outline", "interrupted"):
+        "The worker was shut down partway through the outline build and "
+        "nothing partial was kept. Retry when you're ready.",
 
     ("build", "budget_exceeded"):
         "The phase-1 build hit its spending ceiling — raise the stage budget "
@@ -87,6 +94,10 @@ WORDING: dict[tuple[str, str], str] = {
     ("build", "worker_error"):
         "The worker stopped partway through the build. Finished materials "
         "were kept, so retrying continues rather than starts over.",
+    ("build", "interrupted"):
+        "The worker was shut down partway through the build. What it had "
+        "already finished was kept — retry when you're ready and it carries "
+        "on from there.",
 
     ("promote", "budget_exceeded"):
         "Promotion stopped against the stage budget before finishing — raise "
@@ -106,6 +117,10 @@ WORDING: dict[tuple[str, str], str] = {
     ("promote", "worker_error"):
         "The worker stopped while publishing your course. Nothing partial "
         "was left in place, so retrying is safe.",
+    ("promote", "interrupted"):
+        "The worker was shut down while publishing your course, so the "
+        "course was left unpublished and nothing partial was put in place. "
+        "Retry when you're ready.",
 }
 
 # The profile fields every factory prompt leans on (design §4, Stops 1–4).
@@ -287,6 +302,12 @@ def fold(events) -> OnboardingState:
         elif kind == "build_ready":
             # Straight to promote, pending: the worker enqueues it with no
             # human turn between (design §4 rejected a second gate).
+            _at(flow, "promote", "pending")
+        elif kind == "promote_requested":
+            # The retry of a failed promotion — the only way a flow leaves
+            # promote/failed, exactly as outline_requested and
+            # build_requested are for their stages. Without it the wizard
+            # would keep showing "failed" over a run that is already going.
             _at(flow, "promote", "pending")
         elif kind == "promote_failed":
             _at(flow, "promote", "failed", payload.get("reason"))

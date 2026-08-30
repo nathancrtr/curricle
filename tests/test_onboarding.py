@@ -66,6 +66,18 @@ class OnboardingLedgerTest(unittest.TestCase):
         self.assertNotIn("b-only", courses_a)
         self.assertEqual(courses_b, ["b-only"])
 
+    def test_the_retry_kind_migration_0005_adds_is_accepted(self):
+        # The CHECK is the vocabulary's contract, so this row passing is what
+        # proves migration 0005 ran on this database.
+        scope = db.for_tenant(self.b)
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, scope, "promote_requested",
+                                    "retry-course")
+            kinds = [r.kind for r in conn.execute(scope.onboarding_select())
+                     if r.course == "retry-course"]
+        self.assertEqual(kinds, ["promote_requested"])
+        self.assertIn("promote_requested", db.ONBOARDING_EVENT_KINDS)
+
     def test_unknown_kind_is_refused_by_the_database_too(self):
         # The CHECK constraint holds even if application validation is bypassed.
         with self.engine.connect() as conn:
@@ -201,6 +213,7 @@ class FoldTest(unittest.TestCase):
             (ev("build_ready"), "promote", "pending"),
             (ev("promote_failed", payload={"reason": "compile_failed"}),
              "promote", "failed"),
+            (ev("promote_requested"), "promote", "pending"),
             (ev("promoted", payload={"course_id": "greek-101"}), "done", "waiting"),
         ]
         events = []
@@ -226,6 +239,39 @@ class FoldTest(unittest.TestCase):
             ev("outline_requested"),
         ]).flows["greek-101"]
         self.assertEqual((retried.status, retried.reason), ("pending", None))
+
+    def test_a_failed_promotion_can_be_asked_for_again(self):
+        # The kind 0005 adds. Without it a retried promotion has no row that
+        # moves the flow off "failed", so the wizard would go on showing a
+        # dead run over a live one — O1 says the screen is the fold, which
+        # means the fix is a row and never a flag on a screen.
+        retried = onboarding.fold([
+            ev("scope_saved"),
+            ev("outline_requested"),
+            ev("outline_ready", payload=OUTLINE),
+            ev("outline_approved", payload={"estimate_usd": "4.20"}),
+            ev("build_requested"),
+            ev("build_ready"),
+            ev("promote_failed", payload={"reason": "compile_failed"}),
+            ev("promote_requested"),
+        ]).flows["greek-101"]
+        self.assertEqual((retried.stage, retried.status, retried.reason),
+                         ("promote", "pending", None))
+
+    def test_a_promoted_flow_is_not_reopened_by_a_retry(self):
+        # `promoted` stays absorbing: the retry kind is for failed flows, and
+        # a course that is already published is finished business.
+        st = onboarding.fold([
+            ev("scope_saved"),
+            ev("outline_ready", payload=OUTLINE),
+            ev("outline_approved", payload={"estimate_usd": "4.20"}),
+            ev("build_ready"),
+            ev("promoted", payload={"course_id": "greek-101"}),
+            ev("promote_requested"),
+        ])
+        flow = st.flows["greek-101"]
+        self.assertEqual((flow.stage, flow.status), ("done", "waiting"))
+        self.assertIsNone(st.active())
 
     def test_the_flow_keeps_the_payloads_the_screens_render(self):
         flow = onboarding.fold([
@@ -368,6 +414,9 @@ class ValidateEventTest(unittest.TestCase):
 
     def test_every_other_kind_needs_a_course(self):
         self.refuses("scope_saved", "", {"topic": "koine"})
+        self.refuses("promote_requested", "", {})
+        # A request row is the ask and nothing more: no payload to get wrong.
+        onboarding.validate_event("promote_requested", "greek-101", {})
 
     def test_failures_need_a_reason_from_the_vocabulary(self):
         self.refuses("outline_failed", "greek-101", {})

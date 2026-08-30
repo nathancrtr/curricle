@@ -24,6 +24,11 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - The compiler refuses rather than guesses. New house rules become new
   `Issue`s: errors block emission, warnings print. Every issue carries a
   `where` a human can act on.
+- Content links by reference (`refs.py`): `res:`/`unit:`/`mat:`/`repo:`
+  inside markdown link targets, validated at compile (dangling = error),
+  resolved per medium by a `RefResolver` each renderer builds for its page.
+  The `Interactive` row is derived from materials, never authored; the
+  served `repo/` route hands out only manifest-blessed paths.
 - `tests/test_corpus.py` runs against the sibling repos (`../textual-flow`,
   `../rhyme-schemer`) and skips when absent. The progress-id pin for
   textual-flow is a migration-safety contract — do not "fix" it to match

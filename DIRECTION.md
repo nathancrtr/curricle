@@ -361,6 +361,53 @@ function (the shim guard is `window.curricle &&`), they just render
 unthemed and tell no one. The static export, when it arrives, bundles both
 files rather than reopening this.
 
+## The unit page flows (one-stop-shop, round two)
+
+The productionization pass after the spike; the aim is that clicking a unit
+lands on one readable document that walks end-to-end, not a stack of link
+dumps. Decisions taken:
+
+- **Content links by reference, not URL** (schema-spec rule 4, now real):
+  `[W&G](res:wg)`, `[Unit 8](unit:u8)`, `[the trainer](mat:t-alphabet)`,
+  `[the readme](repo:README.md)` in any content field. The compiler refuses
+  a dangling target; each renderer resolves for its own medium (`refs.py`) —
+  served pages route markdown through the reader, standalone files link the
+  honest nearest thing. A resource whose only URL is an identifier
+  (`urn:isbn:`) resolves to its shelf entry instead of pretending to be a
+  link. A ref rendered with no resolver degrades to its label as plain
+  text — never a dead `href="res:wg"`.
+- **The Interactive row is derived, never authored** (spec rule 2 applied
+  at last): the curriculum computes it from material attachments — kind in
+  words, title as the link. An authored row still renders (and suppresses
+  derivation) so an unmigrated course is honored, but the compiler warns it
+  into retirement. The unit page drops the row entirely: the material cards
+  *are* that row, richer.
+- **Material cards lead with the thing's name.** The verb ("Take the quiz")
+  demoted from `<h3>` to the action line; a grid of four headings now reads
+  as four materials, not four imperatives.
+- **The Milestone row takes the green family** — the tint that means
+  "done" everywhere else, because the milestone is what done will mean
+  here. `Key insight` keeps the accent tint; every other row stays plain.
+- **The page carries what the sidecar always knew**: the phase goal under
+  the masthead, a context line in words (builds on →, load-bearing /
+  safe-to-skim, skippable-when, gated · pending), and the per-unit note.
+  Words first, chips as reinforcement, per the house rule.
+- **Checkpoint prose lands on the phase-closing unit** — the unit that ends
+  a phase renders the full checkpoint (prose, track goals, quiz); earlier
+  units get the one-line "builds toward it" strip. The checkpoint belongs
+  to the walk, not to every page equally.
+- **The path continues at the bottom**: prev/next pills in walking order
+  (next is the primary pill — coral = your next action), and the reader
+  ends with "Back to Unit N", so a lesson is a loop through the unit, not
+  a dead end. The reader's dialogue banner retargets the course's trigger
+  phrase to the unit at hand ("Teach me Unit 6 interactively", not the
+  phrase's hard-coded example unit).
+- **`repo/` serves exactly what the manifest names.** Repo-level documents
+  (REVIEW.md, a `repo:` target) are served through the themed reader — but
+  only paths the compiler blessed. The course repo holds more than the
+  course (gitignored seeds, keys, `.git`), so "whatever is on disk" was
+  never on the table.
+
 ## Left undone / notes
 
 - **Narrow screenshots** (design-branch artifacts; they were review evidence

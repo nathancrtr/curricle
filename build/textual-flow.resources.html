@@ -304,7 +304,7 @@ function render() {
       ${tier.groups.map(g => `
         ${g.sub ? `<p class="subhead">${g.sub}</p>` : ""}
         ${g.entries.map(e => `
-          <article class="entry${tier.compact ? " compact" : ""}${state.inhand[e.id] ? " inhand" : ""}${state.notes[e.id] ? " hasnote" : ""}" data-id="${e.id}">
+          <article id="res-${e.id}" class="entry${tier.compact ? " compact" : ""}${state.inhand[e.id] ? " inhand" : ""}${state.notes[e.id] ? " hasnote" : ""}" data-id="${e.id}">
             <h3 class="title">${e.links.length
               ? `<a href="${e.links[0][1]}" ${e.links[0][1].startsWith("http") ? 'target="_blank" rel="noopener"' : ""}>${e.title}</a>`
               : e.title}<span class="chips">${e.chips.map(([t, c]) =>

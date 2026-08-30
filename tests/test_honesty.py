@@ -43,7 +43,7 @@ DOCS = Docs(readme="learning/README.md",
 
 SHELF = (Resource(key="r1", title="A book worth reading",
                   url="https://example.org/book", tier=1,
-                  formats=("text",), free=True,
+                  formats=("TEXT",), free=True,
                   why_this_one="It is the one that covers the whole path."),)
 TIERS = (ResourceTier(num=1, name="The core path",
                       role="Worked through substantially, in course order."),)
@@ -200,13 +200,15 @@ class TestTheDocumentsPanel(unittest.TestCase):
         cls.served = cls.ITEM.findall(render_hub(cls.mf, api="api/events"))
         cls.standalone = cls.ITEM.findall(render_hub(cls.mf))
 
-    def test_served_drops_everything_above_the_content_root(self):
+    def test_served_routes_repo_files_and_drops_only_directories(self):
         # Served markdown routes through the themed reader (read/), so the
         # click lands on a rendered page, not a text/plain dump; the raw
-        # files stay reachable at their own paths.
+        # files stay reachable at their own paths. A repo-level *file*
+        # (REVIEW.md sits above the content root) serves through repo/ —
+        # only the directory pointer (exploration/) has nowhere to land.
         self.assertEqual([href for href, _ in self.served],
                          ["read/curriculum.md", "read/learning-resources.md",
-                          "read/README.md"])
+                          "read/README.md", "repo/REVIEW.md"])
 
     def test_standalone_keeps_them_all(self):
         self.assertEqual([href for href, _ in self.standalone],

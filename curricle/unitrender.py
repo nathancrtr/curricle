@@ -25,9 +25,12 @@ import html
 import json
 import posixpath
 
+import re
+
 from . import theme
 from .blockmd import block_html
 from .inlinemd import inline_html
+from .refs import RefResolver
 from .schema import Manifest, Material, Unit
 
 STYLE = theme.style("""\
@@ -36,6 +39,12 @@ STYLE = theme.style("""\
   h1 { font-weight:700; font-size:clamp(26px,5vw,36px); line-height:1.15;
        letter-spacing:-.01em; margin:14px 0 0; }
   .gloss { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:62ch; }
+  .phasegoal { margin:10px 0 0; color:var(--muted); font-size:14px; max-width:66ch; }
+  .phasegoal b { color:var(--ink); font-weight:600; }
+  .context { margin:14px 0 0; color:var(--muted); font-size:13.5px;
+             line-height:1.7; max-width:68ch; }
+  .context .chip { vertical-align:1px; }
+  .chip.gate { background:var(--warn-soft); color:var(--warn-text); }
   .actions { display:flex; align-items:center; gap:14px; margin:20px 0 0; }
   .row { margin:0 0 14px; font-size:14.5px; line-height:1.6; max-width:68ch; }
   .row b.lbl { display:block; font-size:11.5px; font-weight:700;
@@ -43,7 +52,17 @@ STYLE = theme.style("""\
                color:var(--muted); margin:0 0 3px; }
   .key { background:var(--accent-soft); padding:11px 15px; border-radius:12px; }
   .key b.lbl { color:var(--accent-text); }
+  /* The deliverable takes the green family — the tint that means "done"
+     everywhere else, because the milestone is what done will mean here. */
+  .deliver { background:var(--good-soft); padding:11px 15px; border-radius:12px; }
+  .deliver b.lbl { color:var(--good-text); }
   .rows { margin:30px 0 0; }
+  .unote { margin:24px 0 0; padding:13px 17px; background:var(--chip);
+           border-radius:14px; font-size:14px; line-height:1.6;
+           max-width:68ch; }
+  .unote b.lbl { display:block; font-size:11.5px; font-weight:700;
+                 letter-spacing:.06em; text-transform:uppercase;
+                 color:var(--muted); margin:0 0 3px; }
   .steps { margin:26px 0 0; padding:16px 20px; }
   .steps h2 { font-size:13px; font-weight:700; letter-spacing:.06em;
               text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
@@ -57,12 +76,15 @@ STYLE = theme.style("""\
   .mats .sub { color:var(--muted); font-size:14px; margin:0 0 14px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
           gap:14px; }
-  .card { padding:15px 18px 13px; }
-  .card h3 { margin:0 0 6px; font-size:16px; }
+  .card { padding:15px 18px 13px; display:flex; flex-direction:column; }
+  .card .chip { margin:0 0 9px; align-self:flex-start; }
+  .card h3 { margin:0 0 6px; font-size:16px; line-height:1.35; }
   .card h3 a { text-decoration:none; }
   .card h3 a:hover { text-decoration:underline; text-underline-offset:3px; }
-  .card p { margin:0 0 8px; font-size:13.5px; color:var(--muted); line-height:1.5; }
-  .card .chip { margin:0; }
+  .card p { margin:0 0 10px; font-size:13.5px; color:var(--muted); line-height:1.5; }
+  .cardact { margin-top:auto; font-size:13px; font-weight:600;
+             color:var(--accent-text); text-decoration:none; }
+  .cardact:hover { text-decoration:underline; text-underline-offset:3px; }
   details.check { margin:26px 0 0; padding:13px 17px; background:var(--panel);
                   border:1.5px solid var(--line); border-radius:14px;
                   font-size:14.5px; }
@@ -70,8 +92,13 @@ STYLE = theme.style("""\
   details.check div { margin-top:10px; color:var(--muted); }
   .cp { margin:30px 0 0; padding:16px 20px; background:var(--good-soft);
         border:1px solid var(--good); border-radius:16px; font-size:14.5px; }
-  .cp b { display:block; font-size:12px; font-weight:700; letter-spacing:.06em;
-          text-transform:uppercase; color:var(--good-text); margin:0 0 6px; }
+  .cp b.cpl { display:block; font-size:12px; font-weight:700; letter-spacing:.06em;
+              text-transform:uppercase; color:var(--good-text); margin:0 0 6px; }
+  .cp .track-goal { margin-top:8px; color:var(--muted); }
+  .unav { display:flex; align-items:center; gap:12px; margin:42px 0 0; }
+  .unav .spacer { flex:1 1 auto; }
+  .unav a { max-width:46%; overflow:hidden; text-overflow:ellipsis;
+            white-space:nowrap; text-decoration:none; }
 
   /* ---- the reader ---- */
   .doc { margin:26px 0 0; font-size:15.5px; line-height:1.65; }
@@ -139,47 +166,80 @@ document.querySelectorAll(".step-row input").forEach(cb =>
 sync();
 """
 
-# What a card invites you to do, by material kind. The verb is the label —
-# the chip beside it says what the thing is, in words, per the house rule.
+# What a card invites you to do, by material kind. The title names the
+# thing; the chip says what it is, in words; the verb is the action line.
 _VERB = {"lesson": "Read the lesson guide", "widget": "Open the widget",
          "trainer": "Open the trainer", "quiz": "Take the quiz",
-         "exercise": "Read the brief", "companion": "Open",
+         "exercise": "Read the brief", "companion": "Read the companion",
          "question-bank": "Browse the questions"}
 
 
-def _material_href(m: Material) -> str:
-    # Served-app hrefs, relative to /c/<slug>/unit/<id>.html — one level up.
-    if m.kind == "exercise":
-        return "../read/" + posixpath.join(m.path, "task.md")
-    if m.path.endswith(".md"):
-        return "../read/" + m.path
-    return "../" + m.path
-
-
-def _cards(materials: tuple[Material, ...]) -> str:
+def _cards(materials: tuple[Material, ...], rr: RefResolver) -> str:
     e = html.escape
     cards = []
     for m in materials:
+        href = e(rr.material_href(m))
         blurb = f"<p>{e(m.blurb)}</p>" if m.blurb else ""
         cards.append(
-            f'<div class="card panel"><h3><a href="{e(_material_href(m))}">'
-            f'{e(_VERB.get(m.kind, "Open"))}</a></h3>{blurb}'
+            f'<div class="card panel">'
             f'<span class="chip{" acc" if m.kind in ("widget", "trainer") else ""}">'
-            f"{e(m.kind)}</span> {e(m.title)}</div>")
+            f"{e(m.kind)}</span>"
+            f'<h3><a href="{href}">{e(m.title)}</a></h3>{blurb}'
+            f'<a class="cardact" href="{href}">'
+            f'{e(_VERB.get(m.kind, "Open"))} →</a></div>')
     return f'<div class="grid">{"".join(cards)}</div>'
+
+
+def _context_line(mf: Manifest, u: Unit, rr: RefResolver) -> str:
+    """What the sidecar knows about this unit's place, in words: what it
+    builds on, whether the path load-bears here, when it may be skipped,
+    what gates it. Rendered only when there is something to say."""
+    e = html.escape
+    bits: list[str] = []
+    if u.depends_on:
+        units_by_id = {x.id: x for x in mf.units}
+        links = []
+        for dep in u.depends_on:
+            d = units_by_id.get(dep)
+            label = f"Unit {d.num} — {d.title}" if d else dep
+            links.append(f'<a href="{e(rr.unit_href(dep))}">{e(label)}</a>'
+                         if d else e(dep))
+        bits.append("Builds on " + ", ".join(links) + ".")
+    if u.load_bearing:
+        bits.append('<span class="chip">load-bearing</span>')
+    elif u.load_bearing is False:
+        bits.append('<span class="chip">safe to skim</span>')
+    if u.skippable_note:
+        bits.append(f"Skippable: {inline_html(u.skippable_note, rr)}")
+    if u.condition:
+        bits.append(f'<span class="chip gate">gated · {e(u.condition.state)}'
+                    f"</span> waits on {e(u.condition.on)}.")
+    return f'<p class="context">{" ".join(bits)}</p>' if bits else ""
 
 
 def render_unit(mf: Manifest, unit_id: str, *, api: str,
                 initial: dict | None = None) -> str:
     e = html.escape
     u: Unit = mf.unit(unit_id)
+    rr = RefResolver(mf, to_root="../")   # the page sits at unit/<id>.html
     phase = next((p for p in mf.phases if unit_id in p.entries), None)
 
     rows = []
     for r in u.rows:
-        cls = " key" if r.kind == "key" else ""
+        if r.label == "Interactive":
+            continue    # derived: the materials section below is that row
+        cls = ""
+        if r.kind == "key":
+            cls = " key"
+        elif r.label == "Milestone":
+            cls = " deliver"
         rows.append(f'<div class="row{cls}"><b class="lbl">{e(r.label)}</b>'
-                    f"{inline_html(r.content)}</div>")
+                    f"{inline_html(r.content, rr)}</div>")
+
+    note = ""
+    if u.note:
+        note = (f'<div class="unote"><b class="lbl">Note</b>'
+                f"{inline_html(u.note, rr)}</div>")
 
     steps = ""
     if u.steps:
@@ -194,25 +254,66 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
     if mats:
         mats_html = ('<section class="mats"><h2>This unit\'s materials</h2>'
                      '<p class="sub">Lessons read here; widgets and quizzes '
-                     "open right in the browser.</p>" + _cards(mats)
+                     "open right in the browser.</p>" + _cards(mats, rr)
                      + "</section>")
 
     check = ""
     if u.check:
         check = (f'<details class="check"><summary>Check yourself: '
-                 f"{inline_html(u.check.q)}</summary>"
-                 f"<div>{inline_html(u.check.ans)}</div></details>")
+                 f"{inline_html(u.check.q, rr)}</summary>"
+                 f"<div>{inline_html(u.check.ans, rr)}</div></details>")
+
+    # The phase's walking order of units, for prev/next and for knowing
+    # whether this unit is the one the checkpoint lands on.
+    ordered = [uid for p in mf.phases for uid in p.entries
+               if any(x.id == uid for x in mf.units)]
+    last_in_phase = phase and [uid for uid in phase.entries
+                               if any(x.id == uid for x in mf.units)][-1] == unit_id
 
     cp = ""
     if phase:
         quizzes = [m for m in mf.materials
                    if m.kind == "quiz" and m.phase == phase.id]
-        if quizzes:
-            links = " · ".join(
-                f'<a href="{e(_material_href(m))}">{e(m.title)}</a>'
-                for m in quizzes)
-            cp = (f'<div class="cp"><b>Phase {phase.num} checkpoint</b>'
+        links = " · ".join(
+            f'<a href="{e(rr.material_href(m))}">{e(m.title)}</a>'
+            for m in quizzes)
+        if last_in_phase and phase.checkpoint:
+            # The phase closes here: the checkpoint says what must be true
+            # now, in the curriculum's own words.
+            goals = "".join(
+                f'<div class="track-goal"><b>{e(next((t.name for t in mf.tracks if t.id == tid), tid))}:</b> '
+                f"{inline_html(text, rr)}</div>"
+                for tid, text in phase.checkpoint.track_goals)
+            quiz_line = f"<p>Prove it to yourself — {links}.</p>" if links else ""
+            cp = (f'<div class="cp"><b class="cpl">Phase {phase.num} checkpoint '
+                  f"— this unit closes the phase</b>"
+                  f"<p>{inline_html(phase.checkpoint.prose, rr)}</p>"
+                  f"{goals}{quiz_line}</div>")
+        elif links:
+            cp = (f'<div class="cp"><b class="cpl">Phase {phase.num} checkpoint</b>'
                   f"This unit builds toward it — {links}.</div>")
+
+    # Prev/next: the course is a path; the page says where it continues.
+    pos = ordered.index(unit_id)
+    units_by_id = {x.id: x for x in mf.units}
+    nav = ""
+    if len(ordered) > 1:
+        parts = []
+        if pos > 0:
+            p_u = units_by_id[ordered[pos - 1]]
+            parts.append(f'<a class="pill" href="{e(p_u.id)}.html">'
+                         f"← Unit {p_u.num} — {e(p_u.title)}</a>")
+        parts.append('<span class="spacer"></span>')
+        if pos + 1 < len(ordered):
+            n_u = units_by_id[ordered[pos + 1]]
+            parts.append(f'<a class="pill primary" href="{e(n_u.id)}.html">'
+                         f"Unit {n_u.num} — {e(n_u.title)} →</a>")
+        nav = f'<nav class="unav">{"".join(parts)}</nav>'
+
+    phase_line = ""
+    if phase:
+        phase_line = (f'<p class="phasegoal"><b>Phase {phase.num} — '
+                      f"{e(phase.title)}.</b> {inline_html(phase.goal, rr)}</p>")
 
     phase_crumb = (f'<span class="sep">·</span> phase {phase.num}'
                    if phase else "")
@@ -222,7 +323,7 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
                             "steps": [s.id for s in u.steps]}),
         "initial": json.dumps(initial, ensure_ascii=False),
     }
-    gloss = f'<p class="gloss">{inline_html(u.gloss)}</p>' if u.gloss else ""
+    gloss = f'<p class="gloss">{inline_html(u.gloss, rr)}</p>' if u.gloss else ""
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -240,15 +341,19 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
     <span class="sep">·</span> unit {u.num:02d}{phase_crumb}</p>
     <h1>{e(u.title)}</h1>
     {gloss}
+    {phase_line}
+    {_context_line(mf, u, rr)}
     <div class="actions">
       <button class="pill" id="mark" aria-pressed="false">Mark done</button>
     </div>
   </header>
   <div class="rows">{"".join(rows)}</div>
+  {note}
   {steps}
   {mats_html}
   {check}
   {cp}
+  {nav}
   <footer>Rendered by curricle from the course manifest ·
     <a href="../curriculum.html#u-{e(u.id)}">this unit on the curriculum</a></footer>
 </div>
@@ -261,24 +366,42 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
 
 
 def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
-                  material: Material | None = None) -> str:
+                  material: Material | None = None,
+                  depth: int | None = None) -> str:
     e = html.escape
-    unit_href = (f"unit/{material.unit}.html"
-                 if material and material.unit else "curriculum.html")
+    if depth is None:
+        depth = doc_depth(material) if material else 1
+    up = "../" * depth
+    rr = RefResolver(mf, to_root=up)   # the reader exists only served
+    unit = (next((x for x in mf.units if x.id == material.unit), None)
+            if material and material.unit else None)
+    unit_href = f"unit/{unit.id}.html" if unit else "curriculum.html"
     banner = ""
     if material and material.kind == "lesson":
+        # The course's own trigger phrase, aimed at *this* unit: the corpus
+        # phrases name a unit by number ("Teach me Unit 2 interactively."),
+        # so the example is retargeted rather than always citing Unit 2.
         say = next((tp.say for tp in mf.course.trigger_phrases
-                    if "lesson" in tp.say.lower()), None)
+                    if "teach" in tp.say.lower() or "lesson" in tp.say.lower()),
+                   None)
+        if say and unit:
+            say = re.sub(r"[Uu]nit \d+", f"Unit {unit.num}", say)
         phrase = (f' — open a fresh Claude chat in the course repo and say '
                   f'<span class="say">{e(say)}</span>' if say else "")
         banner = ('<div class="banner"><b>This is a dialogue script.</b> '
                   "It is written for a tutor to run with you, one question "
                   f"at a time{phrase}. Reading it straight through works too "
                   "— the questions are the lesson.</div>")
-    depth = "../" * (doc_depth(material) if material else 1)
-    crumb_unit = (f'<span class="sep">·</span> <a href="{depth}{e(unit_href)}">'
+    crumb_unit = (f'<span class="sep">·</span> <a href="{up}{e(unit_href)}">'
                   f"its unit</a>"
-                  if material and material.unit else "")
+                  if unit else "")
+    # The document flows back into the course: the way on from the last
+    # line is the unit the document belongs to, not the browser's Back.
+    onward = ""
+    if unit:
+        onward = (f'<nav class="unav"><span class="spacer"></span>'
+                  f'<a class="pill primary" href="{up}{e(unit_href)}">'
+                  f"Back to Unit {unit.num} — {e(unit.title)} →</a></nav>")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -291,14 +414,15 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="{depth}index.html">← course hub</a>
-    <span class="sep">·</span> <a href="{depth}curriculum.html">curriculum</a>
+    <p class="eyebrow"><a href="{up}index.html">← course hub</a>
+    <span class="sep">·</span> <a href="{up}curriculum.html">curriculum</a>
     {crumb_unit}</p>
   </header>
   {banner}
   <div class="doc">
-{block_html(md_text)}
+{block_html(md_text, rr)}
   </div>
+  {onward}
   <footer>The canonical text lives in the course repo — this page renders it,
     it does not replace it.</footer>
 </div>

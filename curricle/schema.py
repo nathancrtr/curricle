@@ -29,6 +29,7 @@ GRADER_TYPES = (
 MILESTONE_KINDS = (
     "contact", "preregistration", "publication", "artifact", "side-quest", "external",
 )
+RESOURCE_FORMATS = ("TEXT", "CODE", "VIDEO", "PAPER", "TOOL", "DATA")
 CONDITION_STATES = ("pending", "open", "closed")
 
 # Core row labels get styled treatment in renderers; anything else passes
@@ -177,6 +178,10 @@ class Resource:
     covers: str | None = None
     verified_at: str | None = None
     access_note: str | None = None
+
+    def __post_init__(self) -> None:
+        for f in self.formats:
+            expect_enum(f, RESOURCE_FORMATS, f"resource {self.key} formats")
 
     @property
     def all_links(self) -> tuple[tuple[str, str], ...]:

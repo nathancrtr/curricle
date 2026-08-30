@@ -19,13 +19,24 @@ and one left running is one its startup sweep would fail.
 
 import contextlib
 import io
+import os
+import shutil
+import tempfile
 import unittest
+from decimal import Decimal
+from unittest import mock
 
 import sqlalchemy as sa
 
-from curricle import db, onboarding, worker
+from curricle import coursehome, db, factory, llm, onboarding, worker
 
 from pg import test_engine
+# The outline stage's own fixtures: a scripted transport for its two roles,
+# and the artifacts they answer with. Reused rather than re-canned, so a
+# change to what a clean outline looks like arrives here too.
+from test_factory import (
+    BROKEN_SIDECAR, GOOD_SHELF, SCOPE, FakeOutlineSend, designer_json,
+)
 
 OUTLINE = {"plan": {"phases": [{"id": "p1", "title": "Phase 1"}]},
            "estimate_usd": "4.20"}
@@ -276,6 +287,150 @@ class DispatchTest(WorkerFixture):
         # No outcome event: the run bought nothing, so it reports nothing.
         self.assertEqual([k for k, _ in self.ledger(self.a, "finished")],
                          ["scope_saved", "promoted"])
+
+
+class OutlineStageTest(WorkerFixture):
+    """The real outline handler, with a scripted transport and a temp home.
+
+    No network and no key, ever: the runner is built through
+    `worker.RUNNER_FACTORY`, which exists exactly so that the seam is one
+    named thing rather than a patch of `llm` from underneath. The scripted
+    replies are test_factory's own, so what is under test here is the wiring
+    — fold in, draft on disk, plan and estimate out — and not the outline
+    stage itself, which has its own suite.
+
+    `CURRICLE_COURSES_DIR` is patched in every one of these. The suite must
+    never read the real one: a machine where the author has exported it is
+    a machine where these tests would write into a real courses home.
+    """
+
+    # The course id is the sidecar's own: the outline stage refuses a draft
+    # whose declared id is not the minted one, and minting is what keeps the
+    # two equal in the running system.
+    COURSE = "tiny-demo"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="curricle-worker-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        patched = mock.patch.dict(os.environ,
+                                  {coursehome.ENV_DIR: self.tmp})
+        patched.start()
+        self.addCleanup(patched.stop)
+
+    def scoped(self, tenant_id: int, course: str) -> None:
+        """A tenant who has published a profile and saved a scope."""
+        scope = db.for_tenant(tenant_id)
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, scope, "profile_published", "")
+            onboarding.append_event(conn, scope, "scope_saved", course,
+                                    dict(SCOPE, title="Tiny demo"))
+
+    def with_send(self, send):
+        """`worker.RUNNER_FACTORY`, answering with a scripted transport."""
+        return mock.patch.object(
+            worker, "RUNNER_FACTORY",
+            lambda engine, scope: llm.Runner(engine, scope, send=send))
+
+    def ledger_stages(self, tenant_id: int) -> list[str]:
+        with self.engine.begin() as conn:
+            return sorted(conn.execute(
+                sa.select(db.token_ledger.c.stage)
+                .where(db.token_ledger.c.tenant_id == tenant_id)).scalars())
+
+    def draft(self, course: str) -> str:
+        return os.path.join(self.tmp, course, ".draft-onboarding")
+
+    def test_a_drafted_outline_lands_on_disk_and_reports_a_plan(self):
+        self.scoped(self.a, self.COURSE)
+        self.enqueue(self.a, self.COURSE, "outline")
+        send = FakeOutlineSend(designer_json(), GOOD_SHELF)
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.a) if r.course == self.COURSE]
+        self.assertEqual((row.status, row.reason), ("done", None))
+        (kind, payload), = [e for e in self.ledger(self.a, self.COURSE)
+                            if e[0] != "scope_saved"]
+        self.assertEqual(kind, "outline_ready")
+
+        # The draft tree is under the temp home, at the layout the promote
+        # stage will later move whole.
+        for rel in factory.OUTLINE_FILES:
+            with self.subTest(file=rel):
+                self.assertTrue(os.path.isfile(
+                    os.path.join(self.draft(self.COURSE), rel)))
+
+        # The plan's keys are BuildSpec's field names, so the approved plan
+        # reaches the build with nothing in between to mistranslate it.
+        plan = payload["plan"]
+        self.assertEqual(
+            factory.BuildSpec(**plan),
+            factory.BuildSpec(
+                phase_id="p1", lesson_unit="u1", widget_unit="u2",
+                widget_concept="The compiler refuses rather than guesses.",
+                exercise_unit="u2", quiz=True, bank=True))
+        # A number the gate can print and the approval row can carry.
+        self.assertGreater(Decimal(payload["estimate_usd"]), 0)
+        self.assertRegex(payload["estimate_usd"], r"^\d+\.\d\d$")
+
+        # L2: every call the stage made is metered, under its role's name.
+        self.assertEqual(self.ledger_stages(self.a),
+                         ["curriculum-designer", "resource-curator"])
+
+    def test_a_draft_that_will_not_compile_is_the_stages_own_failure(self):
+        # Twice: the designer gets one rewrite with the compiler's findings,
+        # answers with the same broken sidecar, and the stage refuses. The
+        # reason is the factory's, carried through the worker untranslated.
+        self.scoped(self.b, self.COURSE)
+        self.enqueue(self.b, self.COURSE, "outline")
+        send = FakeOutlineSend(designer_json(sidecar=BROKEN_SIDECAR), GOOD_SHELF)
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.b) if r.course == self.COURSE]
+        self.assertEqual((row.status, row.reason), ("failed", "compile_failed"))
+        (kind, payload), = [e for e in self.ledger(self.b, self.COURSE)
+                            if e[0] != "scope_saved"]
+        self.assertEqual((kind, payload["reason"]),
+                         ("outline_failed", "compile_failed"))
+        self.assertIn("u9", payload["detail"])          # operator's copy
+        self.assertEqual(send.roles().count("curriculum-designer"), 2)
+        # Nothing partial kept, which is what makes the retry button safe.
+        for rel in factory.OUTLINE_FILES:
+            with self.subTest(file=rel):
+                self.assertFalse(os.path.exists(
+                    os.path.join(self.draft(self.COURSE), rel)))
+        # O2: the screen has a sentence for it.
+        self.assertIn(("outline", "compile_failed"), onboarding.WORDING)
+
+    def test_a_run_for_a_course_nobody_scoped_never_reaches_a_model(self):
+        self.enqueue(self.a, "unscoped", "outline")
+        def never(model, system, prompt, max_tokens):
+            raise AssertionError("a stage with no scope has nothing to ask")
+        with self.with_send(never):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.a) if r.course == "unscoped"]
+        self.assertEqual((row.status, row.reason), ("failed", "worker_error"))
+        (kind, payload), = self.ledger(self.a, "unscoped")
+        self.assertEqual((kind, payload["reason"]),
+                         ("outline_failed", "worker_error"))
+
+    def test_an_unconfigured_courses_home_fails_the_run_before_it_spends(self):
+        # No default, and the worker does not invent one: the run fails
+        # honestly and the learner sees a stopped stage with a retry.
+        self.scoped(self.a, "homeless")
+        self.enqueue(self.a, "homeless", "outline")
+        def never(model, system, prompt, max_tokens):
+            raise AssertionError("there is nowhere to write the draft")
+        with mock.patch.dict(os.environ, {}, clear=True), self.with_send(never):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.a) if r.course == "homeless"]
+        self.assertEqual((row.status, row.reason), ("failed", "worker_error"))
+        (_, payload), = [e for e in self.ledger(self.a, "homeless")
+                         if e[0] != "scope_saved"]
+        self.assertIn(coursehome.ENV_DIR, payload["detail"])
 
 
 class LivenessTest(WorkerFixture):

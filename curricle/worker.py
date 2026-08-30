@@ -43,13 +43,17 @@ nowhere else. The worker serves every tenant and has no ambient one;
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from typing import Callable
 
 import sqlalchemy as sa
+import yaml
 
-from . import db, onboarding
+from . import coursehome, db, factory, llm, onboarding, profile
+from .compiler import compile_course
+from .sidecar import load_sidecar
 
 # A handler runs one claimed stage. It returns the outcome to append to the
 # onboarding ledger, or None (nothing to record — the noop stage).
@@ -57,6 +61,26 @@ from . import db, onboarding
 # `run` is the claimed row (id, tenant_id, course, stage, payload).
 Handler = Callable[[sa.Engine, db.TenantScope, sa.Row],
                    "tuple[str, dict] | None"]
+
+# How a stage builds the thing that spends money. A seam, not a setting:
+# tests hand back a Runner whose transport is scripted, and the process that
+# serves web requests never reaches this module at all. Production has
+# exactly one answer and it is the default.
+RUNNER_FACTORY = llm.Runner
+
+
+class StageFailed(RuntimeError):
+    """A stage refusing in the ledger's own vocabulary.
+
+    `reason` is a REASONS key, which is what makes this different from any
+    other exception a handler can raise: `_reason_of` takes it at its word
+    and the wizard has a sentence ready for it. Everything without one is a
+    `worker_error`, honestly recorded as the bug it is.
+    """
+
+    def __init__(self, reason: str, detail: str):
+        super().__init__(f"{reason}: {detail}")
+        self.reason = reason
 
 
 def _noop(engine: sa.Engine, scope: db.TenantScope, run: sa.Row) -> None:
@@ -69,7 +93,78 @@ def _noop(engine: sa.Engine, scope: db.TenantScope, run: sa.Row) -> None:
     return None
 
 
-HANDLERS: dict[str, Handler] = {"noop": _noop}
+def _outline(engine: sa.Engine, scope: db.TenantScope,
+             run: sa.Row) -> tuple[str, dict]:
+    """Stop 7: draft this course's outline, and price building phase 1 of it.
+
+    Everything the stage needs comes from the claimed row's tenant (T1): the
+    scope out of that tenant's onboarding fold, the profile out of that
+    tenant's evidence fold, and a runner whose spend is metered against that
+    tenant's ledger. The worker has no tenant of its own to fall back on.
+
+    One short read, and then no transaction at all. The draft is minutes of
+    model calls, and `run_once` has already committed the claim precisely so
+    that nothing here has to hold a row lock across them; the outcome this
+    returns is what the second transaction records. A worker that dies in
+    the middle leaves a `running` row for the next one's startup sweep,
+    which fails it honestly as `interrupted` rather than re-spending.
+
+    The plan and the estimate are computed here rather than at the gate
+    because they are what the gate is a gate *on*: the learner approves a
+    number, and O3 says the row carries the number they were shown.
+    """
+    with engine.begin() as conn:
+        flow = onboarding.load_state(conn, scope).flows.get(run.course)
+        prof = profile.load_profile(conn, scope)
+    if flow is None or not flow.scope:
+        # Not a stage failure in the ledger's sense — it is a run enqueued
+        # for a course nobody scoped, which is a bug in whoever enqueued it.
+        raise StageFailed("worker_error",
+                          f"no saved scope for course {run.course!r}")
+
+    # Asked before the runner is built, so an unconfigured courses home
+    # fails the run before it can spend anything. There is no default home
+    # and this is not the place to invent one.
+    draft_dir = os.path.join(coursehome.courses_dir(), run.course,
+                             ".draft-onboarding")
+    runner = RUNNER_FACTORY(engine, scope)
+    try:
+        factory.build_outline(runner, prof, run.course, flow.scope, draft_dir,
+                              note=run.payload.get("note") or flow.note)
+    except llm.BudgetExceeded as exc:
+        # The runner refuses in money's vocabulary; the ledger has a key for
+        # it and the wizard has a sentence. Wrapped rather than re-raised
+        # bare, because `BudgetExceeded` carries no reason of its own.
+        raise StageFailed("budget_exceeded", str(exc)) from exc
+
+    # The draft was already compiled clean by the stage that wrote it; this
+    # is the same compile again for the manifest itself, which is what the
+    # plan is derived from. A refusal here would mean the two disagreed.
+    try:
+        sidecar = load_sidecar(os.path.join(draft_dir, factory.OUTLINE_FILES[1]))
+        manifest, issues = compile_course(draft_dir, sidecar)
+    except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
+        # The same set the outline stage's own validator guards with: the
+        # sidecar loader raises through what it cannot turn into a finding.
+        raise StageFailed("compile_failed",
+                          f"{type(exc).__name__}: {exc}") from exc
+    if manifest is None:
+        raise StageFailed("compile_failed",
+                          "\n".join(str(i) for i in issues if i.level == "error"))
+
+    try:
+        plan = factory.default_build_plan(manifest)
+    except ValueError as exc:
+        # An outline that compiles and still has no phase 1, or a phase 1
+        # with no units in it: a shape this system accepts from the compiler
+        # and cannot build from. That is the outline being wrong, not the
+        # worker breaking, so it is worded as such and the retry is offered.
+        raise StageFailed("validation_failed", str(exc)) from exc
+    estimate = factory.estimate_build_cost(runner.config, plan)
+    return "outline_ready", {"plan": plan, "estimate_usd": f"{estimate:.2f}"}
+
+
+HANDLERS: dict[str, Handler] = {"noop": _noop, "outline": _outline}
 
 # What a stage says in the ledger when it fails — because its handler
 # raised, because the outcome it returned was refused, or because the worker

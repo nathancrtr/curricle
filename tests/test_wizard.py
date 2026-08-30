@@ -15,6 +15,8 @@ import os
 import tempfile
 import unittest
 
+import sqlalchemy as sa
+
 from curricle import db, onboarding, profile, profilerender, webapp, wizard
 
 from pg import test_engine
@@ -291,6 +293,286 @@ class FailedPlaceholderTest(WizardFixture):
         # the browser to come back, and shows no duration either.
         self.assertNotIn(wizard.META_REFRESH, page)
         self.assertNotIn('<span class="elapsed">', page)
+
+
+class ScopeCopyTest(unittest.TestCase):
+    """Stop 6's vocabulary, pinned to the manifest's own."""
+
+    def test_the_modes_are_the_manifests_modes_each_with_a_sentence(self):
+        # The radio group writes the string a sidecar will later declare, so
+        # a fourth mode in the schema (or a renamed one) has to arrive on
+        # this form rather than being silently unofferable.
+        from curricle import schema
+
+        self.assertEqual(tuple(value for value, _, _ in wizard.MODE_COPY),
+                         schema.COURSE_MODES)
+        for _, name, sentence in wizard.MODE_COPY:
+            with self.subTest(name=name):
+                self.assertTrue(name.strip())
+                self.assertTrue(sentence.strip().endswith("."))
+
+    def test_every_asked_field_has_a_label_and_a_line(self):
+        for name, (label, explain) in wizard.SCOPE_LABELS.items():
+            with self.subTest(field=name):
+                self.assertTrue(label.strip())
+                self.assertTrue(explain.strip())
+
+
+class ScopeFormTest(WizardFixture):
+    """The form itself: the wire contract, and the three sentences."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            onboarding.append_event(conn, cls.scope, "profile_published", "")
+
+    def test_the_scope_stop_draws_a_form_and_not_a_placeholder(self):
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["scope"], page)
+        self.assertIn('action="/onboarding/scope"', page)
+        self.assertIn(wizard.SCOPE_LEDE, page)
+        self.assertNotIn("This screen is still being built", page)
+        # A form is your turn, and nothing on it is waiting on a machine.
+        self.assertNotIn(wizard.META_REFRESH, page)
+
+    def test_every_input_the_post_reads_is_on_the_page(self):
+        # The wire contract, both directions: the names below are what the
+        # POST looks for, so a renamed box would be a field silently never
+        # answered.
+        page = self.screen()
+        for name in ("title", "subject", "hours_lo", "hours_hi", "cadence",
+                     "done_looks_like", "out_of_scope", "prior_exposure"):
+            with self.subTest(name=name):
+                self.assertIn(f'name="{name}"', page)
+
+    def test_each_mode_is_offered_with_its_own_sentence(self):
+        page = self.screen()
+        for value, name, sentence in wizard.MODE_COPY:
+            with self.subTest(mode=value):
+                self.assertIn(f'name="mode" value="{value}"', page)
+                self.assertIn(name, page)
+                self.assertIn(sentence, page)
+
+
+class ScopeSaveTest(WizardFixture):
+    """Saving the scope: three rows, one transaction, no human turn after.
+
+    Its own tenant, because saving a scope is a one-way move of this
+    fixture's ledger.
+    """
+
+    FORM = {
+        "title": "Koine Greek, from the papyri",
+        "subject": "Reading documentary papyri of the Roman period",
+        "mode": "subject",
+        "hours_lo": "4",
+        "hours_hi": "6",
+        "cadence": "two weekday evenings",
+        "done_looks_like": "I can read a documentary papyrus with a lexicon.",
+        "out_of_scope": "classical Attic prose\n\nwriting my own grammar\n",
+        "prior_exposure": "One year of Attic, ten years ago.",
+    }
+
+    def pending_runs(self, course: str) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.runs_pending(course)))
+
+    def test_a_saved_scope_is_a_course_a_request_and_a_queued_run(self):
+        self.append("profile_published")
+        saved = self.client.post("/onboarding/scope", data=self.FORM,
+                                 follow_redirects=False)
+        self.assertEqual(saved.status_code, 303, saved.text)
+        self.assertEqual(saved.headers["location"], "/onboarding/")
+
+        rows = [r for r in self.onboarding_rows()
+                if r.kind != "profile_published"]
+        self.assertEqual([r.kind for r in rows],
+                         ["scope_saved", "outline_requested"])
+        # The id is minted from the title and is also the directory the draft
+        # will be written into — one string, by construction.
+        course = "koine-greek-from-the-papyri"
+        self.assertEqual({r.course for r in rows}, {course})
+        # The payload shape is a wire contract with the gate screen and with
+        # the worker, so it is asserted whole rather than key by key.
+        self.assertEqual(rows[0].payload, {
+            "title": "Koine Greek, from the papyri",
+            "subject": "Reading documentary papyri of the Roman period",
+            "mode": "subject",
+            "hours_per_week": [4, 6],
+            "cadence": "two weekday evenings",
+            "done_looks_like": "I can read a documentary papyrus with a "
+                               "lexicon.",
+            "out_of_scope": ["classical Attic prose",
+                             "writing my own grammar"],
+            "prior_exposure": "One year of Attic, ten years ago.",
+        })
+        self.assertEqual(rows[1].payload, {})
+
+        # And the run the second process will claim: written in the same
+        # transaction, because there is no human turn between the two stops.
+        queued = self.pending_runs(course)
+        self.assertEqual([(r.stage, r.status) for r in queued],
+                         [("outline", "queued")])
+        self.assertIsNone(queued[0].claimed_at)
+
+        # The fold has moved on by itself: what /onboarding/ draws now is a
+        # machine's turn, and the form is gone.
+        self.assertEqual(self.current_stop(), "outline")
+        page = self.screen()
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertNotIn('action="/onboarding/scope"', page)
+
+
+class ScopeBeforeTheProfileTest(WizardFixture):
+    """O1 for a write, from the other side: the stop is not open yet."""
+
+    def test_a_scope_posted_before_publishing_is_refused_and_writes_nothing(self):
+        refused = self.client.post("/onboarding/scope",
+                                   data=ScopeSaveTest.FORM,
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(self.onboarding_rows(), [])
+        self.assertEqual(self.current_stop(), "profile")
+
+
+class ScopeRefusalTest(WizardFixture):
+    """Refuse rather than guess — and refuse without leaving half a course."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            onboarding.append_event(conn, cls.scope, "profile_published", "")
+
+    def post(self, **changes):
+        form = dict(ScopeSaveTest.FORM, **changes)
+        return self.client.post("/onboarding/scope", data=form,
+                                follow_redirects=False)
+
+    def scope_rows(self) -> list:
+        return [r for r in self.onboarding_rows()
+                if r.kind != "profile_published"]
+
+    def queued(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(
+                sa.select(db.factory_runs.c.id)
+                .where(db.factory_runs.c.tenant_id == self.tenant)))
+
+    def test_a_missing_required_field_names_it_and_writes_nothing(self):
+        # The whole save is one transaction, so a refusal anywhere in it
+        # leaves neither a scoped course nor a run nobody asked for.
+        refused = self.post(title="")
+        self.assertEqual(refused.status_code, 422)
+        self.assertIn(wizard.SCOPE_LABELS["title"][0], refused.text)
+        self.assertEqual(self.scope_rows(), [])
+        self.assertEqual(self.queued(), [])
+        self.assertEqual(self.current_stop(), "scope")
+
+    def test_every_other_refusal_names_its_box_too(self):
+        for changes, expected in (
+                ({"subject": " "}, wizard.SCOPE_LABELS["subject"][0]),
+                ({"done_looks_like": ""},
+                 wizard.SCOPE_LABELS["done_looks_like"][0]),
+                ({"mode": "vibes"}, wizard.SCOPE_LABELS["mode"][0]),
+                ({"hours_lo": "several"}, "whole number"),
+                ({"hours_lo": "0"}, "at least one"),
+                ({"hours_lo": "9", "hours_hi": "2"}, "below the low end")):
+            with self.subTest(changes=changes):
+                refused = self.post(**changes)
+                self.assertEqual(refused.status_code, 422, refused.text)
+                self.assertIn(expected, refused.text)
+        self.assertEqual(self.scope_rows(), [])
+        self.assertEqual(self.queued(), [])
+
+    def test_a_body_this_form_cannot_read_is_refused(self):
+        posted = self.client.post("/onboarding/scope",
+                                  json=dict(ScopeSaveTest.FORM),
+                                  follow_redirects=False)
+        self.assertEqual(posted.status_code, 415)
+        self.assertEqual(self.scope_rows(), [])
+
+
+class OutlineRetryTest(WizardFixture):
+    """A stopped outline says why in a sentence, and waits for a person."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course, payload in (
+                    ("profile_published", "", {}),
+                    ("scope_saved", "greek-103", {"title": "Greek"}),
+                    ("outline_requested", "greek-103", {}),
+                    ("outline_failed", "greek-103",
+                     {"reason": "compile_failed", "detail": "SchemaError: …"})):
+                onboarding.append_event(conn, cls.scope, kind, course, payload)
+
+    def runs(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.runs_pending("greek-103")))
+
+    # Named to run before the retry below: the retry moves this fixture's
+    # ledger on, and the failed screen exists only until it does.
+    def test_a_stopped_outline_says_why_and_offers_a_retry(self):
+        page = self.screen()
+        self.assertIn(onboarding.WORDING[("outline", "compile_failed")], page)
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        self.assertIn(wizard.FAILED_WORD, page)
+        # O2: the machine's word for what happened never reaches the page.
+        self.assertNotIn("compile_failed", page)
+        self.assertNotIn(wizard.META_REFRESH, page)
+
+    def test_the_button_is_the_scheduler(self):
+        # Nothing retries a failed stage on its own: the run row exists
+        # because a person asked for it, and the ledger says they did.
+        self.assertEqual(self.runs(), [])
+        retried = self.client.post("/onboarding/outline/retry",
+                                   follow_redirects=False)
+        self.assertEqual(retried.status_code, 303, retried.text)
+        self.assertEqual(retried.headers["location"], "/onboarding/")
+        self.assertEqual([r.kind for r in self.onboarding_rows()][-1],
+                         "outline_requested")
+        self.assertEqual([(r.stage, r.status) for r in self.runs()],
+                         [("outline", "queued")])
+        # The flow is a machine's turn again, so the screen says so — and a
+        # second press is refused, because there is no longer a stopped
+        # outline to retry.
+        self.assertEqual(self.current_stop(), "outline")
+        page = self.screen()
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn(wizard.META_REFRESH, page)
+        self.assertNotIn("/onboarding/outline/retry", page)
+        again = self.client.post("/onboarding/outline/retry",
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+
+
+class OutlinePendingCopyTest(WizardFixture):
+    """Design §4 Stop 7: the stage name, the elapsed time, and nothing it
+    would have to invent."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course in (("profile_published", ""),
+                                 ("scope_saved", "greek-105"),
+                                 ("outline_requested", "greek-105")):
+                onboarding.append_event(conn, cls.scope, kind, course,
+                                        {"title": "Greek"} if course else {})
+
+    def test_the_pending_screen_forecasts_nothing(self):
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["outline"], page)
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn("seconds elapsed", page)          # elapsed, not a forecast
+        self.assertIn(wizard.META_REFRESH, page)
+        # And it says so, rather than leaving the absence to be noticed: the
+        # one number on the screen is the one the ledger already knows.
+        self.assertIn("no progress bar", page)
+        self.assertNotIn("/onboarding/outline/retry", page)
 
 
 class ProfileCopyTest(unittest.TestCase):

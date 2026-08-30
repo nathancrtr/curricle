@@ -50,6 +50,13 @@ def main(argv: list[str] | None = None) -> int:
                    default=[], help="course repo root (repeatable)")
     s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
     s.add_argument("--port", type=int, default=8765)
+    # On `serve` and not on `work`: the worker writes no profile events —
+    # checkpoint proposals arrive through this app's API and acceptance
+    # happens on /profile — so the same flag there would configure a writer
+    # that never fires.
+    s.add_argument("--profile-skill-out",
+                   help="re-render the learner-profile SKILL.md projection "
+                        "here after every profile change (default: off)")
 
     # No --tenant: the worker serves every tenant and has none of its own.
     # Each queued run carries the tenant it belongs to, and the worker builds
@@ -307,7 +314,8 @@ def _serve(args) -> int:
     from . import coursehome
     from .webapp import create_app
     app = create_app(args.courses or [], tenant_slug=args.tenant,
-                     courses_dir=coursehome.maybe_courses_dir())
+                     courses_dir=coursehome.maybe_courses_dir(),
+                     profile_skill_out=args.profile_skill_out)
     print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
     uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
     return 0

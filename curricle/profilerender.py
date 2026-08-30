@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import datetime
 import html
+import os
 import re
+import tempfile
 
 from . import theme
 from .inlinemd import inline_html
@@ -102,6 +104,39 @@ def render_skill_md(state: ProfileState) -> str:
         "(`python -m curricle profile --help`), then re-render.*")
     parts.append("")
     return "\n".join(parts)
+
+
+def write_skill_md(state: ProfileState, out_path: str) -> None:
+    """Install the projection at `out_path`, atomically.
+
+    The one writer every caller of the projection hook goes through, so the
+    file on disk is only ever a whole `render_skill_md` or the previous whole
+    one. A model reads this document; a half-written one would be a lie told
+    in the middle of a sentence, and the render is fast enough that the
+    temp-file-and-rename dance costs nothing worth counting.
+
+    The directory is created because the flag names a file this app owns —
+    a fresh machine has no `~/.claude/skills/learner-profile/` until
+    something puts one there. The mode `mkstemp` gives (0600) rides along on
+    purpose: the projection is the learner's profile in plain text.
+    """
+    text = render_skill_md(state)
+    path = os.path.expanduser(out_path)
+    directory = os.path.dirname(path) or "."
+    os.makedirs(directory, exist_ok=True)
+    # Same directory as the target, so the rename is a rename and not a copy
+    # across filesystems — which is the whole atomicity claim.
+    fd, tmp = tempfile.mkstemp(dir=directory, prefix=".skill-", suffix=".md")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        # A failed write leaves the previous projection in place and no
+        # debris beside it.
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
 
 
 # ---------------------------------------------------------------------------

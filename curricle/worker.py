@@ -13,6 +13,13 @@ retry scheduling at all — the wizard's retry button *is* the scheduler. A
 failed stage is simply requested again, which is a row, which is the fold's
 business rather than this module's.
 
+What a *succeeded* stage may do is queue the next one (`CHAINS_TO`), and
+that is not the same thing: design §4 rejected a second human gate between
+the build and the promotion, so there is no person to wait for between them
+and a flow that stopped there would be waiting on nobody. Nothing chains off
+a failure, which is the whole distinction — a stage that stopped costs money
+to run again, and only a person may ask for that.
+
 A run takes exactly two transactions, and the split is the important part.
 The first claims the row and commits it `running` — so the claim is a fact
 the moment it is made, visible to anything that looks, and a stage that then
@@ -43,6 +50,8 @@ nowhere else. The worker serves every tenant and has no ambient one;
 
 from __future__ import annotations
 
+import dataclasses
+import json
 import os
 import sys
 import time
@@ -59,8 +68,26 @@ from .sidecar import load_sidecar
 # onboarding ledger, or None (nothing to record — the noop stage).
 #   handler(engine, scope, run) -> tuple[event_kind, payload] | None
 # `run` is the claimed row (id, tenant_id, course, stage, payload).
+# A handler opens its own short transactions to read and holds none across
+# the work itself; an outcome that has to queue the stage after it says so
+# through `CHAINS_TO` rather than by inserting a row of its own, so that the
+# event and the run row it causes land in one transaction the handler never
+# has to know about.
 Handler = Callable[[sa.Engine, db.TenantScope, sa.Row],
                    "tuple[str, dict] | None"]
+
+# Where the outline stage leaves the course it drafted, under that course's
+# directory in the managed home, and where the build stage reads it back
+# from. `wizard.DRAFT_DIR` is the same name on the other side of the process
+# boundary — the wizard cannot import this module (L1's grep guard).
+DRAFT_DIR = ".draft-onboarding"
+
+# What an outcome queues behind itself, in the same transaction as the
+# outcome event. Design §4 rejected a second human gate over the built
+# materials, so `build_ready` is not a stop: the decision to publish was
+# taken at the outline gate, and a finished build with nothing queued behind
+# it would be a flow waiting on a person who has already answered.
+CHAINS_TO = {"build_ready": "promote"}
 
 # How a stage builds the thing that spends money. A seam, not a setting:
 # tests hand back a Runner whose transport is scripted, and the process that
@@ -125,8 +152,7 @@ def _outline(engine: sa.Engine, scope: db.TenantScope,
     # Asked before the runner is built, so an unconfigured courses home
     # fails the run before it can spend anything. There is no default home
     # and this is not the place to invent one.
-    draft_dir = os.path.join(coursehome.courses_dir(), run.course,
-                             ".draft-onboarding")
+    draft_dir = os.path.join(coursehome.courses_dir(), run.course, DRAFT_DIR)
     runner = RUNNER_FACTORY(engine, scope)
     try:
         factory.build_outline(runner, prof, run.course, flow.scope, draft_dir,
@@ -164,7 +190,151 @@ def _outline(engine: sa.Engine, scope: db.TenantScope,
     return "outline_ready", {"plan": plan, "estimate_usd": f"{estimate:.2f}"}
 
 
-HANDLERS: dict[str, Handler] = {"noop": _noop, "outline": _outline}
+def _build(engine: sa.Engine, scope: db.TenantScope,
+           run: sa.Row) -> tuple[str, dict]:
+    """Stop 9: build phase 1 of the approved outline into the draft tree.
+
+    O3 gets its teeth here — "no token is spent without an upstream ledger
+    row recording the learner's approval and the estimate they were shown".
+    The check is `_approved_plan`'s and it happens before a runner is built,
+    so a build nobody approved cannot reach a model even by accident.
+
+    The plan that runs is the *approval's* plan, never a freshly computed
+    one: what the learner read at the gate is what gets bought. Its keys are
+    `BuildSpec`'s own field names, so it arrives as `BuildSpec(**plan)` with
+    nothing in between to mistranslate it.
+
+    Two short reads and then no transaction at all, the same shape as the
+    outline stage: the build is minutes of model calls, and the claim is
+    already committed. Whatever the run does manage to buy is checkpointed
+    into the draft as it goes, which is what makes the retry a resume rather
+    than a second purchase.
+    """
+    with engine.begin() as conn:
+        rows = list(conn.execute(scope.onboarding_select()))
+        prof = profile.load_profile(conn, scope)
+    plan = _approved_plan(rows, run.course)
+
+    # Asked before the runner is built, like the outline stage's: a home
+    # nobody configured fails the run rather than being guessed at.
+    draft_root = os.path.join(coursehome.courses_dir(), run.course, DRAFT_DIR)
+    try:
+        sidecar = load_sidecar(os.path.join(draft_root, factory.OUTLINE_FILES[1]))
+        manifest, issues = compile_course(draft_root, sidecar)
+    except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
+        # The draft compiled clean when the outline stage wrote it and again
+        # when the gate drew it, so a refusal here means it has been edited
+        # or lost since. Nothing is built against a tree the compiler will
+        # not vouch for.
+        raise StageFailed("compile_failed",
+                          f"{type(exc).__name__}: {exc}") from exc
+    if manifest is None:
+        raise StageFailed("compile_failed",
+                          "\n".join(str(i) for i in issues if i.level == "error"))
+
+    # The draft mirrors a course's own layout, so the content root is its
+    # `learning/` and `build_phase` writes `interactive/.draft-p1/` under it
+    # by exactly the existing mechanics. Nothing in this stage writes outside
+    # the draft tree; only promotion touches a course.
+    content_root = os.path.join(draft_root, "learning")
+    spec = _remaining(factory.BuildSpec(**plan), content_root)
+    try:
+        report = factory.build_phase(RUNNER_FACTORY(engine, scope), manifest,
+                                     prof, content_root, spec)
+    except llm.BudgetExceeded as exc:
+        raise StageFailed("budget_exceeded", str(exc)) from exc
+    except factory.ValidationFailed as exc:
+        # Generated material that failed its checks was thrown away rather
+        # than half-kept, and everything earlier in the run was checkpointed:
+        # the retry buys the refused artifact again and nothing else.
+        raise StageFailed("validation_failed", str(exc)) from exc
+
+    # What *this* run bought. The full set of the phase's artifacts lives in
+    # the draft's own checkpoint manifest, which is what promotion reads —
+    # a resumed run honestly reports only the part it paid for.
+    return "build_ready", {
+        "artifacts": [a.rel_path or a.note for a in report.artifacts],
+        "costs": report.costs,
+    }
+
+
+def _approved_plan(rows: list[sa.Row], course: str) -> dict:
+    """The plan the learner approved for `course`, or a refusal (O3).
+
+    Structural, by ledger order, and never by trusting whoever queued the
+    run: the approval has to be *later than the latest outline*, so an
+    approval of a draft that was since rejected and redrafted does not
+    authorise a build of the new one. Row ids are the order — the fold does
+    not expose them, which is why this reads rows rather than a flow.
+
+    Both halves of the approval must be on the row. A plan says what would
+    be bought and the estimate says what the learner was told it costs; a
+    row carrying neither is a decision nobody can show was informed, so it
+    buys nothing.
+    """
+    mine = [r for r in rows if r.course == course]
+    latest_outline = max((r.id for r in mine if r.kind == "outline_ready"),
+                         default=0)
+    approval = next((r for r in reversed(mine)
+                     if r.kind == "outline_approved" and r.id > latest_outline),
+                    None)
+    if approval is None:
+        raise StageFailed(
+            "unapproved",
+            f"no outline_approved after the latest outline for {course!r}")
+    payload = approval.payload or {}
+    plan, estimate = payload.get("plan"), payload.get("estimate_usd")
+    if not isinstance(plan, dict) or not isinstance(estimate, str):
+        raise StageFailed(
+            "unapproved",
+            f"the approval on file for {course!r} carries no plan and estimate")
+    return plan
+
+
+# The spec fields a checkpointed artifact has already paid for, by the kind
+# of material it registers. The bank has no material of its own — it is a
+# section appended to somebody else's file — so it is recognised below by
+# having no path rather than by a kind.
+_ALREADY_BOUGHT = {
+    "lesson": {"lesson_unit": None},
+    "widget": {"widget_unit": None, "widget_concept": None},
+    "exercise": {"exercise_unit": None},
+    "quiz": {"quiz": False},
+}
+
+
+def _remaining(spec: factory.BuildSpec, content_root: str) -> factory.BuildSpec:
+    """The approved plan minus whatever the draft already holds.
+
+    `build_phase` merges a resumed run into the same draft and checkpoints
+    after every artifact, but it buys whatever its spec asks for — so
+    narrowing the spec is the caller's half of that bargain, and the caller
+    is a learner who pressed retry over a build that stopped partway. This
+    is what makes the wizard's sentence true: finished materials were kept,
+    so a retry carries on rather than paying for them twice.
+    """
+    path = os.path.join(content_root, "interactive", f".draft-{spec.phase_id}",
+                        "manifest.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            done = json.load(f).get("artifacts", [])
+    except (OSError, ValueError):
+        # No checkpoint, or one nothing can read: the honest answer is the
+        # whole plan, which is what a first run gets anyway. A draft this
+        # stage cannot understand is never a reason to refuse the build.
+        return spec
+    bought: dict = {}
+    for artifact in done:
+        if not artifact.get("rel_path"):
+            bought["bank"] = False
+            continue
+        kind = (artifact.get("material") or {}).get("kind")
+        bought.update(_ALREADY_BOUGHT.get(kind, {}))
+    return dataclasses.replace(spec, **bought)
+
+
+HANDLERS: dict[str, Handler] = {"noop": _noop, "outline": _outline,
+                                "build": _build}
 
 # What a stage says in the ledger when it fails — because its handler
 # raised, because the outcome it returned was refused, or because the worker
@@ -196,10 +366,10 @@ def run_once(engine: sa.Engine,
         superseded = _superseded(conn, scope, run)
 
     if superseded:
-        # The fold treats `promoted` as absorbing, so a late outcome could
-        # not resurrect a finished course anyway — but the fold protects the
-        # screen, and this protects the budget. A run for a course that is
-        # already published has nothing left to buy.
+        # A run with nothing left to buy — see `_superseded`. The fold
+        # already declines to act on a late outcome; this is the half that
+        # protects the budget rather than the screen, and it is checked in
+        # the claim's own transaction so the answer is not a stale read.
         with engine.begin() as conn:
             db.finish_run(conn, run.id, "done", "superseded")
         return True
@@ -228,6 +398,12 @@ def run_once(engine: sa.Engine,
             if outcome is not None:
                 kind, payload = outcome
                 onboarding.append_event(conn, scope, kind, run.course, payload)
+                follow_on = CHAINS_TO.get(kind)
+                if follow_on is not None:
+                    # In here rather than after, because an outcome the fold
+                    # reads as "a machine's turn" with no run queued for that
+                    # machine is a flow pending on nothing at all.
+                    conn.execute(scope.runs_insert(run.course, follow_on, {}))
             db.finish_run(conn, run.id, "done")
     except (onboarding.InvalidOnboardingEvent, TypeError, ValueError) as exc:
         # A handler that returns an outcome the ledger refuses — a malformed
@@ -281,11 +457,51 @@ def sweep_interrupted(engine: sa.Engine) -> int:
     return len(stale)
 
 
+# The stops in order, for the one question this module asks of the order:
+# has a flow already gone past the stage a claimed run would run?
+_STAGE_INDEX = {name: i for i, name in enumerate(onboarding.STAGE_SEQUENCE)}
+
+
 def _superseded(conn: sa.Connection, scope: db.TenantScope,
                 run: sa.Row) -> bool:
-    """Has this run's course already been promoted?"""
+    """Is there nothing left for this run to buy?
+
+    Two ways there can be. The course has been promoted, and a promoted
+    course is finished business — the fold treats `promoted` as absorbing,
+    so a late outcome could not resurrect it anyway, but the fold protects
+    the screen and this protects the budget.
+
+    Or the flow has moved past the stage this run would run. That is the
+    approve gate's race made harmless: approving is a read and three writes
+    under READ COMMITTED with no unique index behind it, so two tabs
+    answering at the same moment both see a flow waiting at the gate and
+    both queue a build. O3's letter survives that — each run has an approval
+    above it — and its intent does not, because one decision would be billed
+    twice. The second run is claimed after the first has moved the flow on
+    to `promote`, and it is finished done/superseded with nothing appended,
+    because a run that bought nothing has nothing to report.
+
+    A sibling build some worker has already claimed says the same thing one
+    step earlier, for the case where the fold has not moved yet. It is asked
+    of the build alone, and deliberately: a second *outline* run over a
+    finished one is what rejecting a draft asks for by name, so "this stage
+    has run before" is a refusal only where running twice means paying
+    twice. A `failed` sibling is never one of these either — that is the
+    state the retry button exists for, and the retry resumes from what the
+    stopped run checkpointed rather than buying it again.
+    """
     flow = onboarding.load_state(conn, scope).flows.get(run.course)
-    return flow is not None and flow.stage == "done"
+    if flow is not None and flow.stage == "done":
+        return True
+    if flow is not None and (_STAGE_INDEX.get(flow.stage, -1)
+                             > _STAGE_INDEX.get(run.stage, len(_STAGE_INDEX))):
+        return True
+    if run.stage != "build":
+        return False
+    # The claim in this same transaction has already marked this run
+    # `running`, so it is its own sibling until excluded.
+    return any(row.id != run.id for row in
+               conn.execute(scope.runs_taken(run.course, run.stage)))
 
 
 def _reason_of(exc: Exception) -> str:

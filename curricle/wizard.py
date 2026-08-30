@@ -325,6 +325,15 @@ REJECT_HINT = ("The outline is drafted again with this note in the brief, so "
 REJECT_EMPTY = ("Sending an outline back needs a note saying what to change — "
                 "a redraft briefed with nothing is the same outline again")
 
+# What the build's retry button says under it, and the one thing about this
+# stop that differs from every other retry in the wizard: a stopped build
+# kept what it had finished, and the approval it ran under is a row upstream
+# in the ledger that a stopped run did not spend. So this button asks for
+# neither the money already spent nor the decision already taken.
+BUILD_RETRY_ASIDE = ("What was already finished was kept, so this carries on "
+                     "from where it stopped rather than starting over — and "
+                     "it does not ask you to approve anything again.")
+
 # The review screen's caption, design §4's own sentence. What is under it is
 # the SKILL.md source itself rather than a styled rendering of it: the
 # projection *is* a markdown document, and the honest review of a document
@@ -1242,12 +1251,18 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
 
 
 def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
-    """Stop 9's pending face, in the outline stop's own words and shape.
+    """Stop 9, in the outline stop's own words and shape.
 
-    The same two sentences the drafting screen makes: what is happening, and
-    that nothing here is forecasting how long it will take. The failed face
-    belongs to the stage that can explain what a half-finished build kept,
-    and it lands with that stage.
+    Pending makes the same two sentences the drafting screen does: what is
+    happening, and that nothing here is forecasting how long it will take.
+
+    Failed prints `WORDING[("build", reason)]` and a button, and the button
+    says something the outline's cannot — a stopped build kept whatever it
+    had already finished, so this one continues rather than starting over.
+    Neither the reason key nor the exception reaches the page (O2); both are
+    in the ledger row for an operator. What the screen also never says is
+    that anything has to be approved again: the approval is a row upstream
+    in the ledger and a stopped run did not spend it.
 
     `waiting` is a state this stop should never be seen in — the approval
     and the request for the build are one transaction — but a ledger that
@@ -1255,6 +1270,24 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
     which is the honest rendering of a stage nobody has asked for yet.
     """
     status = flow.status if flow is not None else "waiting"
+    if status == "failed" and flow is not None:
+        worded = onboarding.WORDING.get(
+            ("build", flow.reason or ""),
+            "That stage stopped and what it had already finished was kept.")
+        return Screen(f"""
+  <h1>{STOP_TITLES["build"]}</h1>
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("failed")}</p>
+    <h2>The build stopped</h2>
+    <p class="wording">{worded}</p>
+    <form method="post" action="/onboarding/build/retry">
+      <p class="ask">
+        <button class="pill primary" type="submit">Carry on →</button>
+        <span class="aside">{BUILD_RETRY_ASIDE}</span>
+      </p>
+    </form>
+  </div>
+""")
     since = (f'<span class="elapsed">{elapsed_words(flow.updated_at)}</span>'
              if flow is not None else "")
     return Screen(f"""
@@ -1273,8 +1306,44 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
 """, refresh=status == "pending")
 
 
+def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
+    """Stop 10's pending face: the last machine turn, and no second gate.
+
+    There is no ask on this screen because design §4 put no human turn
+    between the build and the publication — the decision was taken at the
+    gate, and this stop is the system keeping to it. So the copy says what
+    is being done rather than what is being asked, and it names the one rule
+    that could still stop it: a course that does not compile is not served,
+    and this is where that is checked for the last time.
+
+    The failed face and the retry that goes with it belong to the stage that
+    can say what a half-finished promotion left behind, and land with it.
+    """
+    status = flow.status if flow is not None else "waiting"
+    since = (f'<span class="elapsed">{elapsed_words(flow.updated_at)}</span>'
+             if flow is not None else "")
+    return Screen(f"""
+  <h1>{STOP_TITLES["promote"]}</h1>
+  <div class="gatebox">
+    <p class="stateline">{_chip(status)}{since}</p>
+    <h2>Installing your course</h2>
+    <p>The materials that were built are being moved into the course itself
+    and registered, and the whole thing is compiled one last time. A course
+    that does not compile is never served, so nothing is put in place until
+    that check has passed.</p>
+    <p>There is no progress bar here and no estimate of how much longer it
+    will be, because this system would have to invent both. Leave the tab
+    open or close it — the ledger keeps your place either way.</p>
+  </div>
+""", refresh=status == "pending")
+
+
 def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
-    """The placeholder for a stop with no screen of its own yet (8–10).
+    """The placeholder for a stop with no screen of its own yet.
+
+    Every stop now has one but the failed promotion, whose retry lands with
+    the stage that can say what a half-finished publication left behind; a
+    fold that somehow reaches a stop with no flow behind it comes here too.
 
     Everything on it comes from the ledger. A stage that is `failed` prints
     the sentence `WORDING` keeps for its `(stage, reason)` pair and never the
@@ -1506,8 +1575,10 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                 # is not a thing to hold a database transaction across.
                 rendered = outline_gate_screen(
                     flow, draft_manifest(courses_dir, flow.course_id))
-            elif stop == "build" and (flow is None or flow.status != "failed"):
+            elif stop == "build":
                 rendered = build_screen(flow)
+            elif stop == "promote" and (flow is None or flow.status != "failed"):
+                rendered = promote_screen(flow)
             else:
                 rendered = stage_screen(stop, flow)
             return HTMLResponse(_page(stop, rendered, tenant_slug))
@@ -1786,6 +1857,36 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                 conn, scope, "outline_approved", flow.course_id,
                 {"estimate_usd": outline.get("estimate_usd"),
                  "plan": outline.get("plan")})
+            onboarding.append_event(conn, scope, "build_requested",
+                                    flow.course_id, {})
+            conn.execute(scope.runs_insert(flow.course_id, "build", {}))
+        return RedirectResponse("/onboarding/", status_code=303)
+
+    @app.post("/onboarding/build/retry")
+    def retry_build() -> Response:
+        """Ask for the build again. The retry button is still the scheduler.
+
+        No new approval is required, and this is the one place in the wizard
+        where that is worth saying out loud: the `outline_approved` row is
+        upstream in the ledger and a run that stopped did not consume it, so
+        O3 is satisfied by the row that is already there. What the retry does
+        buy is only what the stopped run had not finished — `build_phase`
+        checkpoints into the draft after every artifact and a resumed run
+        merges into the same draft rather than paying for it twice, which is
+        exactly what the button's own sentence promises.
+
+        One refusal, against the fold rather than the form: there has to be
+        a stopped build here, or the button came from a stale tab. Two rows'
+        worth of work in one transaction, like every other request in this
+        module — the ledger row saying a build was asked for, and the run
+        row that makes it happen.
+        """
+        with engine.begin() as conn:
+            flow = onboarding.load_state(conn, scope).active()
+            if (flow is None or flow.stage != "build"
+                    or flow.status != "failed"):
+                raise HTTPException(409, "there is no stopped build to carry "
+                                         "on with — reload /onboarding/")
             onboarding.append_event(conn, scope, "build_requested",
                                     flow.course_id, {})
             conn.execute(scope.runs_insert(flow.course_id, "build", {}))

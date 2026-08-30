@@ -349,6 +349,23 @@ class TenantScope:
             .order_by(factory_runs.c.id)
         )
 
+    def runs_taken(self, course: str, stage: str) -> sa.Select:
+        """This course's runs of one stage that some worker has claimed.
+
+        `running` or `done`, which together mean "already spent, or spending
+        right now" — the question a second run of an expensive stage has to
+        ask before it starts. `failed` is deliberately not in the set: a
+        stopped stage is exactly what a retry exists to run again.
+        """
+        return (
+            sa.select(factory_runs.c.id, factory_runs.c.status)
+            .where(factory_runs.c.tenant_id == self.tenant_id,
+                   factory_runs.c.course == course,
+                   factory_runs.c.stage == stage,
+                   factory_runs.c.status.in_(("running", "done")))
+            .order_by(factory_runs.c.id)
+        )
+
 
 def for_tenant(tenant_id: int) -> TenantScope:
     if not isinstance(tenant_id, int):

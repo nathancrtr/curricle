@@ -260,6 +260,40 @@ class FoldTest(unittest.TestCase):
         # A promoted flow re-enters at Stop 6 (design §4, Stop 10).
         self.assertEqual(st.current_stop(), "scope")
 
+    def test_a_promoted_flow_cannot_be_resurrected_by_a_late_row(self):
+        # The double-clicked retry: two build runs are queued, the winner's
+        # chain reaches `promoted`, and the loser's failure lands afterwards.
+        # A finished course must not fall back into build/failed because a
+        # run nobody is waiting on finally reported.
+        st = onboarding.fold([
+            ev("profile_published", course=""),
+            ev("scope_saved"),
+            ev("outline_requested"),
+            ev("outline_ready", payload=OUTLINE),
+            ev("outline_approved", payload={"estimate_usd": "4.20"}),
+            ev("build_requested"),        # run A
+            ev("build_requested"),        # run B, the second click
+            ev("build_ready"),            # A finishes
+            ev("promoted", payload={"course_id": "greek-101"}),
+            ev("build_failed", payload={"reason": "worker_error"}),   # B, stale
+            ev("outline_requested"),                                  # and worse
+        ])
+        flow = st.flows["greek-101"]
+        self.assertEqual((flow.stage, flow.status, flow.reason),
+                         ("done", "waiting", None))
+        self.assertIsNone(st.active())
+        self.assertEqual(st.current_stop(), "scope")
+
+    def test_a_flow_that_never_saw_scope_saved_still_folds(self):
+        # A fold reads what happened, not what should have: the first row for
+        # a course carries the flow into existence whatever kind it is.
+        st = onboarding.fold([ev("outline_ready", payload=OUTLINE)])
+        self.assertEqual(list(st.flows), ["greek-101"])
+        flow = st.flows["greek-101"]
+        self.assertEqual((flow.stage, flow.status), ("outline_gate", "waiting"))
+        self.assertEqual(flow.outline["estimate_usd"], "4.20")
+        self.assertIsNone(flow.scope)
+
     def test_profile_published_flips_the_flag_and_the_stop(self):
         rows = [ev("scope_saved"), ev("outline_requested")]
         before = onboarding.fold(rows)

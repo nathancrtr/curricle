@@ -239,6 +239,11 @@ def fold(events) -> OnboardingState:
 
     Ledger order means row id. `created_at` is carried through to the flow for
     display — "waiting since" — and takes part in no decision here.
+
+    `promoted` is absorbing: once a course flow has reached "done", every
+    later row for that course id is ignored. A promoted course is finished
+    business, and a stale outcome from a run that was still in flight when it
+    landed must not resurrect it.
     """
     st = OnboardingState()
     for kind, course, payload, created_at in events:
@@ -253,6 +258,11 @@ def fold(events) -> OnboardingState:
             # what happened rather than what should have.
             flow = st.flows[course] = CourseFlow(
                 course_id=course, stage="outline", status="waiting")
+        if flow.stage == "done":
+            # Two runs queued by a double-clicked retry both report; the loser
+            # reports second. Ledgers keep the row — the fold declines to act
+            # on it, rather than the writer pretending it never arrived.
+            continue
         if kind == "scope_saved":
             _at(flow, "outline", "waiting")
             flow.scope = payload

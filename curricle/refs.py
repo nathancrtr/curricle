@@ -80,6 +80,35 @@ def repo_ref_targets(mf: Manifest) -> frozenset[str]:
         if scheme == "repo")
 
 
+def resolve_markdown(text: str, mf: Manifest) -> str:
+    """Resolve reference links for a plain-markdown medium (the MCP tutor
+    export): no pages exist there, so `res:` becomes the verified URL,
+    `mat:`/`repo:` become the repo-relative path in code, and `unit:` keeps
+    just its label — the assistant reaches units through tools, not hrefs."""
+    resources = {r.key: r for r in mf.resources}
+    materials = {m.id: m for m in mf.materials}
+    out = []
+    last = 0
+    for link in re.finditer(r"\[([^\]]+)\]\((res|unit|mat|repo):([^)\s]+)\)", text):
+        label, scheme, target = link.group(1), link.group(2), link.group(3)
+        out.append(text[last:link.start()])
+        last = link.end()
+        if scheme == "res" and target in resources:
+            url = resources[target].all_links[0][1]
+            if url.startswith(("http://", "https://")):
+                out.append(f"[{label}]({url})")
+            else:
+                out.append(label)
+        elif scheme == "mat" and target in materials:
+            out.append(f"{label} (`{materials[target].path}`)")
+        elif scheme == "repo":
+            out.append(f"{label} (`{target}`)")
+        else:
+            out.append(label)
+    out.append(text[last:])
+    return "".join(out)
+
+
 def split_ref(href: str) -> tuple[str, str] | None:
     """(scheme, target) if `href` is a reference, else None."""
     scheme, sep, target = href.partition(":")

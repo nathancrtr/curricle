@@ -29,20 +29,36 @@ Self-refresh is a `<meta http-equiv="refresh">` tag on pending screens and
 no JavaScript at all. The polling stops by construction: a screen that is
 not pending does not carry the tag, so the browser stops asking the moment
 the wait is over.
+
+The outline gate is the one screen that reads anything but the ledger: the
+drafted course is compiled out of the draft tree every time it is drawn,
+because derived data is never stored and a copy of an outline kept beside
+the real one is a second answer to what was drafted. Only the build plan
+and the estimate come out of the `outline_ready` payload, and they do
+because they are the artifact being approved — O3 says the number in the
+approval row is the number that was on the screen, and echoing the stored
+payload into it is how that stops being a thing anyone has to check. The
+compiler is not the metered stage runner: it reads files, spends nothing,
+and L1 still holds on every route here.
 """
 
 from __future__ import annotations
 
 import html as html_mod
+import os
 import re
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from . import coursehome, db, onboarding, profile, profilerender, theme
+from .compiler import compile_course
+from .schema import Manifest, Phase
+from .sidecar import load_sidecar
 
 # The two waits, in words. Design §5: always mark *and* word — the mark is
 # reinforcement, the word is the message, and a screen read with no color at
@@ -282,6 +298,33 @@ SCOPE_CADENCE_HINT = ("When those hours happen, if it matters — "
                       "\"two weekday evenings\", \"one long Sunday\". "
                       "Optional.")
 
+# Where the outline stage leaves the course it drafted, under the course's
+# own directory in the managed home. Spelled here as it is spelled in the
+# worker — the wizard cannot import the module that writes it (L1's grep
+# guard), and a name that appears twice is better than a route that reaches
+# across the process boundary to ask.
+DRAFT_DIR = ".draft-onboarding"
+
+# The gate's lede, and the sentence under the number. The ceiling is named
+# without naming a figure on purpose: what a stage may spend lives in the
+# model configuration, which is the one file this module must never read —
+# the only number on this page is the one the ledger already carries.
+GATE_LEDE = ("This is the course that was drafted for you. Read it, then "
+             "decide: approve it and the first phase of materials gets "
+             "built, or send it back with a note saying what to change.")
+GATE_CEILING = ("An expectation at today's prices, not a cap. The build "
+                "stage also refuses to spend past its own configured "
+                "ceiling, whatever any estimate turned out to be.")
+
+# What the reject box asks for, and why an empty one is refused: the note is
+# the whole content of a rejection, and a redraft briefed with nothing is the
+# same stage run twice at the same cost.
+REJECT_LEAD = "What should change"
+REJECT_HINT = ("The outline is drafted again with this note in the brief, so "
+               "say what was wrong rather than that something was.")
+REJECT_EMPTY = ("Sending an outline back needs a note saying what to change — "
+                "a redraft briefed with nothing is the same outline again")
+
 # The review screen's caption, design §4's own sentence. What is under it is
 # the SKILL.md source itself rather than a styled rendering of it: the
 # projection *is* a markdown document, and the honest review of a document
@@ -399,6 +442,23 @@ WIZARD_CSS = theme.style("""\
   .choice input { margin:0 8px 0 0; }
   .hint { font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 13px; }
   .hint:last-child { margin-bottom:0; }
+  /* The drafted outline, read back. Phases and the shelf are the same
+     panels the forms use, so the review of a course reads in the same
+     rhythm as the questions that produced it. */
+  ol.units, ul.shelf { margin:0; padding:0; list-style:none; }
+  .units li, .shelf li { margin:0 0 15px; max-width:62ch; }
+  .units li:last-child, .shelf li:last-child { margin-bottom:0; }
+  .units b, .shelf b { font-size:14.5px; }
+  .units span, .shelf p { display:block; font-size:13.5px; line-height:1.6;
+                          color:var(--muted); margin:3px 0 0; }
+  /* Both selectors carry .gatebox: the panel's own `p` rule is one element
+     more specific than a bare class would be, and the number would quietly
+     come out at body size and body color. */
+  .gatebox p.cost { font-family:""" + theme.FONT_DISPLAY + """;
+          font-weight:700; font-size:clamp(24px,4.5vw,30px);
+          letter-spacing:-.01em; color:var(--ink); margin:0 0 8px; }
+  .gatebox p.plan { font-size:14.5px; line-height:1.6; color:var(--ink);
+          margin:16px 0 0; max-width:62ch; }
   .nav { display:flex; flex-wrap:wrap; gap:12px; margin:30px 0 0; }
   .gateline { font-size:14.5px; line-height:1.6; color:var(--muted);
               margin:16px 0 0; max-width:62ch; }
@@ -927,6 +987,292 @@ def outline_screen(flow: onboarding.CourseFlow | None) -> Screen:
 """, refresh=status == "pending")
 
 
+def draft_manifest(courses_dir: str | None, course_id: str) -> Manifest | None:
+    """The drafted outline, compiled fresh off disk. None if it won't compile.
+
+    Derived data is never stored: the structure on the gate screen is a
+    compile of the tree the outline stage wrote, never a copy of it carried
+    in a ledger row. This is the compiler, which reads files and spends
+    nothing — the stage that drafted the tree runs in the other process.
+
+    None is the whole vocabulary of failure here, and deliberately so. A
+    home nobody configured, a draft deleted by hand between two screens, a
+    sidecar that will not load, a compile that comes back with errors: the
+    honest screen is the same one in all four cases, because in all four
+    there is no outline to show and none of the findings are a learner's to
+    act on. The exception set is the one the outline stage guards its own
+    load with — the sidecar loader raises through whatever it cannot turn
+    into a finding.
+    """
+    if not courses_dir:
+        return None
+    root = os.path.join(os.path.abspath(os.path.expanduser(courses_dir)),
+                        course_id, DRAFT_DIR)
+    sidecar_path = os.path.join(root, coursehome.SIDECAR_NAMES[0])
+    if not os.path.isfile(sidecar_path):
+        return None
+    try:
+        manifest, _ = compile_course(root, load_sidecar(sidecar_path))
+    except (ValueError, TypeError, OSError, yaml.YAMLError):
+        return None
+    return manifest
+
+
+# (plan key, what that key buys) — the plan's keys are the build spec's own
+# field names, so the sentence is assembled from the keys rather than from
+# any prose the payload happens to carry.
+PLAN_PARTS = (
+    ("lesson_unit", "a Socratic lesson"),
+    ("widget_unit", "a widget"),
+    ("exercise_unit", "a scaffolded exercise"),
+)
+
+
+def plan_sentence(plan: dict, manifest: Manifest | None) -> str:
+    """The build plan in words. Plain text — escaped where it is rendered.
+
+    The plan is read back out of the ledger rather than recomputed, because
+    it is half of what the learner approves and the approval row echoes it:
+    a sentence derived from a second, freshly computed plan could describe a
+    build nobody agreed to. The manifest is asked one question only — what a
+    unit is called on this page — and a unit or phase the compile does not
+    know is printed as the id it is, rather than guessed at.
+
+    A null entry is printed as skipped rather than dropped: "no widget" is
+    part of what the estimate is an estimate of, and a plan that quietly
+    listed only what it does buy would read as a shorter course rather than
+    a cheaper build.
+    """
+    units = {u.id: u for u in manifest.units} if manifest is not None else {}
+    phases = {p.id: p for p in manifest.phases} if manifest is not None else {}
+    phase = phases.get(plan.get("phase_id"))
+    phase_words = (f"phase {phase.num}" if phase is not None
+                   else str(plan.get("phase_id") or "the first phase"))
+
+    clauses = []
+    for key, what in PLAN_PARTS:
+        unit_id = plan.get(key)
+        if not unit_id:
+            clauses.append(f"{what} — skipped")
+            continue
+        unit = units.get(unit_id)
+        named = f"unit {unit.num}" if unit is not None else str(unit_id)
+        concept = plan.get("widget_concept") if key == "widget_unit" else None
+        detail = f" ({concept})" if concept else ""
+        clauses.append(f"{named} gets {what}{detail}")
+    extras = [f"the {phase_words} checkpoint quiz", "the question-bank section"]
+    for i, flag in enumerate(("quiz", "bank")):
+        if not plan.get(flag):
+            extras[i] += " — skipped"
+    clauses.append("plus " + " and ".join(extras))
+    sentence = "; ".join(clauses)
+    return sentence[0].upper() + sentence[1:] + "."
+
+
+def _phase_block(manifest: Manifest, phase: Phase) -> str:
+    """One phase: its number, title and goal, then its units with glosses.
+
+    `entries` carries milestone ids beside unit ids, so the units are taken
+    through the unit map rather than assumed — a side-quest is not a unit
+    and would arrive here as a line with no gloss and no number.
+    """
+    e = html_mod.escape
+    units = {u.id: u for u in manifest.units}
+    items = []
+    for entry in phase.entries:
+        unit = units.get(entry)
+        if unit is None:
+            continue
+        gloss = (f"<span>{e(unit.gloss)}</span>" if unit.gloss else "")
+        items.append(f"<li><b>Unit {unit.num} — {e(unit.title)}</b>"
+                     f"{gloss}</li>")
+    return f"""
+    <div class="panel field">
+      <h3>Phase {phase.num} — {e(phase.title)}</h3>
+      <p class="explain">{e(phase.goal)}</p>
+      <ol class="units">{"".join(items)}</ol>
+    </div>"""
+
+
+def _ladder_block(manifest: Manifest) -> str:
+    """The track ladder, when one was designed. Nothing at all when not.
+
+    A heading over an empty list would tell a learner their course has a
+    parallel track and then show them none of it. The eyebrow says what the
+    panel is, because a ladder that only carried its own name would read as
+    one more phase with strange units in it.
+    """
+    e = html_mod.escape
+    if not manifest.tracks:
+        return ""
+    blocks = []
+    for track in manifest.tracks:
+        stages = "".join(
+            f"<li><b>{e(s.label)}</b>"
+            + (f"<span>{e(s.goal)}</span>" if s.goal else "")
+            + "</li>" for s in track.stages)
+        cadence = (f'<p class="explain">{e(track.cadence)}</p>'
+                   if track.cadence else "")
+        blocks.append(f"""
+    <div class="panel field">
+      <span class="claimkey">A parallel track, on its own clock</span>
+      <h3>{e(track.name)}</h3>
+      {cadence}
+      <ol class="units">{stages}</ol>
+    </div>""")
+    return "".join(blocks)
+
+
+def _shelf_block(manifest: Manifest) -> str:
+    """The resource shelf: each entry's title, its link, and its essay.
+
+    The essay is the manifest's own `why_this_one`, not the shelf markdown
+    read a second time — the compiled field is what the course will show the
+    learner later, and reviewing anything else would be reviewing a document
+    the finished course does not use.
+    """
+    e = html_mod.escape
+    if not manifest.resources:
+        return ""
+    items = []
+    for res in manifest.resources:
+        essay = (f"<p>{e(res.why_this_one)}</p>" if res.why_this_one else "")
+        items.append(f'<li><b><a href="{e(res.url)}">{e(res.title)}</a></b>'
+                     f"{essay}</li>")
+    return f"""
+    <div class="panel field">
+      <h3>The resource shelf</h3>
+      <p class="explain">What this course will send you to read, and why each
+      one is on the shelf.</p>
+      <ul class="shelf">{"".join(items)}</ul>
+    </div>"""
+
+
+def outline_gate_screen(flow: onboarding.CourseFlow,
+                        manifest: Manifest | None) -> Screen:
+    """Stop 8: the outline, read back, and then the spend decision.
+
+    The two halves have two different sources and that is the design (§4).
+    Everything above the line is compiled from the draft on disk, so what is
+    reviewed is the course as the compiler sees it rather than a summary
+    somebody stored. Everything below it — the plan, the number — comes out
+    of the `outline_ready` payload, because those are the artifact being
+    approved, and the approval row echoes the same payload back: the number
+    on this screen and the number in the ledger are the same bytes by
+    construction (O3).
+
+    The number sits above the button, which is the promise Stop 0 made in
+    those words. And when the draft will not compile there is no button at
+    all: a spend button over an outline this system cannot read would be a
+    promise about a course nobody can see.
+
+    Everything interpolated here came out of a model or out of a learner's
+    own typing, so all of it is escaped. This is the first screen in the
+    wizard where that is load-bearing rather than a habit.
+    """
+    e = html_mod.escape
+    if manifest is None:
+        return Screen(f"""
+  <h1>{STOP_TITLES["outline_gate"]}</h1>
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("failed")}</p>
+    <h2>The drafted outline cannot be read back</h2>
+    <p class="wording">The draft is missing, or it no longer compiles, so
+    there is nothing here it would be honest to show you — and this system
+    never asks you to approve spending on a course it cannot read. Nothing
+    has been spent on materials.</p>
+    <p>Drafting it again is safe: the outline stage keeps nothing on its way
+    out, and the next draft is written from your scope exactly as the first
+    one was.</p>
+    <form method="post" action="/onboarding/outline/retry">
+      <p class="ask">
+        <button class="pill primary" type="submit">Draft it again →</button>
+        <span class="aside">This is the cheap stage, and it stops at its own
+        spending ceiling.</span>
+      </p>
+    </form>
+  </div>
+""")
+    outline = flow.outline or {}
+    description = (f'<p class="explain">{e(manifest.course.description)}</p>'
+                   if manifest.course.description else "")
+    phases = "".join(_phase_block(manifest, p) for p in manifest.phases)
+    return Screen(f"""
+  <h1>{STOP_TITLES["outline_gate"]}</h1>
+  <p class="lede">{GATE_LEDE}</p>
+  <div class="panel field">
+    <h3>{e(manifest.course.title)}</h3>
+    {description}
+  </div>
+{phases}{_ladder_block(manifest)}{_shelf_block(manifest)}
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("waiting")}
+      <span class="note">building the first phase is the stage that costs
+      money</span></p>
+    <h2>What building phase 1 will cost</h2>
+    <p class="cost">${e(str(outline.get("estimate_usd", "")))} estimated</p>
+    <p>{GATE_CEILING}</p>
+    <p class="plan">{e(plan_sentence(outline.get("plan") or {}, manifest))}</p>
+    <form method="post" action="/onboarding/outline/approve">
+      <p class="ask">
+        <button class="pill primary" type="submit">Approve and build phase 1
+        →</button>
+        <span class="aside">Your approval is recorded with the estimate
+        above, and nothing spends a token without it.</span>
+      </p>
+    </form>
+  </div>
+  <div class="gatebox">
+    <h2>Or send it back</h2>
+    <p>{REJECT_HINT}</p>
+    <form method="post" action="/onboarding/outline/reject">
+      <label class="claim"><span class="claimkey">{REJECT_LEAD}</span>
+      <textarea name="note" rows="3" required
+      placeholder="Eight weeks on the front end is too many — I have four."
+      ></textarea></label>
+      <p class="ask">
+        <button class="pill" type="submit">Draft it again with this note
+        →</button>
+        <span class="aside">This re-runs the cheap drafting stage. No
+        materials are built and no estimate is approved.</span>
+      </p>
+    </form>
+  </div>
+""")
+
+
+def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
+    """Stop 9's pending face, in the outline stop's own words and shape.
+
+    The same two sentences the drafting screen makes: what is happening, and
+    that nothing here is forecasting how long it will take. The failed face
+    belongs to the stage that can explain what a half-finished build kept,
+    and it lands with that stage.
+
+    `waiting` is a state this stop should never be seen in — the approval
+    and the request for the build are one transaction — but a ledger that
+    somehow held only the approval reads as this screen without the refresh,
+    which is the honest rendering of a stage nobody has asked for yet.
+    """
+    status = flow.status if flow is not None else "waiting"
+    since = (f'<span class="elapsed">{elapsed_words(flow.updated_at)}</span>'
+             if flow is not None else "")
+    return Screen(f"""
+  <h1>{STOP_TITLES["build"]}</h1>
+  <div class="gatebox">
+    <p class="stateline">{_chip(status)}{since}</p>
+    <h2>Building your phase-1 materials</h2>
+    <p>The lesson, the widget, the exercise, the checkpoint quiz and the
+    question bank you approved are being written and checked one at a time.
+    Every one of them is refused rather than kept if it fails its checks, and
+    what has already been finished survives a stage that stops partway.</p>
+    <p>There is no progress bar here and no estimate of how much longer it
+    will be, because this system would have to invent both. Leave the tab
+    open or close it — the ledger keeps your place either way.</p>
+  </div>
+""", refresh=status == "pending")
+
+
 def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
     """The placeholder for a stop with no screen of its own yet (8–10).
 
@@ -1153,6 +1499,15 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                 rendered = scope_screen()
             elif stop == "outline":
                 rendered = outline_screen(flow)
+            elif stop == "outline_gate" and flow is not None:
+                # The compile happens out here rather than inside the screen
+                # so the screen stays a function of what it was handed, and
+                # outside the transaction above because reading a directory
+                # is not a thing to hold a database transaction across.
+                rendered = outline_gate_screen(
+                    flow, draft_manifest(courses_dir, flow.course_id))
+            elif stop == "build" and (flow is None or flow.status != "failed"):
+                rendered = build_screen(flow)
             else:
                 rendered = stage_screen(stop, flow)
             return HTMLResponse(_page(stop, rendered, tenant_slug))
@@ -1369,14 +1724,109 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         nothing: the note lives in the fold, which is where the stage reads
         it from, and copying it into two places would be two places to
         disagree.
+
+        Two folds reach this button, and the second one is the gate with a
+        draft it cannot read. That state has no outline to review and no
+        approval to give, so a redraft is the only move left — but it is
+        offered *only* while the draft really is unreadable, checked here as
+        well as on the screen. Otherwise this would be a second way out of a
+        healthy gate: one that discards a good outline and briefs its
+        replacement with nothing, which is exactly what rejecting with a note
+        exists to prevent.
         """
         with engine.begin() as conn:
             flow = onboarding.load_state(conn, scope).active()
-            if flow is None or flow.stage != "outline" or flow.status != "failed":
-                raise HTTPException(409, "there is no stopped outline to "
-                                         "retry — reload /onboarding/")
+            stopped = (flow is not None and flow.stage == "outline"
+                       and flow.status == "failed")
+            unreadable = (flow is not None and flow.stage == "outline_gate"
+                          and draft_manifest(courses_dir,
+                                             flow.course_id) is None)
+            if flow is None or not (stopped or unreadable):
+                raise HTTPException(409, "there is no outline waiting to be "
+                                         "drafted again — reload /onboarding/")
             onboarding.append_event(conn, scope, "outline_requested",
                                     flow.course_id,
                                     {"note": flow.note} if flow.note else {})
             conn.execute(scope.runs_insert(flow.course_id, "outline", {}))
+        return RedirectResponse("/onboarding/", status_code=303)
+
+    @app.post("/onboarding/outline/approve")
+    def approve_outline() -> Response:
+        """Stop 8's decision: the row that lets money be spent, and the run.
+
+        O3 lives here. The approval carries the estimate the learner was
+        shown, and it carries it by echoing `outline_ready`'s own payload
+        rather than by reading a number off the form — a form could post any
+        number at all, and the point of the row is that the screen and the
+        ledger agree. The plan travels with it for the same reason: what
+        gets built is the plan that was approved, and the build reads it
+        from this row rather than recomputing one of its own.
+
+        Three writes in one transaction, because there is no human turn
+        between Stops 8 and 9: an approval with no build queued behind it is
+        a learner who has spent their decision and got nothing for it.
+
+        Two refusals, both against state rather than against the form. O1:
+        the fold has to be at this stop, or the button came from a stale tab.
+        And the draft has to still compile: the screen draws no approve
+        button over an outline it could not render, and a button that is
+        absent from a page is not a rule.
+        """
+        with engine.begin() as conn:
+            flow = onboarding.load_state(conn, scope).active()
+            if flow is None or flow.stage != "outline_gate":
+                raise HTTPException(409, "there is no outline waiting for "
+                                         "your approval — reload /onboarding/")
+            if draft_manifest(courses_dir, flow.course_id) is None:
+                raise HTTPException(409, "the drafted outline no longer "
+                                         "compiles, so there is nothing to "
+                                         "approve — draft it again")
+            outline = flow.outline or {}
+            onboarding.append_event(
+                conn, scope, "outline_approved", flow.course_id,
+                {"estimate_usd": outline.get("estimate_usd"),
+                 "plan": outline.get("plan")})
+            onboarding.append_event(conn, scope, "build_requested",
+                                    flow.course_id, {})
+            conn.execute(scope.runs_insert(flow.course_id, "build", {}))
+        return RedirectResponse("/onboarding/", status_code=303)
+
+    @app.post("/onboarding/outline/reject")
+    async def reject_outline(request: Request) -> Response:
+        """Send the outline back with a note, which re-runs Stop 7.
+
+        The note is the whole content of a rejection and an empty one is
+        refused: a redraft briefed with nothing is the same stage run again
+        at the same cost, and the learner would be paying for the system's
+        silence. Two rows, because they say two different things — that this
+        outline was rejected, and that another one was asked for — and the
+        note is on both, so neither row has to be read through the other.
+
+        The queued run carries the note as well. That is one more copy than
+        the retry button writes, and it is deliberate: this run exists *to*
+        answer this note, and a stage that reads its own row's payload is
+        briefed by the thing that queued it rather than by whatever the fold
+        looks like by the time a worker gets there.
+        """
+        if not request.headers.get("content-type", "").startswith(
+                "application/x-www-form-urlencoded"):
+            raise HTTPException(415, "the reject form posts urlencoded")
+        try:
+            form = parse_form(await request.body())
+        except UnicodeDecodeError:
+            raise HTTPException(415, "the reject form posts urlencoded")
+        note = submitted(form, "note") or ""
+        with engine.begin() as conn:
+            flow = onboarding.load_state(conn, scope).active()
+            if flow is None or flow.stage != "outline_gate":
+                raise HTTPException(409, "there is no outline waiting on your "
+                                         "review — reload /onboarding/")
+            if not note:
+                raise HTTPException(422, REJECT_EMPTY)
+            onboarding.append_event(conn, scope, "outline_rejected",
+                                    flow.course_id, {"note": note})
+            onboarding.append_event(conn, scope, "outline_requested",
+                                    flow.course_id, {"note": note})
+            conn.execute(scope.runs_insert(flow.course_id, "outline",
+                                           {"note": note}))
         return RedirectResponse("/onboarding/", status_code=303)

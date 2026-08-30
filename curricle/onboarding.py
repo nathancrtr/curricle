@@ -59,9 +59,16 @@ WORDING: dict[tuple[str, str], str] = {
     ("outline", "validation_failed"):
         "The outline came back in a shape this system doesn't accept, so it "
         "was thrown away rather than half-kept. Retrying is safe.",
+    # No "narrow the scope on the previous screen": from the outline stop
+    # there is no previous screen to go back to, and the scope form is behind
+    # a stop the fold has closed. The two things a learner can actually do
+    # are the button on this screen and, once a draft does come back, the
+    # note at the gate — so those are what the sentence names.
     ("outline", "compile_failed"):
         "The drafted outline wouldn't compile, twice, so it was refused. "
-        "Retry, or narrow the scope on the previous screen and try again.",
+        "Nothing partial was kept, so retrying is safe — and a draft that "
+        "does come back can be sent round again with a note asking for "
+        "something narrower.",
     ("outline", "unapproved"):
         "The outline build ran without an approval on file and stopped "
         "before spending anything. Start it again from the scope screen.",

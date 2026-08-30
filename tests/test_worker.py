@@ -38,7 +38,7 @@ from pg import test_engine
 # like arrives here too.
 from test_factory import (
     BROKEN_SIDECAR, GOOD_CURRICULUM, GOOD_SHELF, GOOD_SIDECAR, SCOPE,
-    FakeBuildSend, FakeOutlineSend, designer_json,
+    FakeBuildSend, FakeOutlineSend, compile_draft, designer_json,
 )
 
 OUTLINE = {"plan": {"phases": [{"id": "p1", "title": "Phase 1"}]},
@@ -64,13 +64,21 @@ PROFILE_CLAIM = ("Learns by implementing — pair every abstract idea with "
 FOLD_NOTE = "Too many weeks — I have four, not eight."
 RUN_NOTE = "Start from the lexer, not from grammars."
 
-# The plan the outline stage reports for the tiny-demo draft, spelled out
-# rather than recomputed: these are `BuildSpec`'s own field names, and a
-# build handler that had to translate any of them would fail this fixture
-# before it failed anything else.
+# The plan the ledger carries for the tiny-demo draft, spelled out rather
+# than recomputed: these are `BuildSpec`'s own field names, and a build
+# handler that had to translate any of them would fail this fixture before
+# it failed anything else.
+#
+# `exercise_unit` deliberately disagrees with what `default_build_plan`
+# derives for this draft — it would put the exercise on the phase's last
+# unit, u2. An approved plan is not a derivable one: it is whatever the
+# learner read and said yes to, which is a plan somebody may have regenerated
+# against a note. A handler that checked the approval and then recomputed the
+# plan would pass every other test in this class and fail
+# `test_the_plan_that_runs_is_the_one_that_was_approved`.
 BUILD_PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
               "widget_concept": "The compiler refuses rather than guesses.",
-              "exercise_unit": "u2", "quiz": True, "bank": True}
+              "exercise_unit": "u1", "quiz": True, "bank": True}
 APPROVAL = {"plan": BUILD_PLAN, "estimate_usd": "1.37"}
 
 # The five roles a full phase-1 build buys, in the order build_phase runs
@@ -813,6 +821,64 @@ class BuildStageTest(WorkerFixture):
         # path there is. The plan approved is the plan that ran.
         self.assertEqual(self.token_rows(), BUILD_ROLES)
         self.assertEqual(sorted(r for r, _ in send.calls), BUILD_ROLES)
+
+    def test_the_plan_that_runs_is_the_one_that_was_approved(self):
+        # Not a plan derived again from the draft: `BUILD_PLAN` puts the
+        # exercise on u1 and `default_build_plan` would put it on u2, so the
+        # unit in the exercise-author's prompt is which of the two the stage
+        # believed. What the learner read at the gate is what gets bought,
+        # and an approval is not a licence to build something else.
+        manifest, _ = compile_draft(self.draft_root())
+        self.assertEqual(factory.default_build_plan(manifest)["exercise_unit"],
+                         "u2")
+        self.assertEqual(BUILD_PLAN["exercise_unit"], "u1")
+
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        send = FakeBuildSend()
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        self.assertEqual(self.kinds()[-1], "build_ready")
+        exercise = send.prompt("exercise-author")
+        self.assertIn("## Unit 1: What a manifest is", exercise)
+        self.assertNotIn("What the compiler refuses", exercise)
+        # And the material it registers is unit 1's, which is the same
+        # decision read off the other end of the stage.
+        self.assertTrue(os.path.isdir(
+            os.path.join(self.phase_draft(), "exercises")))
+        ids = [a["material"].get("id") for a in self.checkpoint()["artifacts"]]
+        self.assertIn("x-u01", ids)
+
+    def test_an_approval_of_another_course_approves_nothing_here(self):
+        # One tenant, two courses, and an approval on the wrong one. O3 asks
+        # for an approval of *this* course's outline: a fold read without
+        # that filter would find a live approval two rows away and build a
+        # course nobody said yes to, on the money of one they did.
+        other = "greek-201"
+        self.at_the_gate(approved=False)
+        with self.engine.begin() as conn:
+            for kind, payload in (("scope_saved", {"title": "Greek"}),
+                                  ("outline_ready", APPROVAL),
+                                  ("outline_approved", APPROVAL),
+                                  ("build_requested", {})):
+                onboarding.append_event(conn, self.scope, kind, other, payload)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "unapproved"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("build_failed", "unapproved"))
+        self.assertEqual(self.token_rows(), [])
+        # And the course that really was approved is untouched by the
+        # refusal: nothing was appended to it and nothing built for it.
+        self.assertEqual([k for k, _ in self.ledger(self.tenant, other)],
+                         ["scope_saved", "outline_ready", "outline_approved",
+                          "build_requested"])
+        self.assertFalse(os.path.exists(self.phase_draft()))
 
     def test_a_budget_refusal_is_recorded_in_the_ledgers_own_word(self):
         self.at_the_gate(approved=True)

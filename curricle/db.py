@@ -45,6 +45,26 @@ EVENT_KINDS = (
 # and must have ratified: the agent proposes, the human publishes.
 PROFILE_EVENT_KINDS = ("assert", "propose", "accept", "reject", "retract")
 
+# The onboarding vocabulary (onboarding-design.md §5): request/outcome pairs
+# for the two worker stages, the human's verbs around the outline gate, and
+# the terminal `promoted`. `promote_failed` completes the design doc's list
+# rather than changing it — the promote stage ends in a compile gate that can
+# refuse, and ledger discipline says a failure is a row like any other.
+ONBOARDING_EVENT_KINDS = (
+    "profile_published", "scope_saved",
+    "outline_requested", "outline_ready", "outline_failed",
+    "outline_approved", "outline_rejected",
+    "build_requested", "build_ready", "build_failed",
+    "promote_failed", "promoted",
+)
+
+# What a queued run can ask for, and where it can be. `noop` is a real stage:
+# slice 1 of the build order is provable with a no-op before any new role
+# exists, and a stage the worker can run without spending a token stays useful
+# long after as the end-to-end smoke test.
+RUN_STAGES = ("noop", "outline", "build", "promote")
+RUN_STATUSES = ("queued", "running", "done", "failed")
+
 tenants = sa.Table(
     "tenants", metadata,
     sa.Column("id", sa.Integer, primary_key=True),
@@ -104,11 +124,58 @@ token_ledger = sa.Table(
     sa.Index("ix_token_ledger_tenant_stage", "tenant_id", "stage"),
 )
 
+onboarding_events = sa.Table(
+    "onboarding_events", metadata,
+    # Same identity-ordered sequence as the other two ledgers: the fold
+    # orders by id, never timestamp.
+    sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
+    sa.Column("tenant_id", sa.Integer,
+              sa.ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False),
+    # The course the event belongs to. `profile_published` happens before any
+    # course exists and carries "" — a writer's rule (onboarding.py), not the
+    # database's, because a nullable column would invite three-valued reads.
+    sa.Column("course", sa.Text, nullable=False),
+    sa.Column("kind", sa.Text, nullable=False),
+    sa.Column("payload", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
+    sa.Column("created_at", sa.DateTime(timezone=True),
+              nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(
+        "kind IN " + repr(ONBOARDING_EVENT_KINDS), name="known_onboarding_kind"),
+    sa.Index("ix_onboarding_events_tenant", "tenant_id"),
+)
+
+# The worker's queue. This shape is deliberately a procrastinate job's shape —
+# the thin slice of the queue platform-design §6.1 already plans — so the
+# later migration is "point the same callers at the real queue" rather than a
+# redesign. `reason` holds a machine reason key, never prose: the wording
+# table turns it into a sentence a human reads (O2).
+factory_runs = sa.Table(
+    "factory_runs", metadata,
+    sa.Column("id", sa.BigInteger, sa.Identity(), primary_key=True),
+    sa.Column("tenant_id", sa.Integer,
+              sa.ForeignKey("tenants.id", ondelete="RESTRICT"), nullable=False),
+    sa.Column("course", sa.Text, nullable=False),
+    sa.Column("stage", sa.Text, nullable=False),
+    sa.Column("payload", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")),
+    sa.Column("status", sa.Text, nullable=False, server_default="queued"),
+    sa.Column("claimed_at", sa.DateTime(timezone=True)),
+    sa.Column("finished_at", sa.DateTime(timezone=True)),
+    sa.Column("reason", sa.Text),
+    sa.Column("created_at", sa.DateTime(timezone=True),
+              nullable=False, server_default=sa.func.now()),
+    sa.CheckConstraint(
+        "stage IN " + repr(RUN_STAGES), name="known_run_stage"),
+    sa.CheckConstraint(
+        "status IN " + repr(RUN_STATUSES), name="known_run_status"),
+    sa.Index("ix_factory_runs_status", "status"),
+)
+
 # ---------------------------------------------------------------------------
 # T2: classification, asserted at import
 # ---------------------------------------------------------------------------
 
-TENANT_SCOPED = frozenset({"progress_events", "profile_events", "token_ledger"})
+TENANT_SCOPED = frozenset({"progress_events", "profile_events", "token_ledger",
+                           "onboarding_events", "factory_runs"})
 TENANT_LESS = frozenset({"tenants"})
 
 _all_tables = frozenset(metadata.tables)
@@ -243,6 +310,41 @@ class TenantScope:
             sa.func.coalesce(sa.func.sum(token_ledger.c.cost_usd), 0)
         ).where(token_ledger.c.tenant_id == self.tenant_id,
                 token_ledger.c.stage == stage)
+
+    def onboarding_select(self) -> sa.Select:
+        return (
+            sa.select(onboarding_events.c.id, onboarding_events.c.kind,
+                      onboarding_events.c.course, onboarding_events.c.payload,
+                      onboarding_events.c.created_at)
+            .where(onboarding_events.c.tenant_id == self.tenant_id)
+            .order_by(onboarding_events.c.id)
+        )
+
+    def onboarding_insert(self, kind: str, course: str,
+                          payload: dict) -> sa.Insert:
+        return sa.insert(onboarding_events).values(
+            tenant_id=self.tenant_id, kind=kind, course=course,
+            payload=payload,
+        )
+
+    def runs_insert(self, course: str, stage: str, payload: dict) -> sa.Insert:
+        # No status: `queued` is the server default, so a request row cannot
+        # be written into some other state by a caller's typo.
+        return sa.insert(factory_runs).values(
+            tenant_id=self.tenant_id, course=course, stage=stage,
+            payload=payload,
+        )
+
+    def runs_pending(self, course: str) -> sa.Select:
+        return (
+            sa.select(factory_runs.c.id, factory_runs.c.stage,
+                      factory_runs.c.status, factory_runs.c.claimed_at,
+                      factory_runs.c.created_at)
+            .where(factory_runs.c.tenant_id == self.tenant_id,
+                   factory_runs.c.course == course,
+                   factory_runs.c.status.in_(("queued", "running")))
+            .order_by(factory_runs.c.id)
+        )
 
 
 def for_tenant(tenant_id: int) -> TenantScope:

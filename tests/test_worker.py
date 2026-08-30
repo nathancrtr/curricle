@@ -19,6 +19,7 @@ and one left running is one its startup sweep would fail.
 
 import contextlib
 import io
+import json
 import os
 import shutil
 import tempfile
@@ -31,12 +32,13 @@ import sqlalchemy as sa
 from curricle import coursehome, db, factory, llm, onboarding, profile, worker
 
 from pg import test_engine
-# The outline stage's own fixtures: a scripted transport for its two roles,
-# and the artifacts they answer with. Reused rather than re-canned, so a
-# change to what a clean outline looks like arrives here too.
+# The outline and build stages' own fixtures: scripted transports for their
+# roles, and the artifacts those roles answer with. Reused rather than
+# re-canned, so a change to what a clean outline or a valid lesson looks
+# like arrives here too.
 from test_factory import (
-    BROKEN_SIDECAR, GOOD_CURRICULUM, GOOD_SHELF, SCOPE, FakeOutlineSend,
-    designer_json,
+    BROKEN_SIDECAR, GOOD_CURRICULUM, GOOD_SHELF, GOOD_SIDECAR, SCOPE,
+    FakeBuildSend, FakeOutlineSend, compile_draft, designer_json,
 )
 
 OUTLINE = {"plan": {"phases": [{"id": "p1", "title": "Phase 1"}]},
@@ -61,6 +63,28 @@ PROFILE_CLAIM = ("Learns by implementing — pair every abstract idea with "
 # A reviewer's note, the kind Stop 8's rejection leaves behind.
 FOLD_NOTE = "Too many weeks — I have four, not eight."
 RUN_NOTE = "Start from the lexer, not from grammars."
+
+# The plan the ledger carries for the tiny-demo draft, spelled out rather
+# than recomputed: these are `BuildSpec`'s own field names, and a build
+# handler that had to translate any of them would fail this fixture before
+# it failed anything else.
+#
+# `exercise_unit` deliberately disagrees with what `default_build_plan`
+# derives for this draft — it would put the exercise on the phase's last
+# unit, u2. An approved plan is not a derivable one: it is whatever the
+# learner read and said yes to, which is a plan somebody may have regenerated
+# against a note. A handler that checked the approval and then recomputed the
+# plan would pass every other test in this class and fail
+# `test_the_plan_that_runs_is_the_one_that_was_approved`.
+BUILD_PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
+              "widget_concept": "The compiler refuses rather than guesses.",
+              "exercise_unit": "u1", "quiz": True, "bank": True}
+APPROVAL = {"plan": BUILD_PLAN, "estimate_usd": "1.37"}
+
+# The five roles a full phase-1 build buys, in the order build_phase runs
+# them — the L2 assertion's expected value, read off the token ledger.
+BUILD_ROLES = ["bank-author", "exercise-author", "lesson-writer",
+               "quiz-author", "widget-builder"]
 
 
 def session(engine):
@@ -549,6 +573,441 @@ class OutlineStageTest(WorkerFixture):
         (_, payload), = [e for e in self.ledger(self.a, "homeless")
                          if e[0] != "scope_saved"]
         self.assertIn(coursehome.ENV_DIR, payload["detail"])
+
+
+class BankFailsSend(FakeBuildSend):
+    """The build's transport with its last artifact refused.
+
+    The bank comes back as prose, which `validate_bank` throws away and the
+    stage reports as `validation_failed`. Everything before it was already
+    checkpointed into the draft, which is what makes this the fixture for
+    the retry: a half-finished build is not a hypothetical state here, it is
+    the one this transport leaves behind.
+    """
+
+    def __call__(self, model, system, prompt, max_tokens):
+        text, usage = super().__call__(model, system, prompt, max_tokens)
+        if self.calls[-1][0] == "bank-author":
+            return "Sure! Here is a question bank for phase 1.", usage
+        return text, usage
+
+
+class BrokeRunner:
+    """A runner whose every role refuses in money's vocabulary.
+
+    Not a `Runner` with a scripted transport, because `BudgetExceeded` is
+    raised *before* the transport is reached — the refusal being tested is
+    the one that happens instead of a call, not one that happens during it.
+    """
+
+    def run_role(self, role_name, prompt, max_tokens=32000):
+        raise llm.BudgetExceeded(
+            f"{role_name}: stage budget spent ($0.50 of $0.50)")
+
+
+class BuildStageTest(WorkerFixture):
+    """Stop 9: the real build handler over a planted draft and a fake model.
+
+    The draft tree is the tiny-demo outline the factory's own suite compiles,
+    written where the outline stage would have left it — the build stage
+    reads a course off disk and there is no honest way to hand it one. Its
+    plan is spelled out in `BUILD_PLAN` rather than recomputed, because what
+    is under test is that the *approved* plan is what runs.
+
+    The helpers here mirror the outline stage's above and are deliberately
+    not shared with them: the two stages want different fixtures (that one
+    creates a draft, this one is given one), and a base class over both
+    would be a fixture nobody could read in one place.
+
+    No network and no key, ever: the runner arrives through
+    `worker.RUNNER_FACTORY`, and `CURRICLE_COURSES_DIR` is patched in every
+    test so the suite can never write into a real courses home.
+    """
+
+    COURSE = "tiny-demo"
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="curricle-build-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        patched = mock.patch.dict(os.environ, {coursehome.ENV_DIR: self.tmp})
+        patched.start()
+        self.addCleanup(patched.stop)
+        # A tenant per test: the course id is the sidecar's own, so two tests
+        # building `tiny-demo` would otherwise share one flow. The queue is
+        # retired per test rather than per class for the same reason the
+        # fixture retires it at all — a successful build leaves a `promote`
+        # run queued behind it, and the next test's worker would claim that
+        # one instead of its own.
+        with self.engine.begin() as conn:
+            conn.execute(sa.update(db.factory_runs)
+                         .where(db.factory_runs.c.status.in_(("queued",
+                                                              "running")))
+                         .values(status="done", finished_at=sa.func.now()))
+            self.tenant = db.create_tenant(conn, f"worker-build-{self.id()}")
+        self.scope = db.for_tenant(self.tenant)
+        self.plant()
+
+    def draft_root(self) -> str:
+        return os.path.join(self.tmp, self.COURSE, worker.DRAFT_DIR)
+
+    def content_root(self) -> str:
+        return os.path.join(self.draft_root(), "learning")
+
+    def phase_draft(self) -> str:
+        return os.path.join(self.content_root(), "interactive", ".draft-p1")
+
+    def plant(self) -> None:
+        """The compiled outline the gate approved, where the stage looks."""
+        os.makedirs(os.path.join(self.draft_root(), "learning"))
+        for rel, body in zip(factory.OUTLINE_FILES,
+                             (GOOD_CURRICULUM, GOOD_SIDECAR, GOOD_SHELF)):
+            with open(os.path.join(self.draft_root(), rel), "w",
+                      encoding="utf-8") as f:
+                f.write(body)
+
+    def at_the_gate(self, *, approved: bool) -> None:
+        """The fold of a tenant who reached Stop 8, and maybe answered it.
+
+        The approval echoes the `outline_ready` payload rather than
+        inventing one, exactly as the gate's own route does: O3 says the row
+        carries the plan and the number the learner was shown.
+        """
+        rows = [("profile_published", "", {}),
+                ("scope_saved", self.COURSE, dict(SCOPE, title="Tiny demo")),
+                ("outline_requested", self.COURSE, {}),
+                ("outline_ready", self.COURSE, APPROVAL)]
+        if approved:
+            rows += [("outline_approved", self.COURSE, APPROVAL),
+                     ("build_requested", self.COURSE, {})]
+        with self.engine.begin() as conn:
+            for kind, course, payload in rows:
+                onboarding.append_event(conn, self.scope, kind, course, payload)
+
+    def with_send(self, send):
+        """`worker.RUNNER_FACTORY`, answering with a scripted transport."""
+        return mock.patch.object(
+            worker, "RUNNER_FACTORY",
+            lambda engine, scope: llm.Runner(engine, scope, send=send))
+
+    def with_runner(self, runner):
+        return mock.patch.object(worker, "RUNNER_FACTORY",
+                                 lambda engine, scope: runner)
+
+    def no_runner(self):
+        """A factory that fails the test if a stage asks for a model at all."""
+        def never(engine, scope):
+            raise AssertionError("this run had nothing it was allowed to buy")
+        return mock.patch.object(worker, "RUNNER_FACTORY", never)
+
+    def token_rows(self) -> list[str]:
+        with self.engine.begin() as conn:
+            return sorted(conn.execute(
+                sa.select(db.token_ledger.c.stage)
+                .where(db.token_ledger.c.tenant_id == self.tenant)).scalars())
+
+    def kinds(self) -> list[str]:
+        return [k for k, _ in self.ledger(self.tenant, self.COURSE)]
+
+    def checkpoint(self) -> dict:
+        with open(os.path.join(self.phase_draft(), "manifest.json")) as f:
+            return json.load(f)
+
+    def stage_and_status(self) -> tuple[str, str]:
+        with self.engine.begin() as conn:
+            flow = onboarding.load_state(conn, self.scope).flows[self.COURSE]
+        return flow.stage, flow.status
+
+    # ---- O3: no token is spent without an approval above it -------------
+
+    def test_o3_a_build_with_no_approval_on_file_spends_nothing(self):
+        # Invariant O3, in its falsifiable form: the course has an outline
+        # waiting at the gate and nobody has answered it, so the stage stops
+        # before a runner is built — and the tenant's token ledger, the only
+        # record of money, stays empty.
+        self.at_the_gate(approved=False)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "unapproved"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("build_failed", "unapproved"))
+        self.assertEqual(self.token_rows(), [])
+        self.assertFalse(os.path.exists(self.phase_draft()))
+        # O2: the screen has a sentence for it.
+        self.assertIn(("build", "unapproved"), onboarding.WORDING)
+
+    def test_o3_an_approval_of_a_since_redrafted_outline_spends_nothing(self):
+        # Approve, then reject and redraft: the approval is older than the
+        # outline now on the table, so it is an approval of something the
+        # learner has already sent back. O3 is enforced by ledger order
+        # rather than by trusting whoever queued the run.
+        self.at_the_gate(approved=True)
+        with self.engine.begin() as conn:
+            for kind, payload in (("outline_rejected", {"note": FOLD_NOTE}),
+                                  ("outline_requested", {"note": FOLD_NOTE}),
+                                  ("outline_ready", APPROVAL)):
+                onboarding.append_event(conn, self.scope, kind, self.COURSE,
+                                        payload)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "unapproved"))
+        self.assertEqual(self.kinds()[-1], "build_failed")
+        self.assertEqual(self.token_rows(), [])
+
+    def test_o3_an_approval_without_the_number_shown_is_not_one(self):
+        # The ledger accepts an `outline_approved` carrying no plan (only
+        # the estimate is validated there), so the stage checks for itself:
+        # a row that cannot say what was approved is not evidence anybody
+        # approved it, and nothing is bought on it.
+        self.at_the_gate(approved=False)
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, self.scope, "outline_approved",
+                                    self.COURSE, {"estimate_usd": "1.37"})
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "unapproved"))
+        self.assertEqual(self.token_rows(), [])
+
+    # ---- the approved build, and what it leaves behind -------------------
+
+    def test_an_approved_build_lands_in_the_draft_and_queues_the_promotion(self):
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        send = FakeBuildSend()
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        build, promote = self.runs(self.tenant)
+        self.assertEqual((build.stage, build.status, build.reason),
+                         ("build", "done", None))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual(kind, "build_ready")
+        # The artifacts as the fold will read them: a path each, and the
+        # bank's own note, because a bank section is appended to somebody
+        # else's file rather than moved into place as one.
+        self.assertIn("interactive/lessons/unit-01-lesson.md",
+                      payload["artifacts"])
+        self.assertIn("interactive/quizzes/phase-1-checkpoint.html",
+                      payload["artifacts"])
+        self.assertIn("append to question bank", payload["artifacts"])
+        self.assertEqual(len(payload["artifacts"]), 5)
+        self.assertEqual(sorted(payload["costs"]), BUILD_ROLES)
+
+        # Drafts land in `interactive/.draft-pN/` and nothing in this stage
+        # writes anywhere else: the course tree is promotion's business.
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.phase_draft(), "manifest.json")))
+        self.assertEqual(
+            os.listdir(os.path.join(self.content_root(), "interactive")),
+            [".draft-p1"])
+
+        # Straight on to Stop 10, with no human turn in between: the promote
+        # run is queued in the same transaction as the outcome that caused
+        # it, so the fold and the queue cannot disagree about what is next.
+        self.assertEqual((promote.stage, promote.status),
+                         ("promote", "queued"))
+        self.assertEqual(self.stage_and_status(), ("promote", "pending"))
+
+        # L2: every call is metered under its role's name, through the one
+        # path there is. The plan approved is the plan that ran.
+        self.assertEqual(self.token_rows(), BUILD_ROLES)
+        self.assertEqual(sorted(r for r, _ in send.calls), BUILD_ROLES)
+
+    def test_the_plan_that_runs_is_the_one_that_was_approved(self):
+        # Not a plan derived again from the draft: `BUILD_PLAN` puts the
+        # exercise on u1 and `default_build_plan` would put it on u2, so the
+        # unit in the exercise-author's prompt is which of the two the stage
+        # believed. What the learner read at the gate is what gets bought,
+        # and an approval is not a licence to build something else.
+        manifest, _ = compile_draft(self.draft_root())
+        self.assertEqual(factory.default_build_plan(manifest)["exercise_unit"],
+                         "u2")
+        self.assertEqual(BUILD_PLAN["exercise_unit"], "u1")
+
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        send = FakeBuildSend()
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        self.assertEqual(self.kinds()[-1], "build_ready")
+        exercise = send.prompt("exercise-author")
+        self.assertIn("## Unit 1: What a manifest is", exercise)
+        self.assertNotIn("What the compiler refuses", exercise)
+        # And the material it registers is unit 1's, which is the same
+        # decision read off the other end of the stage.
+        self.assertTrue(os.path.isdir(
+            os.path.join(self.phase_draft(), "exercises")))
+        ids = [a["material"].get("id") for a in self.checkpoint()["artifacts"]]
+        self.assertIn("x-u01", ids)
+
+    def test_an_approval_of_another_course_approves_nothing_here(self):
+        # One tenant, two courses, and an approval on the wrong one. O3 asks
+        # for an approval of *this* course's outline: a fold read without
+        # that filter would find a live approval two rows away and build a
+        # course nobody said yes to, on the money of one they did.
+        other = "greek-201"
+        self.at_the_gate(approved=False)
+        with self.engine.begin() as conn:
+            for kind, payload in (("scope_saved", {"title": "Greek"}),
+                                  ("outline_ready", APPROVAL),
+                                  ("outline_approved", APPROVAL),
+                                  ("build_requested", {})):
+                onboarding.append_event(conn, self.scope, kind, other, payload)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "unapproved"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("build_failed", "unapproved"))
+        self.assertEqual(self.token_rows(), [])
+        # And the course that really was approved is untouched by the
+        # refusal: nothing was appended to it and nothing built for it.
+        self.assertEqual([k for k, _ in self.ledger(self.tenant, other)],
+                         ["scope_saved", "outline_ready", "outline_approved",
+                          "build_requested"])
+        self.assertFalse(os.path.exists(self.phase_draft()))
+
+    def test_a_budget_refusal_is_recorded_in_the_ledgers_own_word(self):
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.with_runner(BrokeRunner()):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "budget_exceeded"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("build_failed", "budget_exceeded"))
+        self.assertIn("stage budget spent", payload["detail"])
+        # Nothing chains off a failure: the promotion is not queued behind a
+        # build that bought nothing.
+        self.assertEqual([r.stage for r in self.runs(self.tenant)], ["build"])
+        self.assertEqual(self.stage_and_status(), ("build", "failed"))
+
+    def test_a_dirty_draft_is_refused_rather_than_built_against(self):
+        # The draft compiled when it was drafted and again when the gate drew
+        # it; a sidecar that does not compile now has been edited or lost
+        # since, and nothing is generated against a tree the compiler will
+        # not vouch for.
+        self.at_the_gate(approved=True)
+        with open(os.path.join(self.draft_root(), factory.OUTLINE_FILES[1]),
+                  "w", encoding="utf-8") as f:
+            f.write(BROKEN_SIDECAR)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", "compile_failed"))
+        _, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertIn("u9", payload["detail"])          # operator's copy
+        self.assertEqual(self.token_rows(), [])
+
+    def test_a_refused_artifact_stops_the_build_and_the_retry_resumes(self):
+        # The retry path, pinned end to end. The first run buys four
+        # artifacts and has the fifth refused; the second buys the fifth and
+        # nothing else, because `build_phase` checkpointed the rest into the
+        # draft and the handler strikes them out of the approved plan.
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.with_send(BankFailsSend()):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason),
+                         ("failed", "validation_failed"))
+        self.assertEqual(self.kinds()[-1], "build_failed")
+        self.assertEqual(len(self.checkpoint()["artifacts"]), 4)
+
+        # The wizard's retry button, spelled as the route spells it: a
+        # request row and a run, and not a second approval.
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, self.scope, "build_requested",
+                                    self.COURSE, {})
+        self.enqueue(self.tenant, self.COURSE, "build")
+        send = FakeBuildSend()
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+
+        self.assertEqual([r for r, _ in send.calls], ["bank-author"])
+        second = [r for r in self.runs(self.tenant) if r.stage == "build"][1]
+        self.assertEqual((second.status, second.reason), ("done", None))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["artifacts"]),
+                         ("build_ready", ["append to question bank"]))
+        # The four kept artifacts were not bought again — the money, not the
+        # files, is what the resume is for.
+        self.assertEqual(self.token_rows().count("lesson-writer"), 1)
+        self.assertEqual(len(self.checkpoint()["artifacts"]), 5)
+
+    # ---- the approve gate's race, closed on the worker's side -----------
+
+    def test_two_approvals_from_two_tabs_build_and_bill_once(self):
+        # The TOCTOU: both tabs read a flow waiting at the gate, both write
+        # an approval and queue a build. O3's letter holds for each of them
+        # and its intent — one decision, one spend — is what this keeps: the
+        # second run is superseded rather than run, with nothing appended.
+        self.at_the_gate(approved=True)
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, self.scope, "outline_approved",
+                                    self.COURSE, APPROVAL)
+            onboarding.append_event(conn, self.scope, "build_requested",
+                                    self.COURSE, {})
+        self.enqueue(self.tenant, self.COURSE, "build")
+        self.enqueue(self.tenant, self.COURSE, "build")
+
+        send = FakeBuildSend()
+        with self.with_send(send):
+            self.assertTrue(worker.run_once(self.engine))
+            self.assertTrue(worker.run_once(self.engine))
+
+        first, second, promote = self.runs(self.tenant)
+        self.assertEqual((first.status, first.reason), ("done", None))
+        self.assertEqual((second.status, second.reason), ("done", "superseded"))
+        self.assertEqual((promote.stage, promote.status), ("promote", "queued"))
+        # One build, one promotion, one set of five calls.
+        self.assertEqual(self.kinds().count("build_ready"), 1)
+        self.assertEqual(sorted(r for r, _ in send.calls), BUILD_ROLES)
+
+    def test_a_build_beside_one_a_worker_already_took_is_superseded(self):
+        # The same guard one step earlier, for the window before the winner
+        # has moved the fold: a sibling build is `running`, so this run has
+        # nothing of its own to buy and says nothing in the ledger about it.
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with self.engine.begin() as conn:
+            live = conn.execute(
+                sa.select(db.factory_runs.c.id)
+                .where(db.factory_runs.c.tenant_id == self.tenant)
+                .order_by(db.factory_runs.c.id)).scalars().first()
+            conn.execute(sa.update(db.factory_runs)
+                         .where(db.factory_runs.c.id == live)
+                         .values(status="running", claimed_at=sa.func.now()))
+
+        with self.no_runner():
+            self.assertTrue(worker.run_once(self.engine))
+
+        rows = self.runs(self.tenant)
+        self.assertEqual([(r.stage, r.status, r.reason) for r in rows],
+                         [("build", "running", None),
+                          ("build", "done", "superseded")])
+        self.assertNotIn("build_ready", self.kinds())
+        self.assertNotIn("build_failed", self.kinds())
+        self.assertEqual(self.token_rows(), [])
 
 
 class LivenessTest(WorkerFixture):

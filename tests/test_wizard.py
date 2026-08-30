@@ -879,6 +879,149 @@ class OutlineApproveTest(GateFixture):
                          [("build", "queued")])
 
 
+class BuildFailedTest(WizardFixture):
+    """Stop 9's failed face, and the button that carries on rather than starts.
+
+    The fold is a whole approved flow, because the retry's promise depends
+    on what is upstream of the failure: an approval that still stands, and a
+    draft holding whatever the stopped run had already finished. Nothing
+    here reads the draft — the screen is the ledger's, like every other one
+    — but the sentences it prints are only true of that shape.
+    """
+
+    COURSE = "greek-107"
+    REASON = "validation_failed"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_requested", {}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_requested", {}),
+                    ("build_failed", {"reason": cls.REASON,
+                                      "detail": "ValidationFailed: quiz "
+                                                "question 3 has no why"})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def runs(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.runs_pending(self.COURSE)))
+
+    # Named to run before the retry below: the retry moves this fixture's
+    # ledger on, and the failed screen exists only until it does.
+    def test_a_stopped_build_says_why_and_offers_to_carry_on(self):
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["build"], page)
+        self.assertIn(onboarding.WORDING[("build", self.REASON)], page)
+        self.assertIn('action="/onboarding/build/retry"', page)
+        self.assertIn(wizard.BUILD_RETRY_ASIDE, page)
+        self.assertIn(wizard.FAILED_WORD, page)
+        # O2: neither the machine's word for what happened nor the exception
+        # behind it reaches the page. Both are in the row, for an operator.
+        self.assertNotIn(self.REASON, page)
+        self.assertNotIn("ValidationFailed", page)
+        self.assertNotIn(wizard.META_REFRESH, page)
+        # And no second approval is asked for: the row upstream still stands.
+        self.assertNotIn('action="/onboarding/outline/approve"', page)
+
+    def test_the_button_is_the_scheduler_and_asks_for_no_new_approval(self):
+        self.assertEqual(self.runs(), [])
+        retried = self.client.post("/onboarding/build/retry",
+                                   follow_redirects=False)
+        self.assertEqual(retried.status_code, 303, retried.text)
+        self.assertEqual(retried.headers["location"], "/onboarding/")
+
+        # One request row and one run — and no `outline_approved`, because
+        # O3 is satisfied by the approval already in the ledger and a run
+        # that stopped did not spend it.
+        requested = self.onboarding_rows()[-1]
+        self.assertEqual((requested.kind, requested.payload),
+                         ("build_requested", {}))
+        self.assertEqual([r.kind for r in self.onboarding_rows()]
+                         .count("outline_approved"), 1)
+        self.assertEqual([(r.stage, r.status) for r in self.runs()],
+                         [("build", "queued")])
+
+        # A machine's turn again, so the screen says so — and a second press
+        # is refused, because there is no longer a stopped build to resume.
+        self.assertEqual(self.current_stop(), "build")
+        page = self.screen()
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn(wizard.META_REFRESH, page)
+        self.assertNotIn("/onboarding/build/retry", page)
+        again = self.client.post("/onboarding/build/retry",
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+
+
+class BuildRetryBeforeTheBuildTest(GateFixture):
+    """A build retry from a flow that is not at a stopped build at all."""
+
+    COURSE = "tinylang"
+
+    def test_a_retry_at_the_gate_is_refused_and_writes_nothing(self):
+        refused = self.client.post("/onboarding/build/retry",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual([r.kind for r in self.onboarding_rows()]
+                         .count("build_requested"), 0)
+        self.assertEqual(self.queued(), [])
+
+
+class PromotePendingTest(WizardFixture):
+    """Stop 10's pending face: no second gate, and nothing forecast.
+
+    Design §4 put no human turn between the build and the publication, so
+    this screen has no ask on it — a button here would be a decision the
+    learner already took at the outline gate being asked for twice.
+    """
+
+    COURSE = "greek-108"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_requested", {}),
+                    ("build_ready", {"artifacts": ["interactive/x"],
+                                     "costs": {"lesson-writer": "$0.02"}})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def test_the_publishing_screen_waits_and_asks_for_nothing(self):
+        self.assertEqual(self.current_stop(), "promote")
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["promote"], page)
+        self.assertIn("Installing your course", page)
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn("seconds elapsed", page)      # elapsed, not a forecast
+        self.assertIn(wizard.META_REFRESH, page)
+        self.assertNotIn("This screen is still being built", page)
+        self.assertNotIn("<button", page)
+        # Nothing from the build's payload is on it: this stop reports
+        # position, and the artifacts are the next screen's business.
+        self.assertNotIn("interactive/x", page)
+
+
 class OutlineRejectTest(GateFixture):
     """Rejecting: two rows carrying the note, and Stop 7 again."""
 

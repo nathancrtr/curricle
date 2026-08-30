@@ -283,20 +283,65 @@ def validate_bank(text: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Quiz shell: reuse the course's existing checkpoint HTML, swap the data
+# and the identity — which quiz this is, and which quiz it reports as
 # ---------------------------------------------------------------------------
 
 QUIZ_DATA_RE = re.compile(r"const QUIZ_DATA = \[.*?\n\];", re.S)
 
+# The shim call the finished quiz reports through. Its first argument is the
+# material id the events API validates the POST against, so a shell copied
+# from another quiz reports under that quiz's id: an unknown id 422s and the
+# result never reaches the ledger, a *known* one lands on the wrong quiz.
+CHECKPOINT_CALL_RE = re.compile(r"""(curricle\.checkpoint\(\s*)(["'])[^"']*\2""")
+
+TITLE_RE = re.compile(r"<title>.*?</title>", re.S)
+
+# The house shell's own subject-matter copy — tinylang's, since that is where
+# the shell was curated from. Neutralised only when the shell *is* the house
+# shell: a course's own checkpoint page keeps its voice, and only its id is
+# rewritten.
+HOUSE_INTRO_RE = re.compile(r"Eight questions on lexing and parsing\.")
+HOUSE_OUTRO_RE = re.compile(r"On to Phase \d+\.")
+
 
 def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
-                     old_phase_num: int) -> str:
+                     old_phase_num: int, *, material_id: str,
+                     course_title: str) -> str:
+    """The shell wearing the identity of the quiz actually being built.
+
+    Everything the page says about *which* quiz this is came from the page it
+    was copied from, so all of it is rewritten: the checkpoint id (the
+    load-bearing one), the title, and every "Phase N" in the chrome, in either
+    case — the eyebrow spells it lowercase. A shell with no checkpoint call is
+    refused rather than shipped mute: a quiz whose result reaches no one is
+    not a checkpoint.
+
+    The data swap goes last so that none of the chrome rewriting reaches the
+    generated questions — a phase-2 quiz is entitled to mention phase 1.
+    """
+    page, calls = CHECKPOINT_CALL_RE.subn(
+        lambda m: m.group(1) + json.dumps(material_id), shell)
+    if not calls:
+        raise ValidationFailed("quiz shell has no curricle.checkpoint call to "
+                               "retarget — its results would reach no one")
+    title = f"Phase {phase_num} Checkpoint — {course_title}"
+    page = TITLE_RE.sub(lambda m: f"<title>{title}</title>", page, count=1)
+    page = re.sub(rf"(?i)\b(phase)\s+{old_phase_num}\b",
+                  lambda m: f"{m.group(1)} {phase_num}", page)
+    if shell == house_exemplar("quiz"):
+        page = HOUSE_INTRO_RE.sub(
+            f"{len(questions)} questions on this phase's material.",
+            page, count=1)
+        page = HOUSE_OUTRO_RE.sub(f"On to Phase {phase_num + 1}.",
+                                  page, count=1)
+
     js_items = ",\n".join(json.dumps(q, ensure_ascii=False, indent=2)
                           for q in questions)
-    replaced = QUIZ_DATA_RE.sub(f"const QUIZ_DATA = [\n{js_items}\n];",
-                                shell, count=1)
-    if replaced == shell:
+    page, swapped = QUIZ_DATA_RE.subn(
+        lambda m: f"const QUIZ_DATA = [\n{js_items}\n];", page, count=1)
+    if not swapped:
         raise ValidationFailed("quiz shell has no QUIZ_DATA block to replace")
-    return replaced.replace(f"Phase {old_phase_num}", f"Phase {phase_num}")
+    return page
 
 
 # ---------------------------------------------------------------------------
@@ -844,12 +889,18 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             ("phase", phase_context),
             ("exemplar_questions", _quiz_exemplar(shell)),
         ]))
-        html = render_quiz_html(shell, questions, phase.num, old_phase)
+        # One id, spelled once: the page reports under exactly the material
+        # the promote step registers, or the POST is refused (or, worse,
+        # accepted against some other phase's quiz).
+        quiz_id = f"q-phase-{phase.num}"
+        html = render_quiz_html(shell, questions, phase.num, old_phase,
+                                material_id=quiz_id,
+                                course_title=manifest.course.title)
         rel = f"quizzes/phase-{phase.num}-checkpoint.html"
         save(rel, html)
         report.artifacts.append(Artifact(
             role="quiz-author", rel_path=f"interactive/{rel}", content=html,
-            material={"id": f"q-phase-{phase.num}", "kind": "quiz",
+            material={"id": quiz_id, "kind": "quiz",
                       "title": f"Phase {phase.num} checkpoint",
                       "path": f"interactive/{rel}", "phase_num": phase.num}))
         checkpoint()

@@ -27,7 +27,10 @@ You will receive:
   Match its structure: the tier intro, `## Tier N — Name` sections, `###`
   headings per resource, the italic citation line, the `→ <url>` line, the
   essay, and the optional `**Access:**` and `**Read it as:**` lines. Close
-  with the reading order and the version footer.
+  with the reading order and the version footer. Copy its structure, not its
+  claims: its footer notes a date on which its entries were verified
+  reachable, and yours may not — close with the dated version footer alone,
+  claiming no verification and no freshness.
 
 House rules:
 

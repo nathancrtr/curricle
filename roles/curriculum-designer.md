@@ -62,18 +62,32 @@ steps, resources, tracks, milestones — and never carries prose. Every key is
 loaded strictly: an unknown one is a hard failure, so use only keys the
 exemplar uses.
 
-- `course:` takes the given id, the scope's title and mode, `hours_per_week`,
-  `docs` pointing at the two files you are writing, a `description`, and a
-  `capstone` naming the final unit.
+- `course:` takes the given id, the scope's title and mode, a `description`,
+  and a `capstone` naming the final unit. `hours_per_week` is always a
+  two-element `[low, high]` list, even when the scope names one number
+  (`[4, 4]`) — the loader reads both ends, and a bare number crashes it
+  rather than earning a finding you can fix.
+- `docs:` names documents, never the sidecar itself. Write exactly two
+  entries: `curriculum_doc: learning/curriculum.md`, the file you are
+  writing, and `resources_doc: learning/learning-resources.md`, the file the
+  `resource-curator` role will write next. Omit `readme` — no README exists
+  at outline time. (The exemplar carries a third entry because its course is
+  finished; yours has two.)
 - `units:` has one entry per `### Unit N` header, `id: uN` matching `num: N`,
   a one-sentence `gloss` (the hub and gallery rows print it), and
-  `depends_on` naming earlier units. Ids are forever: a unit in the sidecar
-  with no matching header, or a header with no sidecar entry, is a refusal.
-  A Phase 0 written as bullets under the phase header rather than as a
-  `### Unit` gets `phase_body: true`, exactly as the exemplar does it.
+  `depends_on` naming earlier units. Ids are forever. A sidecar unit whose
+  number no header claims is a compile error; a header with no sidecar entry
+  is a warning — the id gets minted and the unit goes glossless, which is a
+  worse course, so write the entry. A Phase 0 written as bullets under the
+  phase header rather than as a `### Unit` gets `phase_body: true`, exactly
+  as the exemplar does it.
 - `tracks:` only if the scope genuinely carries a second thread on its own
   clock. Its `row_labels` must match the unit rows you wrote, and its
   `checkpoint_labels` the checkpoint spans, or the labels dangle.
+- `resource_tiers:` declares the tiers by `num`, `name`, and `role` — the
+  core path, the second voice, the reference. Declare them: the curator
+  writes its shelf in `## Tier N — Name` sections, and the review page the
+  learner approves renders the shelf by tier.
 - `resources:` is the shelf: one entry per key you referenced, with `key`,
   `tier`, `title`, `cite`, `formats` (from `TEXT, CODE, VIDEO, PAPER, TOOL,
   DATA`), `cost`, `free`, `links`, and a `why_this_one`. A `res:` key with no

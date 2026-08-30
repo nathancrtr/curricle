@@ -204,9 +204,13 @@ class OutlineRolesTest(unittest.TestCase):
             self.assertEqual(self.config.budget_for_stage(name), default)
             # The tier mapping lives in models.yaml alone; a contract that
             # named a model or a price would be a second place to change.
-            body = load_role(name).system
+            # The whole file, frontmatter included — a model named in
+            # `mission:` is as much a second place as one in the body.
+            with open(os.path.join(llm.roles_dir(), f"{name}.md"),
+                      encoding="utf-8") as f:
+                text = f.read()
             for leak in (*self.config.tiers.values(), *self.config.prices):
-                self.assertNotIn(leak, body)
+                self.assertNotIn(leak, text)
 
     def test_bodies_name_their_prompt_sections(self):
         designer = load_role("curriculum-designer").system

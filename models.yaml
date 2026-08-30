@@ -21,6 +21,8 @@ roles:
   exercise-author: premium
   widget-builder: premium
   bank-author: premium
+  curriculum-designer: premium
+  resource-curator: premium
 
 # USD budget per tenant per stage (stage = role name). The runner refuses
 # a call once the ledger shows the stage's spend at or beyond its budget.

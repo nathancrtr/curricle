@@ -6,7 +6,6 @@ tests must fail against its stub, a widget must be offline) run for real.
 
 import json
 import os
-import re
 import tempfile
 import textwrap
 import unittest
@@ -23,14 +22,36 @@ from corpuspaths import HAVE_ML, ML_ROOT
 from pg import test_engine
 
 
+# Question 4 names a phase on purpose: a later phase's quiz is entitled to ask
+# what an earlier one covered, in those words, and the renderer's phase
+# renumbering must never reach the model's own sentences.
 GOOD_QUIZ = json.dumps([
-    {"q": f"Question {i}?", "options": [
+    {"q": "What did Phase 1 cover?" if i == 4 else f"Question {i}?", "options": [
         {"text": "right", "correct": True, "why": "because"},
         {"text": "wrong a", "correct": False, "why": "misconception a"},
         {"text": "wrong b", "correct": False, "why": "misconception b"},
         {"text": "wrong c", "correct": False, "why": "misconception c"},
     ]} for i in range(10)
 ])
+
+# A course's own checkpoint page, the shape `read_exemplar` finds: its own
+# copy, its own title, and the phase-1 id its own phase-1 quiz reports under.
+# Rendered for a later phase it is the misattribution case — the id is stale
+# but real, so the POST succeeds against the wrong quiz.
+NATIVE_SHELL = """\
+<!DOCTYPE html>
+<title>Phase 1 Checkpoint — Some Other Course</title>
+<p class="eyebrow">phase 1 checkpoint</p>
+<h1>Phase 1 Checkpoint</h1>
+<p class="sub">Six questions on scanning. On to Phase 2.</p>
+<p class="sub">The sequel to all this arrives in Phase 12.</p>
+<script>
+const QUIZ_DATA = [
+  {q: 'old'}
+];
+curricle.checkpoint("quiz-p1", {score});
+</script>
+"""
 
 GOOD_EXERCISE = json.dumps({
     "slug": "unit-03-bpe",
@@ -230,39 +251,79 @@ class ValidatorTest(unittest.TestCase):
             factory.validate_bank("just prose")
 
     def test_quiz_shell_rendering(self):
-        shell = ("<title>Phase 1 Checkpoint</title>\n<script>\n"
-                 "const QUIZ_DATA = [\n  {q: 'old'}\n];\n</script>")
-        out = factory.render_quiz_html(shell, json.loads(GOOD_QUIZ), 2, 1)
+        out = factory.render_quiz_html(
+            NATIVE_SHELL, json.loads(GOOD_QUIZ), 2, 1,
+            material_id="q-phase-2", course_title="Tiny demo")
         self.assertIn("Phase 2 Checkpoint", out)
         self.assertIn("Question 0?", out)
         self.assertNotIn("'old'", out)
 
+    def test_a_course_native_shell_is_retargeted_but_keeps_its_voice(self):
+        """The misattribution variant: a stale id the manifest *does* know.
+
+        Reusing the course's phase-1 page for phase 2 leaves a call the events
+        API happily accepts — against the wrong quiz. The id is rewritten on
+        every shell; the course's own copy is nobody else's to rewrite.
+        """
+        out = factory.render_quiz_html(
+            NATIVE_SHELL, json.loads(GOOD_QUIZ), 2, 1,
+            material_id="q-phase-2", course_title="Tiny demo")
+        self.assertIn('curricle.checkpoint("q-phase-2",', out)
+        self.assertNotIn("quiz-p1", out)
+        self.assertIn("<title>Phase 2 Checkpoint — Tiny demo</title>", out)
+        self.assertIn("phase 2 checkpoint", out)          # the lowercase eyebrow
+        self.assertIn("Six questions on scanning. On to Phase 2.", out)  # its
+        # own copy, kept: neutralising it is the house shell's business alone.
+        # And the renumber is bounded — "Phase 1" is not a prefix of a page.
+        self.assertIn("The sequel to all this arrives in Phase 12.", out)
+
+    def test_a_shell_that_reports_nothing_is_refused(self):
+        mute = NATIVE_SHELL.replace(
+            'curricle.checkpoint("quiz-p1", {score});', "")
+        with self.assertRaises(factory.ValidationFailed) as caught:
+            factory.render_quiz_html(mute, json.loads(GOOD_QUIZ), 2, 1,
+                                     material_id="q-phase-2",
+                                     course_title="Tiny demo")
+        self.assertIn("checkpoint", str(caught.exception))
+
+    def test_a_commented_out_call_is_not_a_call(self):
+        """The shape a half-finished shell has: the report is there, disabled.
+
+        Rendering it would produce a page that looks wired up and reports
+        nothing, so the commented-out call neither satisfies the requirement
+        nor gets retargeted — and a real call on another line still does.
+        """
+        disabled = NATIVE_SHELL.replace(
+            'curricle.checkpoint("quiz-p1", {score});',
+            '// curricle.checkpoint("quiz-p1", {score});')
+        with self.assertRaises(factory.ValidationFailed):
+            factory.render_quiz_html(disabled, json.loads(GOOD_QUIZ), 2, 1,
+                                     material_id="q-phase-2",
+                                     course_title="Tiny demo")
+        out = factory.render_quiz_html(
+            disabled.replace("</script>",
+                             'curricle.checkpoint("quiz-p1", {});\n</script>'),
+            json.loads(GOOD_QUIZ), 2, 1,
+            material_id="q-phase-2", course_title="Tiny demo")
+        self.assertIn('curricle.checkpoint("q-phase-2", {});', out)
+        self.assertIn('// curricle.checkpoint("quiz-p1", {score});', out)
+
 
 # Where each house exemplar came from, relative to tinylang's `interactive/`.
-# Whole copies, so the parity test asserts equality; the bank section is a
-# slice of its source and the quiz shell a dialect rename of its own.
+# All whole copies, so the parity test is plain equality; only the bank section
+# is a slice of its source, and it is asserted by containment below. The quiz
+# shell used to be a dialect rename of its page — tinylang spelled its data
+# `QUESTIONS` and an option `{t, ok, why}` — until the page was migrated to the
+# `{text, correct, why}` the factory emits, and a transform on the way in is
+# exactly the drift a copy cannot have.
 HOUSE_SOURCES = {
     "lesson.md": "lessons/unit-01-lexer.md",
     "widget.html": "widgets/token-stream.html",
+    "quiz-shell.html": "quizzes/phase-1-checkpoint.html",
     "exercise/task.md": "exercises/unit-02-starter/task.md",
     "exercise/pratt.py": "exercises/unit-02-starter/pratt.py",
     "exercise/test_pratt.py": "exercises/unit-02-starter/test_pratt.py",
 }
-
-# tinylang's checkpoint page names its quiz data `QUESTIONS` and spells an
-# option `{t, ok, why}`; `validate_quiz` emits `{text, correct, why}` and
-# `render_quiz_html` looks for `const QUIZ_DATA`. The house shell is that page
-# with these six renames applied and nothing else changed — recorded here so
-# the parity test can recompute it, which is the drift guard the whole-copy
-# files get from plain equality.
-QUIZ_DIALECT = (
-    (r"\bQUESTIONS\b", "QUIZ_DATA"),
-    (r"\bopts\b", "options"),
-    (r"\bo\.t\b", "o.text"),
-    (r"\bo\.ok\b", "o.correct"),
-    (r"\bt: ", "text: "),
-    (r"\bok: ", "correct: "),
-)
 
 
 def tinylang_material(rel):
@@ -276,10 +337,10 @@ class HouseExemplarTest(unittest.TestCase):
     """The shipped exemplar set: what a course's *first* build is shown.
 
     Every lookup in `build_phase` reaches for the course's own earlier
-    materials and a new course has none, so each falls back here. Two things
+    materials and a new course has none, so each falls back here. Three things
     have to hold: the set is usable by the code that consumes it (the shell
-    must render, the widget must survive the widget validator), and it has not
-    drifted from the tinylang materials it was curated from.
+    must render), it passes the validators the roles it teaches are judged by,
+    and it has not drifted from the tinylang materials it was curated from.
     """
 
     def test_every_kind_returns_text_and_an_unknown_one_refuses(self):
@@ -297,18 +358,88 @@ class HouseExemplarTest(unittest.TestCase):
     def test_the_quiz_shell_is_a_shell_the_renderer_can_swap(self):
         shell = factory.house_exemplar("quiz")
         self.assertIn("const QUIZ_DATA", shell)
-        out = factory.render_quiz_html(shell, json.loads(GOOD_QUIZ), 1, 1)
+        out = factory.render_quiz_html(shell, json.loads(GOOD_QUIZ), 1, 1,
+                                       material_id="q-phase-1",
+                                       course_title="Tiny demo")
         self.assertIn("Question 0?", out)
         self.assertNotIn("Why are lexing and parsing two stages", out)
         # And the block the quiz-author is shown is the questions, not the page.
         self.assertIn("const QUIZ_DATA", factory._quiz_exemplar(shell))
 
-    def test_the_widget_would_survive_its_own_validator(self):
-        widget = factory.house_exemplar("widget")
-        # An exemplar the widget validator would refuse is an exemplar that
-        # teaches the role to write refusable widgets.
-        self.assertIsNone(factory.EXTERNAL_REF_RE.search(widget))
-        self.assertTrue(factory.validate_widget(widget))
+    def test_the_rendered_house_shell_carries_no_tinylang_identity(self):
+        """The shipped shell says "quiz-p1", "Phase 1" and "lexer" — a built
+        course inherits none of it. The id is the load-bearing one: it is what
+        the events API validates the learner's POST against, and the id the
+        build registers is `q-phase-{N}`.
+        """
+        out = factory.render_quiz_html(
+            factory.house_exemplar("quiz"), json.loads(GOOD_QUIZ), 3, 1,
+            material_id="q-phase-3", course_title="Tiny demo")
+        self.assertIn('curricle.checkpoint("q-phase-3",', out)
+        self.assertNotIn("quiz-p1", out)
+        self.assertIn("<title>Phase 3 Checkpoint — Tiny demo</title>", out)
+        self.assertNotIn("tinylang", out)
+        self.assertIn("phase 3 checkpoint", out)          # the lowercase eyebrow
+        # Both branches of the house copy are neutralised: counted intro,
+        # phase-relative pass, and a fail branch that sends the learner back to
+        # this course's materials rather than to tinylang's widget.
+        self.assertIn("10 questions on this phase's material.", out)
+        self.assertIn("On to Phase 4.", out)
+        self.assertIn("reread the misses' explanations, then revisit this "
+                      "phase's materials.", out)
+        for tinylangism in ("lexing and parsing.", "lexer",
+                            "token stream explorer"):
+            self.assertNotIn(tinylangism, out)
+        # The chrome is phase 3 throughout; the one "Phase 1" left standing is
+        # the quiz-author's own sentence, which the renderer does not edit.
+        self.assertIn("What did Phase 1 cover?", out)
+        self.assertEqual(out.count("Phase 1"), 1)
+
+    def test_a_house_descendant_is_re_neutralised_rather_than_patched(self):
+        """Phase 2 reads phase 1's *rendered page* as its shell.
+
+        That page is not the shipped file any more, so equality alone would
+        read it as a course's own voice and leave last phase's copy in place —
+        the count stale, the outro one behind, once per phase. The lineage
+        marker is what makes the second render recompute rather than patch.
+        """
+        first = factory.render_quiz_html(
+            factory.house_exemplar("quiz"), json.loads(GOOD_QUIZ), 1, 1,
+            material_id="q-phase-1", course_title="Tiny demo")
+        self.assertIn(factory.HOUSE_MARKER, first)
+        self.assertIn("10 questions on this phase's material.", first)
+        self.assertIn("On to Phase 2.", first)
+
+        second = factory.render_quiz_html(
+            first, json.loads(GOOD_QUIZ)[:8], 3, 1,
+            material_id="q-phase-3", course_title="Tiny demo")
+        self.assertEqual(second.count(factory.HOUSE_MARKER), 1)
+        self.assertIn("8 questions on this phase's material.", second)
+        self.assertNotIn("10 questions", second)
+        self.assertIn("On to Phase 4.", second)
+        self.assertNotIn("On to Phase 2.", second)
+        self.assertIn("reread the misses' explanations, then revisit this "
+                      "phase's materials.", second)
+        self.assertIn('curricle.checkpoint("q-phase-3",', second)
+
+    def test_every_exemplar_survives_the_validator_for_its_kind(self):
+        """The bar the factory enforces, met by the pages that teach it.
+
+        Each role is told to match its exemplar's format exactly, so an
+        exemplar the validator would refuse teaches the role to write refusable
+        output — and the refusal lands on a brand-new course's first build,
+        which is precisely when there is nothing else to fall back to. The
+        quiz and the exercise have no text validator of their own: the shell is
+        checked by rendering it above, the exercise by shipping red.
+        """
+        for kind, validate in (("lesson", factory.validate_lesson),
+                               ("widget", factory.validate_widget),
+                               ("bank", factory.validate_bank)):
+            with self.subTest(kind=kind):
+                self.assertTrue(validate(factory.house_exemplar(kind)))
+        # And the rule no validator can restate: widgets are offline-only.
+        self.assertIsNone(
+            factory.EXTERNAL_REF_RE.search(factory.house_exemplar("widget")))
 
     def test_the_bank_section_is_one_section(self):
         section = factory.house_exemplar("bank")
@@ -323,11 +454,6 @@ class HouseExemplarTest(unittest.TestCase):
 
         bank = tinylang_material("quizzes/question-bank.md")
         self.assertIn(factory.house_exemplar("bank"), bank)
-
-        renamed = tinylang_material("quizzes/phase-1-checkpoint.html")
-        for pattern, replacement in QUIZ_DIALECT:
-            renamed = re.sub(pattern, replacement, renamed)
-        self.assertEqual(factory.house_exemplar("quiz"), renamed)
 
 
 class ConfigLocationTest(unittest.TestCase):
@@ -937,11 +1063,22 @@ class BuildPhaseTest(unittest.TestCase):
         runner = Runner(self.engine, self.scope, send=fake_send)
         with tempfile.TemporaryDirectory() as content_root:
             os.makedirs(os.path.join(content_root, "interactive/quizzes"))
-            # A quiz shell must exist in the (temp) content root.
-            import shutil
-            shutil.copy(
-                os.path.join(ML_ROOT, "interactive/quizzes/phase-1-checkpoint.html"),
-                os.path.join(content_root, "interactive/quizzes/phase-1-checkpoint.html"))
+            # A quiz shell must exist in the (temp) content root. The corpus
+            # page predates the checkpoint shim and reports nothing, which the
+            # renderer now refuses, so the copy carries the call — spelled with
+            # its own phase-1 id, which is the misattribution this pins.
+            with open(os.path.join(
+                    ML_ROOT, "interactive/quizzes/phase-1-checkpoint.html"),
+                    encoding="utf-8") as f:
+                shell = f.read()
+            shell = shell.replace(
+                "</body>", '<script>curricle.checkpoint("quiz-p1", {});'
+                           "</script>\n</body>")
+            with open(os.path.join(
+                    content_root,
+                    "interactive/quizzes/phase-1-checkpoint.html"),
+                    "w", encoding="utf-8") as f:
+                f.write(shell)
             spec = factory.BuildSpec(phase_id="p2", exercise_unit="u3",
                                      quiz=True, bank=False)
             report = factory.build_phase(
@@ -953,7 +1090,14 @@ class BuildPhaseTest(unittest.TestCase):
                 report.draft_dir, "quizzes/phase-2-checkpoint.html")
             self.assertTrue(os.path.exists(quiz_path))
             with open(quiz_path) as f:
-                self.assertIn("Question 0?", f.read())
+                page = f.read()
+            self.assertIn("Question 0?", page)
+            # The page reports under the material the build registers, which
+            # is the id promote writes into the sidecar.
+            self.assertIn('curricle.checkpoint("q-phase-2",', page)
+            self.assertNotIn("quiz-p1", page)
+            quiz = next(a for a in report.artifacts if a.role == "quiz-author")
+            self.assertEqual(quiz.material["id"], "q-phase-2")
             self.assertTrue(os.path.exists(os.path.join(
                 report.draft_dir, "exercises/unit-03-bpe/task.md")))
 
@@ -1040,7 +1184,8 @@ NATIVE_FILES = {
     "exercises/unit-01-native/task.md": "# Native task\nNATIVE-EXERCISE.\n",
     "quizzes/phase-1-checkpoint.html": (
         "<title>Phase 1 Checkpoint</title>\n<script>\n"
-        "const QUIZ_DATA = [\n  {q: 'NATIVE-QUIZ'}\n];\n</script>\n"),
+        "const QUIZ_DATA = [\n  {q: 'NATIVE-QUIZ'}\n];\n"
+        'curricle.checkpoint("quiz-p1", {});\n</script>\n'),
     "quizzes/question-bank.md": "# Bank\n\n## Unit 1\nNATIVE-BANK.\n",
 }
 
@@ -1132,7 +1277,7 @@ class HouseFallbackBuildTest(unittest.TestCase):
     def test_a_course_with_its_own_materials_keeps_using_them(self):
         manifest, content_root = self.course(GOOD_SIDECAR + NATIVE_MATERIALS,
                                              NATIVE_FILES)
-        send, _ = self.build(manifest, content_root)
+        send, report = self.build(manifest, content_root)
 
         for role, marker in (("lesson-writer", "NATIVE-LESSON"),
                              ("widget-builder", "NATIVE-WIDGET"),
@@ -1148,6 +1293,14 @@ class HouseFallbackBuildTest(unittest.TestCase):
                          send.prompt("exercise-author"))
         self.assertNotIn("Why are lexing and parsing two stages",
                          send.prompt("quiz-author"))
+
+        # Its own shell, but not its own checkpoint id: the page the build
+        # writes reports under the material the build registers.
+        with open(os.path.join(report.draft_dir,
+                               "quizzes/phase-1-checkpoint.html")) as f:
+            html = f.read()
+        self.assertIn('curricle.checkpoint("q-phase-1",', html)
+        self.assertNotIn("quiz-p1", html)
 
 
 if __name__ == "__main__":

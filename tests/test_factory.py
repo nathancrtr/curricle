@@ -6,7 +6,6 @@ tests must fail against its stub, a widget must be offline) run for real.
 
 import json
 import os
-import re
 import tempfile
 import textwrap
 import unittest
@@ -311,30 +310,20 @@ class ValidatorTest(unittest.TestCase):
 
 
 # Where each house exemplar came from, relative to tinylang's `interactive/`.
-# Whole copies, so the parity test asserts equality; the bank section is a
-# slice of its source and the quiz shell a dialect rename of its own.
+# All whole copies, so the parity test is plain equality; only the bank section
+# is a slice of its source, and it is asserted by containment below. The quiz
+# shell used to be a dialect rename of its page — tinylang spelled its data
+# `QUESTIONS` and an option `{t, ok, why}` — until the page was migrated to the
+# `{text, correct, why}` the factory emits, and a transform on the way in is
+# exactly the drift a copy cannot have.
 HOUSE_SOURCES = {
     "lesson.md": "lessons/unit-01-lexer.md",
     "widget.html": "widgets/token-stream.html",
+    "quiz-shell.html": "quizzes/phase-1-checkpoint.html",
     "exercise/task.md": "exercises/unit-02-starter/task.md",
     "exercise/pratt.py": "exercises/unit-02-starter/pratt.py",
     "exercise/test_pratt.py": "exercises/unit-02-starter/test_pratt.py",
 }
-
-# tinylang's checkpoint page names its quiz data `QUESTIONS` and spells an
-# option `{t, ok, why}`; `validate_quiz` emits `{text, correct, why}` and
-# `render_quiz_html` looks for `const QUIZ_DATA`. The house shell is that page
-# with these six renames applied and nothing else changed — recorded here so
-# the parity test can recompute it, which is the drift guard the whole-copy
-# files get from plain equality.
-QUIZ_DIALECT = (
-    (r"\bQUESTIONS\b", "QUIZ_DATA"),
-    (r"\bopts\b", "options"),
-    (r"\bo\.t\b", "o.text"),
-    (r"\bo\.ok\b", "o.correct"),
-    (r"\bt: ", "text: "),
-    (r"\bok: ", "correct: "),
-)
 
 
 def tinylang_material(rel):
@@ -348,10 +337,10 @@ class HouseExemplarTest(unittest.TestCase):
     """The shipped exemplar set: what a course's *first* build is shown.
 
     Every lookup in `build_phase` reaches for the course's own earlier
-    materials and a new course has none, so each falls back here. Two things
+    materials and a new course has none, so each falls back here. Three things
     have to hold: the set is usable by the code that consumes it (the shell
-    must render, the widget must survive the widget validator), and it has not
-    drifted from the tinylang materials it was curated from.
+    must render), it passes the validators the roles it teaches are judged by,
+    and it has not drifted from the tinylang materials it was curated from.
     """
 
     def test_every_kind_returns_text_and_an_unknown_one_refuses(self):
@@ -433,12 +422,24 @@ class HouseExemplarTest(unittest.TestCase):
                       "phase's materials.", second)
         self.assertIn('curricle.checkpoint("q-phase-3",', second)
 
-    def test_the_widget_would_survive_its_own_validator(self):
-        widget = factory.house_exemplar("widget")
-        # An exemplar the widget validator would refuse is an exemplar that
-        # teaches the role to write refusable widgets.
-        self.assertIsNone(factory.EXTERNAL_REF_RE.search(widget))
-        self.assertTrue(factory.validate_widget(widget))
+    def test_every_exemplar_survives_the_validator_for_its_kind(self):
+        """The bar the factory enforces, met by the pages that teach it.
+
+        Each role is told to match its exemplar's format exactly, so an
+        exemplar the validator would refuse teaches the role to write refusable
+        output — and the refusal lands on a brand-new course's first build,
+        which is precisely when there is nothing else to fall back to. The
+        quiz and the exercise have no text validator of their own: the shell is
+        checked by rendering it above, the exercise by shipping red.
+        """
+        for kind, validate in (("lesson", factory.validate_lesson),
+                               ("widget", factory.validate_widget),
+                               ("bank", factory.validate_bank)):
+            with self.subTest(kind=kind):
+                self.assertTrue(validate(factory.house_exemplar(kind)))
+        # And the rule no validator can restate: widgets are offline-only.
+        self.assertIsNone(
+            factory.EXTERNAL_REF_RE.search(factory.house_exemplar("widget")))
 
     def test_the_bank_section_is_one_section(self):
         section = factory.house_exemplar("bank")
@@ -453,11 +454,6 @@ class HouseExemplarTest(unittest.TestCase):
 
         bank = tinylang_material("quizzes/question-bank.md")
         self.assertIn(factory.house_exemplar("bank"), bank)
-
-        renamed = tinylang_material("quizzes/phase-1-checkpoint.html")
-        for pattern, replacement in QUIZ_DIALECT:
-            renamed = re.sub(pattern, replacement, renamed)
-        self.assertEqual(factory.house_exemplar("quiz"), renamed)
 
 
 class ConfigLocationTest(unittest.TestCase):

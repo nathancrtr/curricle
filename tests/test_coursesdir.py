@@ -24,7 +24,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from curricle import coursehome, db, webapp
+from curricle import coursehome, db, onboarding, webapp
 
 from pg import test_engine
 
@@ -145,7 +145,14 @@ class ServedFromTheHomeTest(unittest.TestCase):
         from fastapi.testclient import TestClient
 
         with self.engine.begin() as conn:
-            db.create_tenant(conn, slug)
+            tenant = db.create_tenant(conn, slug)
+            # Past onboarding, deliberately: the wizard's gate redirects a
+            # tenant who has neither a course nor a published profile, and
+            # every case below is about a course arriving (or refusing to)
+            # for someone already set up. The gate is tested where it lives,
+            # in tests/test_wizard.py.
+            onboarding.append_event(conn, db.for_tenant(tenant),
+                                    "profile_published", "")
         return TestClient(webapp.create_app(
             roots, tenant_slug=slug, database_url=str(self.engine.url),
             courses_dir=courses_dir))

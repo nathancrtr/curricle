@@ -19,6 +19,14 @@ route miss and each front-door render consult the home and load what is new.
 Every one of those paths goes through `load_course`, so the startup rule
 holds unchanged: a course that does not compile is an absence, never a page.
 
+A tenant who has neither published a profile nor got a course is not shown
+an empty front door: the gate below redirects every learner-facing route to
+`/onboarding/`, where `wizard.py` draws the setup screens (mounted here, so
+this module still owns every route the app answers). `/profile` stays
+reachable from every state of the account — no state of your account is a
+state where your data is hostage — and a tenant with a course configured is
+never gated at all.
+
 The front door (`/`) is the one page this module draws itself rather than
 delegating to a renderer, and it draws it on the same design system (see
 theme.py): wordmark, a greeting off the clock, and one panel per course
@@ -40,11 +48,12 @@ import threading
 from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 import posixpath
 
-from . import coursehome, db, profile, progress, theme
+from . import coursehome, db, onboarding, profile, progress, theme, wizard
 from .compiler import compile_course
 from .currender import render_curriculum
 from .hubrender import render_hub
@@ -216,6 +225,15 @@ MATERIAL_JS = """\
 """
 
 
+# What the onboarding gate lets through: the wizard itself, and the profile
+# surface in both its shapes, because the promise is that your own data is
+# reachable from every state of your account. The wizard needs no asset of
+# its own — its stylesheet is inlined in the page, like every other page
+# here — so there is nothing else on this list, and anything added to it is
+# a route an unstarted tenant may reach.
+GATE_EXEMPT = ("/onboarding", "/profile", "/api/profile")
+
+
 def create_app(course_roots: list[str], tenant_slug: str,
                database_url: str | None = None,
                courses_dir: str | None = None) -> FastAPI:
@@ -294,6 +312,42 @@ def create_app(course_roots: list[str], tenant_slug: str,
         return courses.get(slug)
 
     app = FastAPI(title="curricle", docs_url=None, redoc_url=None)
+    wizard.mount(app, engine=engine, scope=scope, tenant_slug=tenant_slug,
+                 courses=courses, courses_dir=courses_dir)
+
+    @app.middleware("http")
+    async def onboarding_gate(request: Request, call_next):
+        """Send an unstarted tenant to the wizard, from wherever they asked.
+
+        Two conditions, both cheap and both re-asked every request: no course
+        is configured, and the onboarding fold has no `profile_published`
+        row. The course check comes first because it is free and because it
+        is the one that exempts a corpus user entirely — someone serving
+        their own course repos is never gated, whatever their profile says.
+
+        Nothing about the decision is cached beyond the request. A cookie or
+        a module-level flag would be a second place the wizard's position is
+        recorded, and the ledger is the only one allowed to have it: a reload
+        can never put the wizard behind work already done.
+
+        307 rather than 302 so a POST arrives at the wizard as a POST — a
+        gated write that silently became a GET would look to the caller like
+        a write that succeeded.
+        """
+        path = request.url.path
+        if not courses and not any(path == prefix or path.startswith(prefix + "/")
+                                   for prefix in GATE_EXEMPT):
+            # The route functions are sync and run in the threadpool; this
+            # middleware is async and runs on the loop, so its one query goes
+            # to the threadpool by hand rather than blocking every other
+            # request for the length of a round trip.
+            def published() -> bool:
+                with engine.begin() as conn:
+                    return onboarding.load_state(conn, scope).profile_published
+
+            if not await run_in_threadpool(published):
+                return RedirectResponse("/onboarding/", status_code=307)
+        return await call_next(request)
 
     def handle(slug: str) -> CourseHandle:
         h = courses.get(slug) or register_from_home(slug)

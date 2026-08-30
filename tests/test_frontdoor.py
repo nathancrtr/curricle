@@ -21,7 +21,7 @@ import os
 import re
 import unittest
 
-from curricle import db, progress, theme, webapp
+from curricle import db, onboarding, progress, theme, webapp
 
 from corpuspaths import HAVE_RS, HAVE_TF, RS_ROOT, TF_ROOT
 from pg import test_engine
@@ -41,11 +41,21 @@ def stones(page: str) -> list[list[str]]:
 
 
 def client(engine, roots: list[str], slug: str):
-    """A test client for an app serving `roots` to a fresh tenant."""
+    """A test client for an app serving `roots` to a fresh tenant.
+
+    The tenant arrives past onboarding. The wizard's gate redirects a tenant
+    who has neither a course nor a published profile, and the front door is
+    a page *about courses* — including its no-courses-at-all shape, which is
+    what someone who has been through the wizard and deleted their course
+    sees. Publishing here keeps that shape reachable in the tests that own
+    it; the gate itself is owned by tests/test_wizard.py.
+    """
     from fastapi.testclient import TestClient
 
     with engine.begin() as conn:
-        db.create_tenant(conn, slug)
+        tenant = db.create_tenant(conn, slug)
+        onboarding.append_event(conn, db.for_tenant(tenant),
+                                "profile_published", "")
     return TestClient(webapp.create_app(roots, tenant_slug=slug,
                                         database_url=str(engine.url)))
 
@@ -299,7 +309,7 @@ class WordmarkTest(unittest.TestCase):
 # Every module on a request path. L1 is a property of the serving process
 # rather than of one file, so this list grows by one line each time `serve`
 # gains a module — the wizard joins it here.
-GUARDED_MODULES = ("webapp.py",)
+GUARDED_MODULES = ("webapp.py", "wizard.py")
 
 
 class InvariantL1Test(unittest.TestCase):

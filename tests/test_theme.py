@@ -127,6 +127,9 @@ SHEETS = [
     Sheet("curricle.webapp", "INDEX_STYLE", ".wordmark", themed=True),
     # SPIKE (one-stop-shop): the unit page and the markdown reader.
     Sheet("curricle.unitrender", "STYLE", ".doc blockquote", themed=True),
+    # The onboarding wizard, which is a page the same way the front door is:
+    # drawn by the module that serves it, spending the same tokens.
+    Sheet("curricle.wizard", "WIZARD_CSS", ".gatebox", themed=True),
 ]
 
 SHARED_PREFIX = theme.TOKENS_CSS + theme.BASE_CSS

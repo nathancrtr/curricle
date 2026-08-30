@@ -12,6 +12,7 @@ for one of them can never be a screen drawn from the other's ledger.
 
 import html
 import os
+import shutil
 import tempfile
 import unittest
 
@@ -20,6 +21,10 @@ import sqlalchemy as sa
 from curricle import db, onboarding, profile, profilerender, webapp, wizard
 
 from pg import test_engine
+# The draft trees the gate screen compiles are planted with the courses
+# home's own fixture — including its `broken=` switch, which is what an
+# uncompilable draft looks like everywhere else in this suite.
+from test_coursesdir import plant
 # The lock a live worker holds, taken here by a detached session so the
 # welcome banner can be tested in both of its states.
 from test_worker import session
@@ -28,26 +33,29 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TINYLANG = os.path.join(REPO_ROOT, "examples", "tinylang")
 
 
-def client(engine, slug: str, roots: list[str] | None = None):
+def client(engine, slug: str, roots: list[str] | None = None,
+           courses_dir: str | None = None):
     """A test client for a fresh tenant, serving `roots` (usually none)."""
     from fastapi.testclient import TestClient
 
     with engine.begin() as conn:
         db.create_tenant(conn, slug)
     return TestClient(webapp.create_app(roots or [], tenant_slug=slug,
-                                        database_url=str(engine.url)))
+                                        database_url=str(engine.url),
+                                        courses_dir=courses_dir))
 
 
 class WizardFixture(unittest.TestCase):
     """One courseless tenant with an app in front of it. No tests of its own."""
 
     ROOTS: list[str] = []
+    COURSES_DIR: str | None = None
 
     @classmethod
     def setUpClass(cls):
         cls.engine = test_engine()
         cls.slug = f"wizard-{cls.__name__}"
-        cls.client = client(cls.engine, cls.slug, cls.ROOTS)
+        cls.client = client(cls.engine, cls.slug, cls.ROOTS, cls.COURSES_DIR)
         with cls.engine.begin() as conn:
             cls.tenant = db.tenant_id_for(conn, cls.slug)
         cls.scope = db.for_tenant(cls.tenant)
@@ -625,6 +633,422 @@ class OutlinePendingCopyTest(WizardFixture):
         # one number on the screen is the one the ledger already knows.
         self.assertIn("no progress bar", page)
         self.assertNotIn("/onboarding/outline/retry", page)
+
+
+class GateFixture(WizardFixture):
+    """A tenant at the outline gate, with a draft on disk to compile.
+
+    The draft is a copy of the example course under the layout the outline
+    stage writes — `<home>/<id>/.draft-onboarding/` — because the first half
+    of the gate screen *is* a compile of that tree, and a fixture that handed
+    the screen a manifest directly would exercise everything except the thing
+    this stop does. The course id is the draft sidecar's own, which is what
+    minting guarantees in the running system.
+
+    `CURRICLE_COURSES_DIR` is never read here: the app is built with the home
+    it serves, so no exported variable can point these tests at a real
+    courses directory.
+    """
+
+    COURSE = "tinylang"
+    # The plan the outline stage would have reported for this course, keyed
+    # by the build spec's field names, and a number in its own format.
+    PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
+            "widget_concept": "precedence as a table of binding powers",
+            "exercise_unit": "u2", "quiz": True, "bank": True}
+    ESTIMATE = "1.37"
+    BROKEN = False        # a draft that will not compile
+    MISSING = False       # a draft deleted by hand between two screens
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="curricle-gate-")
+        plant(os.path.join(cls.tmp, cls.COURSE), wizard.DRAFT_DIR,
+              broken=cls.BROKEN)
+        if cls.MISSING:
+            shutil.rmtree(os.path.join(cls.tmp, cls.COURSE))
+        cls.COURSES_DIR = cls.tmp
+        super().setUpClass()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Interpreters, end to end"}),
+                    ("outline_requested", {}),
+                    ("outline_ready", {"plan": cls.PLAN,
+                                       "estimate_usd": cls.ESTIMATE})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def outline_ready_payload(self) -> dict:
+        row, = [r for r in self.onboarding_rows() if r.kind == "outline_ready"]
+        return row.payload
+
+    def queued(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(
+                sa.select(db.factory_runs.c.stage, db.factory_runs.c.status,
+                          db.factory_runs.c.payload)
+                .where(db.factory_runs.c.tenant_id == self.tenant)
+                .order_by(db.factory_runs.c.id)))
+
+
+class OutlineGateScreenTest(GateFixture):
+    """Stop 8: the drafted course read back, and then the number.
+
+    Read-only, so one tenant serves the lot: nothing here writes a row.
+    """
+
+    def test_the_gate_renders_the_outline_it_compiled(self):
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["outline_gate"], page)
+        # The course, its phases with their goals, and its units with their
+        # glosses — all of it out of a fresh compile of the draft, none of it
+        # out of the ledger.
+        self.assertIn("Interpreters, end to end", page)
+        self.assertIn("Turn source text into a syntax tree you can print, "
+                      "test, and trust.", page)
+        self.assertIn("Phase 1 — The front end", page)
+        self.assertIn("Unit 1 — Characters to tokens", page)
+        self.assertIn("Tokens become a tree, and precedence stops being a "
+                      "mystery", page)
+        # The track ladder, designed for this course, with its stages.
+        self.assertIn("Formal grammars", page)
+        self.assertIn("Recognise what a lexer can and cannot decide.", page)
+        # And the shelf: the link, and the essay as the manifest carries it
+        # rather than the shelf markdown read a second time.
+        self.assertIn('href="https://craftinginterpreters.com/"', page)
+        self.assertIn("The spine of this course, and the rare technical book",
+                      page)
+        # A phase's entries carry milestone ids beside unit ids, and a
+        # side-quest is not a unit: it has no number and no gloss, and a line
+        # for it would be a unit the course does not have.
+        self.assertNotIn("m-errors", page)
+        # Your turn, so nothing here is watching a machine.
+        self.assertIn(wizard.WAITING_WORD, page)
+        self.assertNotIn(wizard.META_REFRESH, page)
+
+    def test_the_number_on_the_screen_is_the_number_in_the_ledger(self):
+        # O3's first half. The estimate is not recomputed for the screen and
+        # not reformatted for it either: the bytes the outline stage wrote
+        # are the bytes a learner reads, or the row the approval carries
+        # would be a number nobody was shown.
+        page = self.screen()
+        estimate = self.outline_ready_payload()["estimate_usd"]
+        self.assertEqual(estimate, self.ESTIMATE)
+        self.assertIn(f"${estimate} estimated", page)
+
+    def test_the_plan_is_a_sentence_derived_from_its_own_keys(self):
+        page = self.screen()
+        self.assertIn("Unit 1 gets a Socratic lesson", page)
+        self.assertIn("unit 2 gets a widget (precedence as a table of binding "
+                      "powers)", page)
+        self.assertIn("unit 2 gets a scaffolded exercise", page)
+        self.assertIn("plus the phase 1 checkpoint quiz and the "
+                      "question-bank section", page)
+
+    def test_a_skipped_artifact_is_printed_as_skipped(self):
+        # "No widget" is part of what the estimate is an estimate of, so it
+        # is said rather than left out — a plan listing only what it does buy
+        # reads as a shorter course rather than a cheaper build.
+        sentence = wizard.plan_sentence(
+            dict(self.PLAN, widget_unit=None, widget_concept=None, bank=False),
+            None)
+        self.assertIn("a widget — skipped", sentence)
+        self.assertIn("the question-bank section — skipped", sentence)
+
+    def test_the_estimate_comes_before_the_button(self):
+        # Stop 0's third never-promise, kept on the screen it was about: the
+        # number is above the decision, not under it.
+        page = self.screen()
+        self.assertLess(page.index(f"${self.ESTIMATE} estimated"),
+                        page.index('action="/onboarding/outline/approve"'))
+
+    def test_the_ceiling_is_named_without_naming_a_price(self):
+        # The wizard never reads the model configuration, so the sentence
+        # about the hard ceiling says what it is rather than what it is set
+        # to. The only number on this page is the ledger's own.
+        page = self.screen()
+        self.assertIn(wizard.GATE_CEILING, page)
+        self.assertEqual(page.count("$"), 1)
+
+    def test_both_decisions_are_offered_and_the_note_is_required(self):
+        page = self.screen()
+        self.assertIn('action="/onboarding/outline/approve"', page)
+        self.assertIn('action="/onboarding/outline/reject"', page)
+        self.assertIn('name="note"', page)
+        self.assertIn("required", page)
+
+
+class OutlineGateEscapingTest(GateFixture):
+    """The first screen that reads learner-side text back as markup.
+
+    Two sources meet here and both are escaped where they are interpolated:
+    the compiled draft, which a model wrote from a learner's own scope, and
+    the plan out of the ledger.
+    """
+
+    PLAN = dict(GateFixture.PLAN,
+                widget_concept="binding powers & <b>precedence</b>")
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Edited after planting, because the draft is compiled per request:
+        # what the screen renders is whatever is on disk when it is drawn.
+        sidecar = os.path.join(cls.tmp, cls.COURSE, wizard.DRAFT_DIR,
+                               "learning", "course.yaml")
+        with open(sidecar, encoding="utf-8") as f:
+            text = f.read()
+        text = text.replace("title: Interpreters, end to end",
+                            "title: Interpreters <b>&</b> ends")
+        text = text.replace("Unit 2's technique, in one sitting.",
+                            "Unit 2's <b>technique</b> & why.")
+        with open(sidecar, "w", encoding="utf-8") as f:
+            f.write(text)
+
+    def test_nothing_from_the_draft_or_the_plan_renders_as_markup(self):
+        page = self.screen()
+        self.assertIn("Interpreters &lt;b&gt;&amp;&lt;/b&gt; ends", page)
+        self.assertIn("Unit 2&#x27;s &lt;b&gt;technique&lt;/b&gt; &amp; why.",
+                      page)
+        self.assertIn("binding powers &amp; &lt;b&gt;precedence&lt;/b&gt;",
+                      page)
+        for leak in ("<b>&</b>", "<b>technique</b>", "<b>precedence</b>"):
+            with self.subTest(leak=leak):
+                self.assertNotIn(leak, page)
+
+
+class OutlineApproveTest(GateFixture):
+    """O3's producer: the row that lets money be spent.
+
+    Invariant O3 (design §5): "no token is spent without an upstream ledger
+    row recording the learner's approval and the estimate they were shown."
+    The approval echoes `outline_ready`'s payload rather than reading a
+    number off the form, so the estimate on the screen and the estimate in
+    the ledger are the same bytes by construction — which is what the
+    byte-equality assertion below is pinning.
+
+    Its own tenant, because approving is a one-way move of this ledger.
+    """
+
+    def test_approving_records_the_estimate_shown_and_queues_the_build(self):
+        approved = self.client.post("/onboarding/outline/approve",
+                                    follow_redirects=False)
+        self.assertEqual(approved.status_code, 303, approved.text)
+        self.assertEqual(approved.headers["location"], "/onboarding/")
+
+        rows = [r for r in self.onboarding_rows()
+                if r.kind in ("outline_approved", "build_requested")]
+        self.assertEqual([r.kind for r in rows],
+                         ["outline_approved", "build_requested"])
+        approval = rows[0].payload
+        # O3, byte for byte: not a number computed again at approval time,
+        # and not one posted by the form — the one the ledger already held.
+        self.assertEqual(approval["estimate_usd"],
+                         self.outline_ready_payload()["estimate_usd"])
+        self.assertIsInstance(approval["estimate_usd"], str)
+        # The plan travels with it: what gets built is what was approved.
+        self.assertEqual(approval["plan"], self.PLAN)
+        self.assertEqual(rows[1].payload, {})
+
+        # And the run the second process will claim, written in the same
+        # transaction: there is no human turn between Stops 8 and 9.
+        self.assertEqual([(r.stage, r.status) for r in self.queued()],
+                         [("build", "queued")])
+
+    def test_the_fold_moves_to_the_build_and_a_second_approval_is_refused(self):
+        # Named to run after the approval above: same tenant, same ledger.
+        self.assertEqual(self.current_stop(), "build")
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["build"], page)
+        self.assertIn("Building your phase-1 materials", page)
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn("seconds elapsed", page)      # elapsed, not a forecast
+        self.assertIn(wizard.META_REFRESH, page)
+        self.assertNotIn("This screen is still being built", page)
+        self.assertNotIn('action="/onboarding/outline/approve"', page)
+        # O1 for a write, from a tab that still has the button on it: a
+        # second approval would be a second build queued over the first.
+        again = self.client.post("/onboarding/outline/approve",
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+        self.assertEqual([(r.stage, r.status) for r in self.queued()],
+                         [("build", "queued")])
+
+
+class OutlineRejectTest(GateFixture):
+    """Rejecting: two rows carrying the note, and Stop 7 again."""
+
+    NOTE = "Four phases is too many — I have eight weeks, not sixteen."
+
+    def test_a_rejection_is_two_rows_and_a_run_that_carries_the_note(self):
+        rejected = self.client.post("/onboarding/outline/reject",
+                                    data={"note": self.NOTE},
+                                    follow_redirects=False)
+        self.assertEqual(rejected.status_code, 303, rejected.text)
+        self.assertEqual(rejected.headers["location"], "/onboarding/")
+        rows = self.onboarding_rows()[-2:]
+        self.assertEqual([r.kind for r in rows],
+                         ["outline_rejected", "outline_requested"])
+        # The note is on both rows, so neither has to be read through the
+        # other: one says this outline was rejected, one says another was
+        # asked for, and both say what for.
+        for row in rows:
+            with self.subTest(kind=row.kind):
+                self.assertEqual(row.payload["note"], self.NOTE)
+        # And on the run, which exists to answer it.
+        self.assertEqual([(r.stage, r.status, r.payload) for r in self.queued()],
+                         [("outline", "queued", {"note": self.NOTE})])
+        # The fold is back at a machine's turn, and the gate is gone.
+        self.assertEqual(self.current_stop(), "outline")
+        page = self.screen()
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertNotIn('action="/onboarding/outline/reject"', page)
+
+    def test_a_second_rejection_from_a_stale_tab_is_refused(self):
+        # Named to run after the rejection above: the stop it belongs to is
+        # behind this ledger now.
+        again = self.client.post("/onboarding/outline/reject",
+                                 data={"note": "and narrower still"},
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+
+
+class OutlineRejectRefusalTest(GateFixture):
+    """An empty note is refused, and the refusal writes nothing."""
+
+    def test_a_note_free_rejection_is_refused_in_words(self):
+        for note in ("", "   ", "\n"):
+            with self.subTest(note=repr(note)):
+                refused = self.client.post("/onboarding/outline/reject",
+                                           data={"note": note},
+                                           follow_redirects=False)
+                self.assertEqual(refused.status_code, 422, refused.text)
+                self.assertIn("note saying what to change", refused.text)
+        # Nothing written, and the learner is still at their own gate.
+        self.assertEqual([r.kind for r in self.onboarding_rows()][-1],
+                         "outline_ready")
+        self.assertEqual(self.queued(), [])
+        self.assertEqual(self.current_stop(), "outline_gate")
+
+    def test_a_body_this_form_cannot_read_is_refused(self):
+        posted = self.client.post("/onboarding/outline/reject",
+                                  json={"note": "smuggled"},
+                                  follow_redirects=False)
+        self.assertEqual(posted.status_code, 415)
+        self.assertEqual(self.queued(), [])
+
+
+class ApproveBeforeTheGateTest(WizardFixture):
+    """O1 for a write: the stop is not open yet, so neither is the spend."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course in (("profile_published", ""),
+                                 ("scope_saved", "greek-108"),
+                                 ("outline_requested", "greek-108")):
+                onboarding.append_event(conn, cls.scope, kind, course,
+                                        {"title": "Greek"} if course else {})
+
+    def test_an_approval_with_no_outline_ready_is_refused(self):
+        # There is no estimate on the ledger to carry, and an approval row
+        # without one is the one row O3 must never see.
+        before = len(self.onboarding_rows())
+        refused = self.client.post("/onboarding/outline/approve",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(len(self.onboarding_rows()), before)
+        self.assertEqual(self.current_stop(), "outline")
+
+    def test_a_rejection_before_the_gate_is_refused_too(self):
+        refused = self.client.post("/onboarding/outline/reject",
+                                   data={"note": "narrower, please"},
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+
+
+class DirtyDraftGateTest(GateFixture):
+    """The compiler refuses rather than guesses, and so does the screen."""
+
+    BROKEN = True
+
+    def test_an_uncompilable_draft_gets_a_panel_and_no_spend_button(self):
+        page = self.screen()
+        self.assertIn("The drafted outline cannot be read back", page)
+        self.assertIn(wizard.FAILED_WORD, page)
+        # A spend button over an outline this system cannot read would be a
+        # promise about a course nobody can see.
+        self.assertNotIn('action="/onboarding/outline/approve"', page)
+        self.assertNotIn(f"${self.ESTIMATE}", page)
+        # Nothing partial either: no phase, no unit, no shelf entry.
+        for partial in ("Phase 1 — The front end", "Characters to tokens",
+                        "The resource shelf"):
+            with self.subTest(partial=partial):
+                self.assertNotIn(partial, page)
+        # What is offered instead is the redraft, which is the only move
+        # left at a gate with nothing to review.
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        # The compiler's findings are an operator's, not a learner's: they
+        # name files nobody on this screen has ever seen.
+        self.assertNotIn("not-here.md", page)
+
+    def test_the_approval_is_refused_as_well_as_undrawn(self):
+        # A button that is absent from a page is not a rule.
+        refused = self.client.post("/onboarding/outline/approve",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertIn("no longer compiles", refused.text)
+        self.assertEqual([r.kind for r in self.onboarding_rows()][-1],
+                         "outline_ready")
+        self.assertEqual(self.queued(), [])
+
+    def test_the_redraft_starts_the_stage_over(self):
+        # Named to run last: it moves this fixture's ledger off the gate.
+        retried = self.client.post("/onboarding/outline/retry",
+                                   follow_redirects=False)
+        self.assertEqual(retried.status_code, 303, retried.text)
+        self.assertEqual(self.onboarding_rows()[-1].kind, "outline_requested")
+        self.assertEqual([(r.stage, r.status) for r in self.queued()],
+                         [("outline", "queued")])
+        self.assertEqual(self.current_stop(), "outline")
+
+
+class MissingDraftGateTest(GateFixture):
+    """A draft deleted by hand between two screens reads the same way."""
+
+    MISSING = True
+
+    def test_a_draft_that_is_gone_is_the_same_honest_panel(self):
+        page = self.screen()
+        self.assertIn("The drafted outline cannot be read back", page)
+        self.assertNotIn('action="/onboarding/outline/approve"', page)
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        self.assertIsNone(wizard.draft_manifest(self.tmp, self.COURSE))
+        # And an unconfigured home is the same absence rather than a crash:
+        # a wizard with nowhere to look has no outline to show.
+        self.assertIsNone(wizard.draft_manifest(None, self.COURSE))
+
+
+class HealthyGateRedraftTest(GateFixture):
+    """The redraft button is not a second way out of a working gate."""
+
+    def test_a_redraft_over_a_readable_outline_is_refused(self):
+        # Rejecting with a note is the way back to Stop 7 from here, and it
+        # is that way because the note is what the next draft is briefed
+        # with. A note-free redraft would spend the stage again to ask the
+        # same question, so the retry route asks the draft for itself.
+        page = self.screen()
+        self.assertNotIn('action="/onboarding/outline/retry"', page)
+        refused = self.client.post("/onboarding/outline/retry",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(self.queued(), [])
+        self.assertEqual(self.current_stop(), "outline_gate")
 
 
 class ProfileCopyTest(unittest.TestCase):

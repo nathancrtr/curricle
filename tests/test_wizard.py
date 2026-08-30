@@ -1022,6 +1022,206 @@ class PromotePendingTest(WizardFixture):
         self.assertNotIn("interactive/x", page)
 
 
+class PromoteFailedTest(WizardFixture):
+    """Stop 10's failed face, and the one retry in the wizard that is free.
+
+    The fold is a whole built flow, because what the screen promises depends
+    on what is behind the failure: materials that were bought and kept, and
+    a publication that appends its row only after the compile at the course's
+    own final location. Nothing partial is in place, so nothing on this
+    screen has to warn about anything.
+    """
+
+    COURSE = "greek-109"
+    REASON = "compile_failed"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_requested", {}),
+                    ("build_ready", {"artifacts": ["interactive/x"],
+                                     "costs": {"lesson-writer": "$0.02"}}),
+                    ("promote_failed", {"reason": cls.REASON,
+                                        "detail": "ValidationFailed: unit u9 "
+                                                  "is in no phase"})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def runs(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.runs_pending(self.COURSE)))
+
+    # Named to run before the retry below: the retry moves this fixture's
+    # ledger on, and the failed screen exists only until it does.
+    def test_a_stopped_publication_says_why_and_offers_to_try_again(self):
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["promote"], page)
+        self.assertIn(onboarding.WORDING[("promote", self.REASON)], page)
+        self.assertIn('action="/onboarding/promote/retry"', page)
+        self.assertIn(wizard.PROMOTE_RETRY_ASIDE, page)
+        self.assertIn(wizard.FAILED_WORD, page)
+        # O2: neither the machine's word for what happened nor the exception
+        # behind it reaches the page. Both are in the row, for an operator.
+        self.assertNotIn(self.REASON, page)
+        self.assertNotIn("ValidationFailed", page)
+        self.assertNotIn(wizard.META_REFRESH, page)
+        # And the placeholder is gone: this stop has a screen of its own in
+        # both of the states it can be in.
+        self.assertNotIn("This screen is still being built", page)
+
+    def test_the_button_appends_the_request_row_and_queues_the_run(self):
+        self.assertEqual(self.runs(), [])
+        retried = self.client.post("/onboarding/promote/retry",
+                                   follow_redirects=False)
+        self.assertEqual(retried.status_code, 303, retried.text)
+        self.assertEqual(retried.headers["location"], "/onboarding/")
+
+        requested = self.onboarding_rows()[-1]
+        self.assertEqual((requested.kind, requested.course, requested.payload),
+                         ("promote_requested", self.COURSE, {}))
+        self.assertEqual([(r.stage, r.status) for r in self.runs()],
+                         [("promote", "queued")])
+
+        # A machine's turn again, so the screen says so rather than showing a
+        # stale failure over a run that is already going — which is the whole
+        # reason the request row exists. And a second press is refused.
+        self.assertEqual(self.current_stop(), "promote")
+        page = self.screen()
+        self.assertIn(wizard.PENDING_WORD, page)
+        self.assertIn(wizard.META_REFRESH, page)
+        self.assertNotIn("/onboarding/promote/retry", page)
+        again = self.client.post("/onboarding/promote/retry",
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+
+
+class PromoteRetryBeforeTheStopTest(GateFixture):
+    """A promotion retry from a flow that has not reached the stop at all."""
+
+    def test_a_retry_at_the_gate_is_refused_and_writes_nothing(self):
+        refused = self.client.post("/onboarding/promote/retry",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual([r.kind for r in self.onboarding_rows()]
+                         .count("promote_requested"), 0)
+        self.assertEqual(self.queued(), [])
+
+
+class LandingCardTest(WizardFixture):
+    """Stop 10's last face: the course, and the two ways to work on it.
+
+    The courses home is a temp directory holding nothing — the card reads it
+    for a path to print and never for a course, so there is nothing to plant.
+    """
+
+    COURSE = "greek-110"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="curricle-landing-")
+        cls.COURSES_DIR = cls.tmp
+        super().setUpClass()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_ready", {"artifacts": [], "costs": {}}),
+                    ("promoted", {"course_id": cls.COURSE})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def test_the_card_is_what_a_finished_setup_lands_on(self):
+        # The fold re-enters at Stop 6 for a second course, and the screen
+        # under that stop with a finished flow behind it is the card.
+        self.assertEqual(self.current_stop(), "scope")
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["done"], page)
+        self.assertIn(f'href="/c/{self.COURSE}/index.html"', page)
+        # Every step behind the learner, and none under them.
+        self.assertIn("All 6 steps done", page)
+        self.assertNotIn('class="now"', page)
+        # Nothing is forecast and nothing is counted: done marks and next-up
+        # are the hub's derived answer, and a copy here would be a second one.
+        self.assertNotIn(wizard.META_REFRESH, page)
+        self.assertNotIn("0 of", page)
+
+    def test_the_snippet_is_filled_in_for_this_course_and_this_tenant(self):
+        page = self.screen()
+        block = page.split('<pre class="snippet">')[1].split("</pre>")[0]
+        self.assertIn(self.slug, block)
+        self.assertIn(os.path.join(self.tmp, self.COURSE), block)
+        # Escaped like everything else on the page — the quotes a config
+        # block is made of are entities by the time they reach the browser.
+        self.assertIn("&quot;curricle-tutor&quot;", block)
+        self.assertIn("&quot;mcp&quot;", block)
+        # And the committed page is named, for the day the tab is closed.
+        self.assertIn(wizard.MCP_DOC, page)
+
+    def test_the_card_can_be_asked_for_by_name(self):
+        # A card is a page you can come back to, not a moment that passes.
+        page = self.screen(f"?course={self.COURSE}")
+        self.assertIn(wizard.STOP_TITLES["done"], page)
+        self.assertIn(f'href="/c/{self.COURSE}/index.html"', page)
+
+    def test_naming_no_finished_course_is_the_way_to_the_scope_form(self):
+        # The link the card itself carries, and the second-course re-entry
+        # design §4 Stop 10 asks for. `?course=` names nothing, because no
+        # minted id is empty.
+        self.assertIn('href="/onboarding/?course="', self.screen())
+        for query in ("?course=", "?course=never-existed"):
+            with self.subTest(query=query):
+                page = self.screen(query)
+                self.assertIn(wizard.STOP_TITLES["scope"], page)
+                self.assertNotIn(wizard.STOP_TITLES["done"], page)
+
+
+class GateScansTheHomeBeforeRedirectingTest(WizardFixture):
+    """The manual dropper: a course copied in while the gate is still firing.
+
+    Promotion lifts the gate for wizard users by giving them a course, and a
+    published profile lifts it anyway. This is the other case — a tenant who
+    never started the wizard and put a course in the home by hand — where
+    the front door's lazy rescan is exactly the thing the gate is standing
+    in front of, so the scan happens at the moment of the redirect instead.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.mkdtemp(prefix="curricle-gatescan-")
+        cls.COURSES_DIR = cls.tmp
+        super().setUpClass()
+        cls.addClassCleanup(shutil.rmtree, cls.tmp, ignore_errors=True)
+
+    def test_a_course_that_appears_after_startup_lifts_the_gate(self):
+        # Empty home, no published profile: the gate fires, having looked.
+        self.assertEqual(self.client.get("/", follow_redirects=False)
+                         .status_code, 307)
+        plant(self.tmp, "tinylang")
+        page = self.client.get("/", follow_redirects=False)
+        self.assertEqual(page.status_code, 200, page.text)
+        self.assertIn('href="/c/tinylang/"', page.text)
+        # No row was written to lift it: registration is a fact about the
+        # filesystem, and the ledger still says this tenant never started.
+        self.assertEqual(self.onboarding_rows(), [])
+
+
 class OutlineRejectTest(GateFixture):
     """Rejecting: two rows carrying the note, and Stop 7 again."""
 

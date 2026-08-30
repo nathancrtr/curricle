@@ -10,6 +10,13 @@ the fold has already opened: a value the vocabulary does not know sends the
 learner back to `/onboarding/`, and `?screen=` is ignored outright once the
 stop is past the profile.
 
+The scope stop has the wizard's one other pair of screens, for the same
+reason and under the same rule: a tenant who has finished a course lands on
+its card, and starts their next course from that same stop (design §4, Stop
+10), so `?course=` chooses between the two. Like `?screen=` it can only
+reach a screen the fold has already opened — it names a *finished* flow, or
+it names nothing, and the scope form is what nothing means.
+
 Screens say two different things about two different waits (design §5).
 `pending` is a machine's turn, so the screen shows the word, the mark, and
 elapsed time since the last ledger row — elapsed, never a forecast, because
@@ -334,6 +341,25 @@ BUILD_RETRY_ASIDE = ("What was already finished was kept, so this carries on "
                      "from where it stopped rather than starting over — and "
                      "it does not ask you to approve anything again.")
 
+# And what the publication's retry says under it. Publishing calls no model
+# at all — it moves finished files and compiles them — so the one thing this
+# button has to promise is that pressing it costs nothing.
+PROMOTE_RETRY_ASIDE = ("Publishing moves files and compiles them; it calls no "
+                       "model and spends nothing, so this costs you nothing "
+                       "and your built materials are exactly where the build "
+                       "left them.")
+
+# The committed page the landing card points at, and the tutor's config
+# block with this course and this tenant filled in. The repo has never
+# committed the snippet anywhere (design §9), so the doc is where a learner
+# who closed the tab finds it again — and the card prints a filled-in copy
+# so that nobody has to work out their own paths from a template.
+MCP_DOC = "docs/mcp-config.md"
+MCP_LEDE = ("The same course, read by your own assistant. This runs on your "
+            "machine against this database, and the conversation happens "
+            "wherever you already work — on your inference bill, not this "
+            "system's.")
+
 # The review screen's caption, design §4's own sentence. What is under it is
 # the SKILL.md source itself rather than a styled rendering of it: the
 # projection *is* a markdown document, and the honest review of a document
@@ -354,6 +380,9 @@ STOP_TITLES = {
     "outline_gate": "Your outline, and what the build will cost",
     "build": "Building the first phase",
     "promote": "Publishing your course",
+    # Not a stop — the fold's terminal stage, and the only title the step
+    # strip is drawn for with every step behind it.
+    "done": "Your course is ready",
 }
 STEP_LABELS = {
     "profile": "Profile", "scope": "Scope", "outline": "Outline",
@@ -482,6 +511,15 @@ WIZARD_CSS = theme.style("""\
                    background:var(--panel); border:1px solid var(--line);
                    border-radius:18px; box-shadow:var(--shadow);
                    color:var(--ink); padding:20px 24px; margin:14px 0 0; }
+  /* The tutor's config, inside a panel rather than as one: it is a block
+     within the closing card, so it takes the card's own inset rather than
+     the projection's full-page shadow. Wrapping for the same reason — a
+     path long enough to scroll sideways is a path nobody can copy. */
+  pre.snippet { font:12.5px/1.6 """ + theme.FONT_MONO + """;
+                white-space:pre-wrap; overflow-wrap:anywhere;
+                background:var(--chip); border:1px solid var(--line);
+                border-radius:12px; color:var(--ink);
+                padding:14px 16px; margin:0 0 12px; }
 """)
 
 # The illustration vocabulary this surface owns: three small marks drawn in
@@ -566,7 +604,19 @@ def _steps(stop: str) -> str:
     a learner sees exactly once. Done steps carry the check mark beside
     their name and the line beneath says the position in words, so the strip
     is legible with every color stripped out of it.
+
+    `done` is the fold's terminal stage rather than a seventh stop, so it
+    draws every step behind the learner and no step under them. A strip with
+    a "now" on it over a finished setup would be the one screen in the
+    wizard that says there is more to do when there is not.
     """
+    total = len(onboarding.STAGE_SEQUENCE)
+    if stop == "done":
+        items = [f'<li class="done">{_CHECK}{STEP_LABELS[stage]}</li>'
+                 for stage in onboarding.STAGE_SEQUENCE]
+        return (f'<ol class="steps">{"".join(items)}</ol>'
+                f'<p class="stepline">All {total} steps done · '
+                f'{STOP_TITLES["done"]}</p>')
     at = onboarding.STAGE_SEQUENCE.index(stop)
     items = []
     for i, stage in enumerate(onboarding.STAGE_SEQUENCE):
@@ -579,7 +629,7 @@ def _steps(stop: str) -> str:
             items.append(f"<li>{label}</li>")
     return (f'<ol class="steps">{"".join(items)}</ol>'
             f'<p class="stepline">Step {at + 1} of '
-            f'{len(onboarding.STAGE_SEQUENCE)} · {STOP_TITLES[stop]}</p>')
+            f'{total} · {STOP_TITLES[stop]}</p>')
 
 
 def _page(stop: str, screen: Screen, tenant_slug: str) -> str:
@@ -1307,19 +1357,44 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
 
 
 def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
-    """Stop 10's pending face: the last machine turn, and no second gate.
+    """Stop 10's pending and failed faces: the last machine turn, no gate.
 
-    There is no ask on this screen because design §4 put no human turn
+    There is no ask on the pending face because design §4 put no human turn
     between the build and the publication — the decision was taken at the
     gate, and this stop is the system keeping to it. So the copy says what
     is being done rather than what is being asked, and it names the one rule
     that could still stop it: a course that does not compile is not served,
     and this is where that is checked for the last time.
 
-    The failed face and the retry that goes with it belong to the stage that
-    can say what a half-finished promotion left behind, and land with it.
+    The failed face says the one thing that is true of every way this stage
+    can stop, and is the reason the sequence is ordered the way it is: the
+    ledger row that publishes a course is appended after the compile at the
+    course's own final location, so a stage that stopped published nothing.
+    The retry is therefore offered without a caveat about money, because
+    unlike the two stages before it this one never spends any.
+
+    `WORDING[("promote", reason)]` and never the exception behind it (O2);
+    the reason key itself never reaches the page either.
     """
     status = flow.status if flow is not None else "waiting"
+    if status == "failed" and flow is not None:
+        worded = onboarding.WORDING.get(
+            ("promote", flow.reason or ""),
+            "That stage stopped and your course was not published.")
+        return Screen(f"""
+  <h1>{STOP_TITLES["promote"]}</h1>
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("failed")}</p>
+    <h2>Publishing stopped</h2>
+    <p class="wording">{worded}</p>
+    <form method="post" action="/onboarding/promote/retry">
+      <p class="ask">
+        <button class="pill primary" type="submit">Try again →</button>
+        <span class="aside">{PROMOTE_RETRY_ASIDE}</span>
+      </p>
+    </form>
+  </div>
+""")
     since = (f'<span class="elapsed">{elapsed_words(flow.updated_at)}</span>'
              if flow is not None else "")
     return Screen(f"""
@@ -1338,12 +1413,118 @@ def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
 """, refresh=status == "pending")
 
 
+def promoted_flow(state: onboarding.OnboardingState,
+                  course: str | None) -> onboarding.CourseFlow | None:
+    """Which finished course the landing card is for, if it is for one.
+
+    The scope stop has two screens behind it now, and this is the whole of
+    what chooses between them (design §4, Stop 10). With no hint in the URL
+    the card is drawn for the last course to finish, because the request
+    that arrives with no hint is the one the publishing screen's own refresh
+    made and the learner is looking for the course they just built. A hint
+    naming a finished course draws that one's card — the card is a page you
+    can come back to, not a moment that passes.
+
+    A hint naming anything else is the way to the scope form, and `?course=`
+    is what the card's own "start another" link carries: no course answers
+    to the empty string, because minting never produces one, so the sentinel
+    cannot collide with a real id. That is deliberate rather than clever —
+    the scope form is the screen for a course that does not exist yet, and
+    asking for it by naming no course is what it is.
+    """
+    finished = [f for f in state.flows.values() if f.stage == "done"]
+    if course is None:
+        return finished[-1] if finished else None
+    return next((f for f in finished if f.course_id == course), None)
+
+
+def mcp_config(course_path: str, tenant_slug: str) -> str:
+    """The tutor's config block, filled in for one course and one tenant.
+
+    Plain text, escaped where it is rendered: both values came from outside
+    this module — one from the environment, one from the command line.
+    Written out here rather than assembled from a serializer, because what
+    the learner copies is a *document*, and its line breaks and its
+    indentation are as much of it as its keys are.
+    """
+    return f"""{{
+  "mcpServers": {{
+    "curricle-tutor": {{
+      "command": "python",
+      "args": ["-m", "curricle", "mcp",
+               "--course", "{course_path}",
+               "--tenant", "{tenant_slug}"]
+    }}
+  }}
+}}"""
+
+
+def landing_screen(course_id: str, courses_dir: str | None,
+                   tenant_slug: str) -> Screen:
+    """Stop 10's last face: the course, and the two ways to work on it.
+
+    The hub link comes first and carries no numbers with it. Done marks at
+    zero and a next-up pointing at unit 1 are the hub's own derived answer,
+    and printing them here would be this page keeping a second copy of a
+    count it does not own — which is the one thing this codebase does not do
+    with derived data. So the card says the course is ready and links to the
+    page that can say the rest.
+
+    Then the two onward paths (design §4). The browser one is a sentence,
+    because the link above it is already the whole of it. The tutor one is a
+    snippet, because a config block is not a thing to describe: it is filled
+    in with this courses home and this tenant so that the learner copies an
+    answer rather than a template, and the committed doc is named underneath
+    for the day they need it again with the tab closed.
+
+    Everything interpolated is escaped: the course id was minted from a
+    title the learner typed, the path came from the environment, and the
+    tenant slug came from the command line.
+    """
+    e = html_mod.escape
+    course_path = (os.path.join(
+        os.path.abspath(os.path.expanduser(courses_dir)), course_id)
+        if courses_dir else course_id)
+    return Screen(f"""
+  <h1>{STOP_TITLES["done"]}</h1>
+  <p class="lede">Everything you approved was built, checked, compiled and
+  put in place. This is a course now, and where you are on it is kept for
+  you from here on.</p>
+  <p class="ask">
+    <a class="pill primary" href="/c/{e(course_id)}/index.html">Open your
+    course →</a>
+    <span class="aside">The hub is the front of it: the path, what comes
+    next, and the materials as you reach them.</span>
+  </p>
+  <div class="gatebox">
+    <h2>Work in the browser</h2>
+    <p>Read the curriculum, walk the units, and mark what you finish. The
+    lessons, the widget, the exercise and the checkpoint quiz are served
+    from the same place, and every mark you make is written to your own
+    database rather than to this tab.</p>
+  </div>
+  <div class="gatebox">
+    <h2>Or connect the tutor to your assistant</h2>
+    <p>{MCP_LEDE}</p>
+    <pre class="snippet">{e(mcp_config(course_path, tenant_slug))}</pre>
+    <p class="hint">The same block, with the paths left blank, is committed
+    at <code>{MCP_DOC}</code> — that page explains what the tutor can see
+    and what it can write.</p>
+  </div>
+  <div class="nav">
+    <a class="pill" href="/onboarding/?course=">Start another course →</a>
+    <a class="pill" href="/profile">Your profile</a>
+  </div>
+""")
+
+
 def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
     """The placeholder for a stop with no screen of its own yet.
 
-    Every stop now has one but the failed promotion, whose retry lands with
-    the stage that can say what a half-finished publication left behind; a
-    fold that somehow reaches a stop with no flow behind it comes here too.
+    Every stop has one now, so what is left for this is the fold that
+    reaches a stop with no flow behind it at all — an outline gate with
+    nothing to gate, which is a ledger nobody's code can write and a screen
+    that should still say something true if one ever appears.
 
     Everything on it comes from the ledger. A stage that is `failed` prints
     the sentence `WORDING` keeps for its `(stage, reason)` pair and never the
@@ -1547,7 +1728,8 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         profilerender.write_skill_md(state, profile_skill_out)
 
     @app.get("/onboarding/")
-    def onboarding_page(screen: str = "welcome") -> Response:
+    def onboarding_page(screen: str = "welcome",
+                        course: str | None = None) -> Response:
         # One transaction for the three questions a screen can ask: where the
         # fold says you are, what your profile holds, and whether the second
         # process is running. Three round trips would let the page describe a
@@ -1565,6 +1747,19 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             # screen of their own yet keep the placeholder.
             flow = state.active()
             if stop == "scope":
+                # Two screens behind one stop: a course that finished has a
+                # card to land on, and the same stop is where a second
+                # course is started from (design §4, Stop 10). The card is
+                # drawn under the fold's terminal stage rather than under
+                # "scope", because the step strip over a finished setup must
+                # not say a step is still in progress.
+                landed = promoted_flow(state, course)
+                if landed is not None:
+                    return HTMLResponse(_page(
+                        "done",
+                        landing_screen(landed.course_id, courses_dir,
+                                       tenant_slug),
+                        tenant_slug))
                 rendered = scope_screen()
             elif stop == "outline":
                 rendered = outline_screen(flow)
@@ -1577,7 +1772,7 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                     flow, draft_manifest(courses_dir, flow.course_id))
             elif stop == "build":
                 rendered = build_screen(flow)
-            elif stop == "promote" and (flow is None or flow.status != "failed"):
+            elif stop == "promote":
                 rendered = promote_screen(flow)
             else:
                 rendered = stage_screen(stop, flow)
@@ -1890,6 +2085,33 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             onboarding.append_event(conn, scope, "build_requested",
                                     flow.course_id, {})
             conn.execute(scope.runs_insert(flow.course_id, "build", {}))
+        return RedirectResponse("/onboarding/", status_code=303)
+
+    @app.post("/onboarding/promote/retry")
+    def retry_promote() -> Response:
+        """Ask for the publication again. The cheapest retry in the wizard.
+
+        Same two rows as the other two retries — the request, and the run —
+        and for the same reason: without the request row there is nothing to
+        move the flow off `failed`, and the wizard would show a live run as
+        a dead one for as long as it took (O1). The stage itself is the one
+        that spends nothing, so this button asks for no approval and there
+        is no half-bought work for it to be careful about; what it is
+        careful about instead is the tree, and that care is the handler's —
+        every step of publishing is skipped by the state it already finds.
+
+        One refusal, against the fold rather than the form: there has to be
+        a stopped publication here, or the button came from a stale tab.
+        """
+        with engine.begin() as conn:
+            flow = onboarding.load_state(conn, scope).active()
+            if (flow is None or flow.stage != "promote"
+                    or flow.status != "failed"):
+                raise HTTPException(409, "there is no stopped publication to "
+                                         "try again — reload /onboarding/")
+            onboarding.append_event(conn, scope, "promote_requested",
+                                    flow.course_id, {})
+            conn.execute(scope.runs_insert(flow.course_id, "promote", {}))
         return RedirectResponse("/onboarding/", status_code=303)
 
     @app.post("/onboarding/outline/reject")

@@ -58,7 +58,7 @@ from .compiler import compile_course
 from .currender import render_curriculum
 from .hubrender import render_hub
 from . import refs
-from .profilerender import render_profile_page
+from .profilerender import render_profile_page, write_skill_md
 from .resrender import render_resources
 from .schema import Manifest, SchemaError
 from .sidecar import load_sidecar
@@ -236,7 +236,8 @@ GATE_EXEMPT = ("/onboarding", "/profile", "/api/profile")
 
 def create_app(course_roots: list[str], tenant_slug: str,
                database_url: str | None = None,
-               courses_dir: str | None = None) -> FastAPI:
+               courses_dir: str | None = None,
+               profile_skill_out: str | None = None) -> FastAPI:
     engine = db.make_engine(database_url)
     with engine.begin() as conn:
         tenant_id = db.tenant_id_for(conn, tenant_slug)   # fail at startup, T1
@@ -313,7 +314,8 @@ def create_app(course_roots: list[str], tenant_slug: str,
 
     app = FastAPI(title="curricle", docs_url=None, redoc_url=None)
     wizard.mount(app, engine=engine, scope=scope, tenant_slug=tenant_slug,
-                 courses=courses, courses_dir=courses_dir)
+                 courses=courses, courses_dir=courses_dir,
+                 profile_skill_out=profile_skill_out)
 
     @app.middleware("http")
     async def onboarding_gate(request: Request, call_next):
@@ -453,6 +455,22 @@ def create_app(course_roots: list[str], tenant_slug: str,
 </html>
 """
 
+    def render_projection(state: profile.ProfileState) -> None:
+        """Re-render the installed SKILL.md, when one is installed.
+
+        The other half of the wizard's hook (design §4, Stop 5): every path
+        that writes a profile event re-renders, so nobody has to remember to.
+        `propose` changes `pending` rather than the fold's claims and so
+        re-renders to the same bytes — idempotent, and cheaper to do than to
+        reason about which kinds could have moved a claim.
+
+        Called after the transaction commits, never inside it: a file beside
+        an uncommitted row would be a projection of a ledger that might yet
+        roll back.
+        """
+        if profile_skill_out is not None:
+            write_skill_md(state, profile_skill_out)
+
     @app.get("/profile", response_class=HTMLResponse)
     def profile_page() -> str:
         with engine.begin() as conn:
@@ -475,6 +493,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
                 state = profile.load_profile(conn, scope)
         except profile.InvalidProfileEvent as exc:
             raise HTTPException(422, str(exc))
+        render_projection(state)
         return JSONResponse({"ok": True, "pending": len(state.pending)})
 
     @app.get("/c/{slug}/")

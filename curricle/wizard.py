@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from . import db, onboarding, profile, theme
+from . import db, onboarding, profile, profilerender, theme
 
 # The two waits, in words. Design §5: always mark *and* word — the mark is
 # reinforcement, the word is the message, and a screen read with no color at
@@ -224,6 +224,14 @@ FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
 GATE_LEAD = ("Before you can publish your profile, these still need at least "
              "one claim in your own words:")
 
+# The review screen's caption, design §4's own sentence. What is under it is
+# the SKILL.md source itself rather than a styled rendering of it: the
+# projection *is* a markdown document, and the honest review of a document
+# that gets sent somewhere is the document that gets sent. The styled view
+# of the same claims already exists at `/profile`, linked from here.
+REVIEW_CAPTION = ("This exact document rides along on every model call that "
+                  "builds your course.")
+
 # Five seconds is short enough that a finished stage is seen almost at once
 # and long enough that a browser left open overnight is not a load.
 META_REFRESH = '<meta http-equiv="refresh" content="5">'
@@ -318,6 +326,16 @@ WIZARD_CSS = theme.style("""\
   .gateline { font-size:14.5px; line-height:1.6; color:var(--muted);
               margin:16px 0 0; max-width:62ch; }
   .gateline b { color:var(--ink); }
+  .caption { font-size:14.5px; line-height:1.6; color:var(--ink);
+             margin:26px 0 0; max-width:62ch; }
+  /* The projection, shown as what it is: a text file, in a text file's
+     typeface, wrapping rather than scrolling sideways so every line of it
+     can be read without a horizontal gesture. */
+  pre.projection { font:13px/1.62 """ + theme.FONT_MONO + """;
+                   white-space:pre-wrap; overflow-wrap:anywhere;
+                   background:var(--panel); border:1px solid var(--line);
+                   border-radius:18px; box-shadow:var(--shadow);
+                   color:var(--ink); padding:20px 24px; margin:14px 0 0; }
 """)
 
 # The illustration vocabulary this surface owns: three small marks drawn in
@@ -636,24 +654,49 @@ def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
 
 
 def review_screen(profile_state: profile.ProfileState) -> Screen:
-    """Stop 5: the projection, whole, then publish. Placeholder until it lands."""
+    """Stop 5: the projection, whole, then publish.
+
+    The document is rendered here and nowhere else in this module —
+    `profilerender.render_skill_md` is the only thing that knows how a
+    profile becomes that file, and a second renderer for the review screen
+    would be a second answer to what the model is about to read. Escaped,
+    because every substantive line of it is a claim the learner typed.
+
+    Publishing is refused here as well as displayed: the confirm form is not
+    drawn at all while the gate is unsatisfied, and `POST .../publish` asks
+    `profile_gate_missing` again for itself, because a button that is absent
+    from a page is not a rule.
+    """
+    e = html_mod.escape
     missing = onboarding.profile_gate_missing(profile_state)
-    gate = (f"<p>Still missing before the profile can be published: "
-            f"<b>{html_mod.escape(', '.join(missing))}</b>.</p>"
-            if missing else
-            "<p>Every field the course builder leans on has at least one "
-            "claim on the record.</p>")
+    if missing:
+        names = ", ".join(FIELD_LABELS[f] for f in missing)
+        confirm = f"""
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("waiting")}</p>
+    <h2>Not ready to publish yet</h2>
+    <p>{GATE_LEAD} <b>{e(names)}</b>.</p>
+  </div>"""
+    else:
+        confirm = """
+  <form method="post" action="/onboarding/profile/publish">
+    <p class="ask">
+      <button class="pill primary" type="submit">Publish my profile →</button>
+      <span class="aside">Publishing opens the rest of the setup. Your claims
+      stay editable on your profile page for as long as you have an account.</span>
+    </p>
+  </form>"""
     return Screen(f"""
   <h1>Read it back before you publish</h1>
-  <div class="gatebox">
-    <p class="stateline">{_chip("waiting")}</p>
-    <h2>This review screen is still being built</h2>
-    <p>It will show the rendered profile whole — the exact document that
-    rides along on every model call that builds your course — and publishing
-    it is what opens the rest of the setup.</p>
-    {gate}
+  <p class="lede">This is the whole of what a course gets told about you —
+  generated from your claims, and from nothing else.</p>
+  <p class="caption">{REVIEW_CAPTION}</p>
+  <pre class="projection">{e(profilerender.render_skill_md(profile_state))}</pre>
+  <div class="nav">
+    <a class="pill" href="/onboarding/?screen=1">← Edit your claims</a>
+    <a class="pill" href="/profile">See it as a page</a>
   </div>
-  <p class="ask"><a class="pill" href="/onboarding/">← back to the start</a></p>
+{confirm}
 """)
 
 
@@ -767,7 +810,8 @@ def claim_lines(form: dict[str, str], field: str) -> list[str]:
 # --------------------------------------------------------------------------
 
 def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
-          courses: dict, courses_dir: str | None) -> None:
+          courses: dict, courses_dir: str | None,
+          profile_skill_out: str | None = None) -> None:
     """Register the wizard's routes on `app`, closure style.
 
     `courses` is the live course map `create_app` keeps and mutates; the
@@ -776,7 +820,28 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
     against. Both are held here rather than fetched, because the app has
     exactly one of each and passing them is cheaper than a second source of
     truth for either.
+
+    `profile_skill_out` is the projection's install path, or None for off —
+    the interim home of a setting that wants to be tenant config the day
+    tenant config exists (design §11).
     """
+
+    def render_projection() -> None:
+        """Re-render the installed SKILL.md, if one is installed anywhere.
+
+        Called after a profile write commits, never inside the transaction:
+        a file written beside an uncommitted row would be a projection of a
+        ledger that might yet roll back. The fold is re-read rather than
+        reused for the same reason — what the writing transaction held is
+        the profile as it was *before* its own rows.
+
+        Off by default, and the read only happens when it is on.
+        """
+        if profile_skill_out is None:
+            return
+        with engine.begin() as conn:
+            state = profile.load_profile(conn, scope)
+        profilerender.write_skill_md(state, profile_skill_out)
 
     @app.get("/onboarding/")
     def onboarding_page(screen: str = "welcome") -> Response:
@@ -808,6 +873,43 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         else:
             rendered = form_screen(screen, profile_state)
         return HTMLResponse(_page(stop, rendered, tenant_slug))
+
+    # Registered before `/onboarding/profile/{number}`: routes match in
+    # registration order, and the other way round "publish" would arrive as a
+    # screen number and leave as a 404.
+    @app.post("/onboarding/profile/publish")
+    def publish_profile() -> Response:
+        """Stop 5's confirm: one ledger row saying publishing happened.
+
+        The row carries no claim and never will (design §5) — the profile
+        ledger is the record of what you said, and this one records only
+        that you were ready. Two checks, both against the fold and both
+        inside the writing transaction, so neither can be answered by a page
+        that was drawn a while ago:
+
+        - O1: a tenant past the profile stop is not publishing a profile;
+          they published one already, and the second row would be a no-op
+          written over a course build in flight.
+        - The gate: `onboarding.profile_gate_missing` is the single rule,
+          asked here as well as displayed on the way here, because a form a
+          learner reached with a stale tab or with curl is a form that never
+          saw the button being absent.
+        """
+        with engine.begin() as conn:
+            if onboarding.load_state(conn, scope).current_stop() != "profile":
+                raise HTTPException(409, "your profile is already published; "
+                                         "edit your claims on /profile")
+            missing = onboarding.profile_gate_missing(
+                profile.load_profile(conn, scope))
+            if missing:
+                names = ", ".join(FIELD_LABELS[f] for f in missing)
+                raise HTTPException(
+                    422, f"these fields still need a claim: {names}")
+            onboarding.append_event(conn, scope, "profile_published", "", {})
+        render_projection()
+        # 303 to the one URL: what the learner sees next is whatever the fold
+        # says now, which is the scope stop.
+        return RedirectResponse("/onboarding/", status_code=303)
 
     @app.post("/onboarding/profile/{number}")
     async def save_profile_screen(number: str, request: Request) -> Response:
@@ -893,6 +995,7 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             except profile.InvalidProfileEvent as exc:
                 raise HTTPException(422, str(exc))
 
+        render_projection()
         at = SCREEN_ORDER.index(number)
         # 303: the save is done, and what follows is a page to look at — a
         # reload of it must never post the form a second time.

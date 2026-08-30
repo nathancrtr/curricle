@@ -10,10 +10,12 @@ Two tenants per fixture (T5): an app is built per tenant, so a screen drawn
 for one of them can never be a screen drawn from the other's ledger.
 """
 
+import html
 import os
+import tempfile
 import unittest
 
-from curricle import db, onboarding, profile, webapp, wizard
+from curricle import db, onboarding, profile, profilerender, webapp, wizard
 
 from pg import test_engine
 # The lock a live worker holds, taken here by a detached session so the
@@ -71,6 +73,28 @@ class WizardFixture(unittest.TestCase):
     def profile_state(self) -> profile.ProfileState:
         with self.engine.begin() as conn:
             return profile.load_profile(conn, self.scope)
+
+    def onboarding_rows(self) -> list:
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.onboarding_select()))
+
+    def current_stop(self) -> str:
+        with self.engine.begin() as conn:
+            return onboarding.load_state(conn, self.scope).current_stop()
+
+    def satisfy_the_gate(self):
+        """A claim in each of the four required fields, through the forms.
+
+        Written by posting the screens rather than by inserting rows: what
+        the gate is asked about is the profile fold a learner could actually
+        have produced here.
+        """
+        self.save("1", {"new__background": "Eight years of backend work."})
+        self.save("2", {"new__style": "Learns by implementing: pair every "
+                                      "idea with something runnable.",
+                        "new__pacing": "Four hours a week, two evenings."})
+        self.save("3", {"new__calibration": "The failure it prevents first, "
+                                            "then the formal statement."})
 
 
 class GuardTest(unittest.TestCase):
@@ -504,6 +528,191 @@ class ClosedScreenRefusesTest(WizardFixture):
                          409)
         self.assertEqual([r.payload["text"] for r in self.profile_rows()],
                          ["before"])
+
+
+class ReviewScreenTest(WizardFixture):
+    """Stop 5 shows the artifact itself, whole, under design §4's caption."""
+
+    def test_the_projection_is_the_page(self):
+        self.satisfy_the_gate()
+        page = self.screen("?screen=review")
+        self.assertIn(wizard.REVIEW_CAPTION, page)
+        # The exact document, not a second rendering of the same claims: what
+        # is on the screen is `render_skill_md` and the escaping, and nothing
+        # else has had an opinion about it.
+        projection = profilerender.render_skill_md(self.profile_state())
+        start = page.index('<pre class="projection">')
+        pre = page[start:page.index("</pre>", start)]
+        self.assertIn(html.escape(projection), pre)
+        self.assertIn("Learns by implementing", pre)
+        # Edit loops back to the forms; the styled view of the same claims is
+        # a link away; and the gate is met, so the confirm form is drawn.
+        self.assertIn('href="/onboarding/?screen=1"', page)
+        self.assertIn("See it as a page", page)
+        self.assertIn('action="/onboarding/profile/publish"', page)
+
+    def test_a_claim_is_escaped_inside_the_projection(self):
+        # The document is a learner's sentences top to bottom, and the review
+        # screen is the one place they are read back as markup.
+        self.save("4", {"new__subject_adapters": "assume <b>engineering</b> "
+                                                 "judgment & weak formalism"})
+        page = self.screen("?screen=review")
+        self.assertIn("assume &lt;b&gt;engineering&lt;/b&gt; judgment &amp; "
+                      "weak formalism", page)
+        self.assertNotIn("<b>engineering</b>", page)
+
+
+class ReviewGateTest(WizardFixture):
+    """The gate at the review: named in words, and enforced at the POST."""
+
+    def test_an_unmet_gate_names_the_field_and_draws_no_button(self):
+        # Three of the four required fields — the fourth is the test.
+        self.save("2", {"new__style": "learns by implementing",
+                        "new__pacing": "four hours a week"})
+        self.save("3", {"new__calibration": "the failure first"})
+        self.assertEqual(onboarding.profile_gate_missing(self.profile_state()),
+                         ("background",))
+        page = self.screen("?screen=review")
+        self.assertIn(wizard.GATE_LEAD, page)
+        self.assertIn(wizard.FIELD_LABELS["background"], page)
+        self.assertNotIn("/onboarding/profile/publish", page)
+
+    def test_publishing_under_an_unmet_gate_is_refused(self):
+        # A button that is absent from a page is not a rule: the POST asks
+        # `profile_gate_missing` for itself, and refuses in the same words.
+        refused = self.client.post("/onboarding/profile/publish",
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 422)
+        self.assertIn(wizard.FIELD_LABELS["background"], refused.text)
+        self.assertEqual(self.onboarding_rows(), [])
+        self.assertEqual(self.current_stop(), "profile")
+
+
+class PublishProfileTest(WizardFixture):
+    """One row saying publishing happened — and never a word of a claim."""
+
+    def test_publishing_moves_the_fold_and_opens_the_rest_of_the_setup(self):
+        self.satisfy_the_gate()
+        published = self.client.post("/onboarding/profile/publish",
+                                     follow_redirects=False)
+        self.assertEqual(published.status_code, 303, published.text)
+        self.assertEqual(published.headers["location"], "/onboarding/")
+        # The onboarding ledger records position, never content (design §5):
+        # one row, no course, and an empty payload holding no claim.
+        rows = self.onboarding_rows()
+        self.assertEqual([(r.kind, r.course, r.payload) for r in rows],
+                         [("profile_published", "", {})])
+        self.assertEqual(self.current_stop(), "scope")
+        # The gate from issue 05 stops firing, for the front door and for the
+        # wizard alike: what /onboarding/ shows now is the next stop.
+        self.assertEqual(self.client.get("/", follow_redirects=False)
+                         .status_code, 200)
+        self.assertIn(wizard.STOP_TITLES["scope"], self.screen())
+        # Asserted in the same test because it is the same one-way ledger:
+        # O1 for a write, from a tab that still has the button on it.
+        again = self.client.post("/onboarding/profile/publish",
+                                 follow_redirects=False)
+        self.assertEqual(again.status_code, 409)
+        self.assertEqual(len(self.onboarding_rows()), 1)
+
+
+class ProjectionHookTest(unittest.TestCase):
+    """The installed SKILL.md follows the ledger, and only when configured.
+
+    The target is a temp path in every one of these, and the rule that says
+    so is older than the wizard: `~/.claude/skills/learner-profile/SKILL.md`
+    is a real person's real file, and a test that wrote to it would be the
+    hand-editing this projection exists to retire, done by a machine.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+
+        cls.engine = test_engine()
+        cls.tmp = tempfile.TemporaryDirectory(prefix="curricle-skill-")
+        cls.out = os.path.join(cls.tmp.name, "SKILL.md")
+        cls.slug = "wizard-hook"
+        with cls.engine.begin() as conn:
+            db.create_tenant(conn, cls.slug)
+        cls.client = TestClient(webapp.create_app(
+            [], tenant_slug=cls.slug, database_url=str(cls.engine.url),
+            profile_skill_out=cls.out))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def installed(self) -> str:
+        with open(self.out, encoding="utf-8") as f:
+            return f.read()
+
+    def test_the_target_is_a_temp_path_and_never_the_real_skill_file(self):
+        self.assertTrue(self.out.startswith(tempfile.gettempdir()))
+        self.assertFalse(self.out.startswith(os.path.expanduser("~/.claude")))
+
+    def test_a_claim_through_the_api_re_renders_the_projection(self):
+        posted = self.client.post("/api/profile/events", json={
+            "kind": "assert", "field": "pacing", "key": "pacing-01",
+            "payload": {"text": "four hours a week, two evenings",
+                        "tier": "attested"}})
+        self.assertEqual(posted.status_code, 200, posted.text)
+        self.assertIn("four hours a week, two evenings", self.installed())
+
+    def test_a_wizard_save_re_renders_the_projection(self):
+        self.client.post("/onboarding/profile/1",
+                         data={"new__background": "eight years of backend work"},
+                         follow_redirects=False)
+        installed = self.installed()
+        self.assertIn("eight years of backend work", installed)
+        # Whole, not partial: the file is a complete render, which is what
+        # the temp-file-and-rename buys. And no debris beside it — a writer
+        # that left its temp files would be one that had not renamed them.
+        self.assertTrue(installed.startswith("---\nname: learner-profile"))
+        self.assertTrue(installed.rstrip().endswith("re-render.*"))
+        self.assertEqual(os.listdir(self.tmp.name), ["SKILL.md"])
+
+    def test_publishing_re_renders_too(self):
+        # Publishing writes no claim, so the render is the same bytes as the
+        # last one — unconditional and idempotent beats a rule about which
+        # events could have moved the fold.
+        for number, boxes in (("1", {"new__background": "backend work"}),
+                              ("2", {"new__style": "learns by implementing",
+                                     "new__pacing": "four hours a week"}),
+                              ("3", {"new__calibration": "the failure first"})):
+            self.client.post(f"/onboarding/profile/{number}", data=boxes,
+                             follow_redirects=False)
+        before = self.installed()
+        published = self.client.post("/onboarding/profile/publish",
+                                     follow_redirects=False)
+        self.assertEqual(published.status_code, 303, published.text)
+        self.assertEqual(self.installed(), before)
+        self.assertEqual(os.listdir(self.tmp.name), ["SKILL.md"])
+
+
+class ProjectionHookOffTest(unittest.TestCase):
+    """Default: off. No path, no file, anywhere."""
+
+    def test_an_unconfigured_app_writes_no_projection(self):
+        import inspect
+
+        self.assertIsNone(inspect.signature(webapp.create_app)
+                          .parameters["profile_skill_out"].default)
+        engine = test_engine()
+        with tempfile.TemporaryDirectory(prefix="curricle-skill-") as empty:
+            # Nothing points here; the directory is the witness that the hook
+            # does not go looking for somewhere to write when nobody has said
+            # where. A default that had quietly become the real skill file
+            # would fail on the line above instead.
+            c = client(engine, "wizard-hook-off")
+            posted = c.post("/api/profile/events", json={
+                "kind": "assert", "field": "pacing", "key": "pacing-01",
+                "payload": {"text": "four hours a week", "tier": "attested"}})
+            self.assertEqual(posted.status_code, 200, posted.text)
+            self.assertEqual(c.post("/onboarding/profile/1",
+                                    data={"new__background": "backend work"},
+                                    follow_redirects=False).status_code, 303)
+            self.assertEqual(os.listdir(empty), [])
 
 
 class StateChipTest(unittest.TestCase):

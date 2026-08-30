@@ -23,8 +23,11 @@ from corpuspaths import HAVE_ML, ML_ROOT
 from pg import test_engine
 
 
+# Question 4 names a phase on purpose: a later phase's quiz is entitled to ask
+# what an earlier one covered, in those words, and the renderer's phase
+# renumbering must never reach the model's own sentences.
 GOOD_QUIZ = json.dumps([
-    {"q": f"Question {i}?", "options": [
+    {"q": "What did Phase 1 cover?" if i == 4 else f"Question {i}?", "options": [
         {"text": "right", "correct": True, "why": "because"},
         {"text": "wrong a", "correct": False, "why": "misconception a"},
         {"text": "wrong b", "correct": False, "why": "misconception b"},
@@ -42,6 +45,7 @@ NATIVE_SHELL = """\
 <p class="eyebrow">phase 1 checkpoint</p>
 <h1>Phase 1 Checkpoint</h1>
 <p class="sub">Six questions on scanning. On to Phase 2.</p>
+<p class="sub">The sequel to all this arrives in Phase 12.</p>
 <script>
 const QUIZ_DATA = [
   {q: 'old'}
@@ -271,6 +275,8 @@ class ValidatorTest(unittest.TestCase):
         self.assertIn("phase 2 checkpoint", out)          # the lowercase eyebrow
         self.assertIn("Six questions on scanning. On to Phase 2.", out)  # its
         # own copy, kept: neutralising it is the house shell's business alone.
+        # And the renumber is bounded — "Phase 1" is not a prefix of a page.
+        self.assertIn("The sequel to all this arrives in Phase 12.", out)
 
     def test_a_shell_that_reports_nothing_is_refused(self):
         mute = NATIVE_SHELL.replace(
@@ -280,6 +286,28 @@ class ValidatorTest(unittest.TestCase):
                                      material_id="q-phase-2",
                                      course_title="Tiny demo")
         self.assertIn("checkpoint", str(caught.exception))
+
+    def test_a_commented_out_call_is_not_a_call(self):
+        """The shape a half-finished shell has: the report is there, disabled.
+
+        Rendering it would produce a page that looks wired up and reports
+        nothing, so the commented-out call neither satisfies the requirement
+        nor gets retargeted — and a real call on another line still does.
+        """
+        disabled = NATIVE_SHELL.replace(
+            'curricle.checkpoint("quiz-p1", {score});',
+            '// curricle.checkpoint("quiz-p1", {score});')
+        with self.assertRaises(factory.ValidationFailed):
+            factory.render_quiz_html(disabled, json.loads(GOOD_QUIZ), 2, 1,
+                                     material_id="q-phase-2",
+                                     course_title="Tiny demo")
+        out = factory.render_quiz_html(
+            disabled.replace("</script>",
+                             'curricle.checkpoint("quiz-p1", {});\n</script>'),
+            json.loads(GOOD_QUIZ), 2, 1,
+            material_id="q-phase-2", course_title="Tiny demo")
+        self.assertIn('curricle.checkpoint("q-phase-2", {});', out)
+        self.assertIn('// curricle.checkpoint("quiz-p1", {score});', out)
 
 
 # Where each house exemplar came from, relative to tinylang's `interactive/`.
@@ -350,7 +378,7 @@ class HouseExemplarTest(unittest.TestCase):
         self.assertIn("const QUIZ_DATA", factory._quiz_exemplar(shell))
 
     def test_the_rendered_house_shell_carries_no_tinylang_identity(self):
-        """The shipped shell says "quiz-p1", "Phase 1" and "lexing" — a built
+        """The shipped shell says "quiz-p1", "Phase 1" and "lexer" — a built
         course inherits none of it. The id is the load-bearing one: it is what
         the events API validates the learner's POST against, and the id the
         build registers is `q-phase-{N}`.
@@ -363,11 +391,47 @@ class HouseExemplarTest(unittest.TestCase):
         self.assertIn("<title>Phase 3 Checkpoint — Tiny demo</title>", out)
         self.assertNotIn("tinylang", out)
         self.assertIn("phase 3 checkpoint", out)          # the lowercase eyebrow
-        self.assertNotIn("Phase 1", out)
-        # The house copy is neutralised: counted, phase-relative, no lexers.
+        # Both branches of the house copy are neutralised: counted intro,
+        # phase-relative pass, and a fail branch that sends the learner back to
+        # this course's materials rather than to tinylang's widget.
         self.assertIn("10 questions on this phase's material.", out)
-        self.assertNotIn("lexing and parsing.", out)
         self.assertIn("On to Phase 4.", out)
+        self.assertIn("reread the misses' explanations, then revisit this "
+                      "phase's materials.", out)
+        for tinylangism in ("lexing and parsing.", "lexer",
+                            "token stream explorer"):
+            self.assertNotIn(tinylangism, out)
+        # The chrome is phase 3 throughout; the one "Phase 1" left standing is
+        # the quiz-author's own sentence, which the renderer does not edit.
+        self.assertIn("What did Phase 1 cover?", out)
+        self.assertEqual(out.count("Phase 1"), 1)
+
+    def test_a_house_descendant_is_re_neutralised_rather_than_patched(self):
+        """Phase 2 reads phase 1's *rendered page* as its shell.
+
+        That page is not the shipped file any more, so equality alone would
+        read it as a course's own voice and leave last phase's copy in place —
+        the count stale, the outro one behind, once per phase. The lineage
+        marker is what makes the second render recompute rather than patch.
+        """
+        first = factory.render_quiz_html(
+            factory.house_exemplar("quiz"), json.loads(GOOD_QUIZ), 1, 1,
+            material_id="q-phase-1", course_title="Tiny demo")
+        self.assertIn(factory.HOUSE_MARKER, first)
+        self.assertIn("10 questions on this phase's material.", first)
+        self.assertIn("On to Phase 2.", first)
+
+        second = factory.render_quiz_html(
+            first, json.loads(GOOD_QUIZ)[:8], 3, 1,
+            material_id="q-phase-3", course_title="Tiny demo")
+        self.assertEqual(second.count(factory.HOUSE_MARKER), 1)
+        self.assertIn("8 questions on this phase's material.", second)
+        self.assertNotIn("10 questions", second)
+        self.assertIn("On to Phase 4.", second)
+        self.assertNotIn("On to Phase 2.", second)
+        self.assertIn("reread the misses' explanations, then revisit this "
+                      "phase's materials.", second)
+        self.assertIn('curricle.checkpoint("q-phase-3",', second)
 
     def test_the_widget_would_survive_its_own_validator(self):
         widget = factory.house_exemplar("widget")

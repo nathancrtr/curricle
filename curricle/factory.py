@@ -19,6 +19,13 @@ in the course's established voice for this specific learner. A course's
 *first* build has no earlier phases to quote, so each of those lookups falls
 back to the shipped house set in `curricle/exemplars/`; from phase 2 on the
 course's own materials take over, exactly as before.
+
+That handover has one wrinkle, and `render_quiz_html` carries it: what phase
+2 reads as its quiz shell is phase 1's *rendered page*, which — if phase 1
+fell back — is the house shell wearing a course's identity rather than a page
+the course wrote. So a house render stamps its lineage into the page and a
+later render recomputes the house copy from its own phase and question count,
+instead of either freezing last phase's wording or editing an edit.
 """
 
 from __future__ import annotations
@@ -292,16 +299,37 @@ QUIZ_DATA_RE = re.compile(r"const QUIZ_DATA = \[.*?\n\];", re.S)
 # material id the events API validates the POST against, so a shell copied
 # from another quiz reports under that quiz's id: an unknown id 422s and the
 # result never reaches the ledger, a *known* one lands on the wrong quiz.
-CHECKPOINT_CALL_RE = re.compile(r"""(curricle\.checkpoint\(\s*)(["'])[^"']*\2""")
+#
+# A commented-out call is not a call: `before` is the rest of its own line and
+# may not contain `//`, so a shell whose only report is commented out refuses
+# rather than rendering mute — and the comment is left as its author wrote it.
+# Two cases are knowingly not handled, because handling them means parsing
+# JavaScript: a call inside a `/* … */` block, and an id built as a template
+# string (`curricle.checkpoint(`q-phase-${n}`…)`), which the quoted-literal
+# pattern simply does not match and which therefore refuses.
+CHECKPOINT_CALL_RE = re.compile(
+    r"""(?m)^(?P<before>(?:(?!//).)*?)"""
+    r"""(?P<call>curricle\.checkpoint\(\s*)(?P<q>["'])[^"']*(?P=q)""")
 
 TITLE_RE = re.compile(r"<title>.*?</title>", re.S)
 
+# Rendered into every page descended from the house shell, so a later build
+# reusing that page as its shell can tell house lineage from a course's own
+# voice. Without it the second render would see a page that no longer equals
+# the shipped file, keep its copy, and compound the phase numbers.
+HOUSE_MARKER = "<!-- curricle:house-quiz-shell -->"
+
 # The house shell's own subject-matter copy — tinylang's, since that is where
-# the shell was curated from. Neutralised only when the shell *is* the house
-# shell: a course's own checkpoint page keeps its voice, and only its id is
-# rewritten.
-HOUSE_INTRO_RE = re.compile(r"Eight questions on lexing and parsing\.")
+# the shell was curated from — and, alternated in, this function's own output
+# from the last time it neutralised a page. Every render recomputes all three
+# from scratch, so a descendant gets fresh copy rather than an edit of an
+# edit. Applied to house lineage only: a course's own checkpoint page keeps
+# its voice, and only its id is rewritten.
+HOUSE_INTRO_RE = re.compile(
+    r"(?:Eight questions on lexing and parsing"
+    r"|\d+ questions on this phase's material)\.")
 HOUSE_OUTRO_RE = re.compile(r"On to Phase \d+\.")
+HOUSE_FAIL_RE = re.compile(r"reread the misses' explanations, then [^\"]*")
 
 
 def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
@@ -316,11 +344,24 @@ def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
     refused rather than shipped mute: a quiz whose result reaches no one is
     not a checkpoint.
 
-    The data swap goes last so that none of the chrome rewriting reaches the
-    generated questions — a phase-2 quiz is entitled to mention phase 1.
+    Order matters twice. The data swap goes last, so none of the chrome
+    rewriting reaches the generated questions — a phase-2 quiz is entitled to
+    mention phase 1, in those words. And the house copy is neutralised after
+    the phase renumber, so the outro is computed from the phase being built
+    rather than from whatever the renumber left behind.
+
+    Lineage matters once. The house shell's own subject copy is neutralised;
+    a course's own page keeps its voice. But the *output* of a house render is
+    what the next phase's build reads as its shell — it is no longer equal to
+    the shipped file, and mistaking it for a course-native page would freeze
+    last phase's copy and compound its numbers. So a house render stamps
+    `HOUSE_MARKER` into the page and the marker counts as house lineage, with
+    every neutralisation recomputed from this render's phase and question
+    count rather than patched forward.
     """
     page, calls = CHECKPOINT_CALL_RE.subn(
-        lambda m: m.group(1) + json.dumps(material_id), shell)
+        lambda m: m.group("before") + m.group("call")
+        + json.dumps(material_id), shell)
     if not calls:
         raise ValidationFailed("quiz shell has no curricle.checkpoint call to "
                                "retarget — its results would reach no one")
@@ -328,12 +369,16 @@ def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
     page = TITLE_RE.sub(lambda m: f"<title>{title}</title>", page, count=1)
     page = re.sub(rf"(?i)\b(phase)\s+{old_phase_num}\b",
                   lambda m: f"{m.group(1)} {phase_num}", page)
-    if shell == house_exemplar("quiz"):
+    if shell == house_exemplar("quiz") or HOUSE_MARKER in shell:
         page = HOUSE_INTRO_RE.sub(
             f"{len(questions)} questions on this phase's material.",
             page, count=1)
         page = HOUSE_OUTRO_RE.sub(f"On to Phase {phase_num + 1}.",
                                   page, count=1)
+        page = HOUSE_FAIL_RE.sub(
+            "reread the misses' explanations, then revisit this phase's "
+            "materials.", page, count=1)
+        page = _stamp_house_lineage(page)
 
     js_items = ",\n".join(json.dumps(q, ensure_ascii=False, indent=2)
                           for q in questions)
@@ -342,6 +387,15 @@ def render_quiz_html(shell: str, questions: list[dict], phase_num: int,
     if not swapped:
         raise ValidationFailed("quiz shell has no QUIZ_DATA block to replace")
     return page
+
+
+def _stamp_house_lineage(page: str) -> str:
+    """The marker, once — a re-render of a marked page is still one page."""
+    if HOUSE_MARKER in page:
+        return page
+    if "</head>" in page:
+        return page.replace("</head>", f"{HOUSE_MARKER}\n</head>", 1)
+    return f"{HOUSE_MARKER}\n{page}"
 
 
 # ---------------------------------------------------------------------------

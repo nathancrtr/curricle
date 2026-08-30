@@ -130,6 +130,87 @@ class CourseRootsTest(unittest.TestCase):
             coursehome.course_roots(os.path.join(self.tmp, "nope")), [])
 
 
+class MintCourseIdTest(unittest.TestCase):
+    """The one string that is both a course id and a directory name.
+
+    Registration keys on the basename, so the id and the folder holding it
+    have to agree; minting them as one string is what makes that true by
+    construction rather than by a check somewhere downstream. Everything
+    below is therefore also a test about directory names.
+    """
+
+    def test_a_title_becomes_a_lowercase_hyphenated_slug(self):
+        self.assertEqual(coursehome.mint_course_id("Koine Greek 101", set()),
+                         "koine-greek-101")
+
+    def test_runs_of_anything_else_collapse_to_one_hyphen(self):
+        self.assertEqual(
+            coursehome.mint_course_id("Rust: a project — from scratch!", set()),
+            "rust-a-project-from-scratch")
+
+    def test_the_id_is_capped_and_never_ends_in_a_hyphen(self):
+        # Truncation at a word boundary would otherwise leave a trailing
+        # hyphen, and the collision suffix would then read "…--2".
+        minted = coursehome.mint_course_id("a" * 39 + " tail", set())
+        self.assertEqual(minted, "a" * 39)
+        long = coursehome.mint_course_id("The complete and utterly exhaustive "
+                                         "guide to everything", set())
+        self.assertEqual(len(long), coursehome.ID_MAX)
+        self.assertEqual(long, "the-complete-and-utterly-exhaustive-guid")
+
+    def test_a_title_with_nothing_sluggable_still_gets_a_home(self):
+        # A title in a non-Latin script is the honest case here, not an odd
+        # one: the words stay the learner's on the ledger, and the directory
+        # name is ASCII because a path and a URL segment are.
+        for title in ("!!!", "   ", "Ελληνικά"):
+            with self.subTest(title=title):
+                self.assertEqual(coursehome.mint_course_id(title, set()),
+                                 coursehome.ID_FALLBACK)
+
+    def test_a_taken_name_takes_the_next_number(self):
+        self.assertEqual(coursehome.mint_course_id("Greek", {"greek"}),
+                         "greek-2")
+        self.assertEqual(coursehome.mint_course_id("Greek",
+                                                   {"greek", "greek-2"}),
+                         "greek-3")
+        # The suffix rides on top of the cap rather than inside it: a
+        # disambiguator that could itself be truncated would not disambiguate.
+        capped = coursehome.mint_course_id("a" * 50, {"a" * 40})
+        self.assertEqual(capped, "a" * 40 + "-2")
+
+
+class TakenIdsTest(unittest.TestCase):
+    """What a new course may not be called: served slugs, and every name in
+    the home — a directory holding only a draft included."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="curricle-home-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+
+    def test_loaded_slugs_and_directory_names_are_both_taken(self):
+        plant(self.tmp, "tinylang")
+        os.makedirs(os.path.join(self.tmp, "notes"))
+        with open(os.path.join(self.tmp, "loose.txt"), "w", encoding="utf-8") as f:
+            f.write("not a directory, not a reservation")
+        self.assertEqual(coursehome.taken_ids({"elsewhere": object()}, self.tmp),
+                         {"elsewhere", "tinylang", "notes"})
+
+    def test_a_directory_holding_only_a_draft_reserves_its_name(self):
+        # `course_roots` passes it over — it cannot be served yet — but its
+        # name is spoken for all the same, or two flows would share a draft.
+        os.makedirs(os.path.join(self.tmp, "half-built", ".draft-onboarding"))
+        self.assertEqual(coursehome.course_roots(self.tmp), [])
+        self.assertIn("half-built", coursehome.taken_ids({}, self.tmp))
+        self.assertEqual(coursehome.mint_course_id("Half built", {"half-built"}),
+                         "half-built-2")
+
+    def test_an_unconfigured_or_absent_home_is_no_reservation_at_all(self):
+        self.assertEqual(coursehome.taken_ids({"tinylang": object()}, None),
+                         {"tinylang"})
+        self.assertEqual(
+            coursehome.taken_ids({}, os.path.join(self.tmp, "nope")), set())
+
+
 class ServedFromTheHomeTest(unittest.TestCase):
     """The app's two sources of courses, and the gate they share."""
 

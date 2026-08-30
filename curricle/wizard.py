@@ -42,7 +42,7 @@ from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from . import db, onboarding, profile, profilerender, theme
+from . import coursehome, db, onboarding, profile, profilerender, theme
 
 # The two waits, in words. Design §5: always mark *and* word — the mark is
 # reinforcement, the word is the message, and a screen read with no color at
@@ -224,6 +224,64 @@ FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
 GATE_LEAD = ("Before you can publish your profile, these still need at least "
              "one claim in your own words:")
 
+# Stop 6's three course shapes, each explained in a sentence (design §4).
+# (value, name, what choosing it means) — the values are the manifest's
+# `COURSE_MODES` and a test pins them to it, because this radio group is
+# where a learner picks the string a sidecar will later declare.
+MODE_COPY = (
+    ("subject", "A subject",
+     "A field you want to understand. The course is organized around the "
+     "ideas, and the work exists to make them stick."),
+    ("project", "A project",
+     "Something you want to have built. The course is organized around "
+     "shipping it, and each idea arrives when the build needs it."),
+    ("research", "A question",
+     "Something you want to be able to investigate. The course is organized "
+     "around the literature and the methods that let you read it."),
+)
+
+# The scope form's fields, in the words this surface asks them in: the input
+# name a POST reads, mapped to (what the box is called, the one line under
+# it). The form is assembled from these and the refusals are worded from them
+# too, so a box and the sentence refusing it can never drift apart.
+SCOPE_LABELS = {
+    "mode": ("What kind of course this is",
+             "The three shapes ask different things of the same subject. "
+             "Pick the one that matches why you want it."),
+    "title": ("Working title",
+              "What you would call this course today. The course's id and "
+              "the folder it lives in are minted from this, once, and never "
+              "change afterwards — the words themselves you can change."),
+    "subject": ("Subject",
+                "The territory, in a phrase or two. Narrower is better: a "
+                "course that covers everything covers it in one paragraph "
+                "each."),
+    "done_looks_like": ("What done looks like",
+                        "The thing you want to be able to do at the end, "
+                        "concretely enough that you would know it had "
+                        "happened."),
+    "out_of_scope": ("What this is not",
+                     "One line per thing you do not want this course to "
+                     "spend your weeks on. The most useful box on this "
+                     "page — it is what stops a course growing sideways."),
+    "prior_exposure": ("Where you are with this subject already",
+                       "Your profile says how you learn; this says what you "
+                       "have already met of this subject in particular."),
+}
+
+# The lede over the whole form (design §4, Stop 6): no model is called here.
+SCOPE_LEDE = ("Nothing on this page calls a model — it is a form, and what "
+              "you write in it is what the next stage is briefed with.")
+
+# The hours question, which is the sizing constant for the whole course: one
+# unit is meant to be one honest week of your work.
+SCOPE_HOURS_LEAD = "Hours a week you can really give this"
+SCOPE_HOURS_HINT = ("A range, low to high. Units are sized against the low "
+                    "end, so answer for a bad week rather than a good one.")
+SCOPE_CADENCE_HINT = ("When those hours happen, if it matters — "
+                      "\"two weekday evenings\", \"one long Sunday\". "
+                      "Optional.")
+
 # The review screen's caption, design §4's own sentence. What is under it is
 # the SKILL.md source itself rather than a styled rendering of it: the
 # projection *is* a markdown document, and the honest review of a document
@@ -320,6 +378,25 @@ WIZARD_CSS = theme.style("""\
      --muted, never the decorative --faint. */
   textarea::placeholder { color:var(--muted); }
   textarea:focus { outline:none; border-color:var(--accent); }
+  /* The scope form's one-line answers, in the same box as the many-line
+     ones: a title and a number are typed into the same kind of field a
+     claim is, because they are the same kind of answer. */
+  input[type=text], input[type=number] { font:14px/1.55 """
+             + theme.FONT_BODY + """; color:var(--ink);
+             background:var(--panel); border:1.5px solid var(--line);
+             border-radius:12px; padding:9px 13px; }
+  input[type=text] { width:100%; }
+  input[type=number] { width:88px; }
+  input:focus { outline:none; border-color:var(--accent); }
+  .hours { display:flex; flex-wrap:wrap; align-items:center; gap:10px;
+           margin:0 0 13px; }
+  .hours span { font-size:14px; color:var(--muted); }
+  .choice { display:block; border:1.5px solid var(--line); border-radius:12px;
+            padding:11px 14px; margin:0 0 10px; }
+  .choice b { font-size:14.5px; }
+  .choice span { display:block; font-size:13.5px; line-height:1.55;
+                 color:var(--muted); margin:4px 0 0 22px; max-width:58ch; }
+  .choice input { margin:0 8px 0 0; }
   .hint { font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 13px; }
   .hint:last-child { margin-bottom:0; }
   .nav { display:flex; flex-wrap:wrap; gap:12px; margin:30px 0 0; }
@@ -700,8 +777,158 @@ def review_screen(profile_state: profile.ProfileState) -> Screen:
 """)
 
 
+def _scope_panel(name: str, control: str, *, labelled: bool = True) -> str:
+    """One question on the scope form: what it asks, why, and the box.
+
+    The heading *is* the label — one question per panel, so a second name
+    over the box would be the same words twice. `labelled=False` is for the
+    one panel whose control is a group rather than a box: a radio group's
+    label is each option's own, and `for` pointing at one of three would name
+    the wrong thing.
+    """
+    label, explain = SCOPE_LABELS[name]
+    heading = (f'<label for="f-{name}">{label}</label>' if labelled else label)
+    return f"""
+    <div class="panel field">
+      <h3>{heading}</h3>
+      <p class="explain">{explain}</p>
+      {control}
+    </div>"""
+
+
+def _scope_line(name: str) -> str:
+    return f'<input type="text" id="f-{name}" name="{name}" required>'
+
+
+def _scope_box(name: str, placeholder: str, required: bool) -> str:
+    return (f'<textarea id="f-{name}" name="{name}" rows="3" '
+            f'placeholder="{placeholder}"'
+            f'{" required" if required else ""}></textarea>')
+
+
+def scope_screen() -> Screen:
+    """Stop 6: the form that is not a model call.
+
+    Design §4 is explicit that the `scope` stage "turns out not to be an LLM
+    stage at all: it is a form" — so nothing here is drafted, guessed or
+    completed for the learner, and the eight answers below are the whole of
+    what the next stage is briefed with. Blank rather than prefilled: the
+    form is only ever drawn at a stop with no scope on the ledger behind it,
+    and a box holding a suggestion would be this page answering its own
+    question.
+
+    Required fields carry the browser's `required` and are checked again at
+    the POST, for the same reason the publish button is: a rule a page draws
+    is not a rule a server keeps.
+    """
+    radios = "".join(
+        f'<label class="choice"><input type="radio" name="mode" '
+        f'value="{value}" required><b>{name}</b><span>{sentence}</span></label>'
+        for value, name, sentence in MODE_COPY)
+    hours = f"""
+    <div class="panel field">
+      <h3>{SCOPE_HOURS_LEAD}</h3>
+      <p class="explain">{SCOPE_HOURS_HINT}</p>
+      <p class="hours"><span>between</span>
+        <input type="number" name="hours_lo" min="1" max="80" required
+               aria-label="Fewest hours a week">
+        <span>and</span>
+        <input type="number" name="hours_hi" min="1" max="80" required
+               aria-label="Most hours a week">
+        <span>hours</span></p>
+      <p class="hint">{SCOPE_CADENCE_HINT}</p>
+      <label class="claim"><span class="claimkey">When, roughly</span>
+      <input type="text" name="cadence"></label>
+    </div>"""
+    return Screen(f"""
+  <h1>{STOP_TITLES["scope"]}</h1>
+  <p class="lede">{SCOPE_LEDE}</p>
+  <form method="post" action="/onboarding/scope">
+    {_scope_panel("title", _scope_line("title"))}
+    {_scope_panel("subject", _scope_line("subject"))}
+    {_scope_panel("mode", radios, labelled=False)}
+    {hours}
+    {_scope_panel("done_looks_like",
+                  _scope_box("done_looks_like",
+                             "I can read a paper in this field and say what "
+                             "it claims.", True))}
+    {_scope_panel("out_of_scope",
+                  _scope_box("out_of_scope", "One line per thing to leave out",
+                             False))}
+    {_scope_panel("prior_exposure",
+                  _scope_box("prior_exposure",
+                             "What you have already read, built or half-"
+                             "finished in this subject.", False))}
+    <p class="ask">
+      <button class="pill primary" type="submit">Draft my outline →</button>
+      <span class="aside">This starts the first stage that calls a model. It
+      is the cheap one, and it stops at its own spending ceiling; the
+      expensive stage waits for your approval of an estimate.</span>
+    </p>
+  </form>
+""")
+
+
+def outline_screen(flow: onboarding.CourseFlow | None) -> Screen:
+    """Stop 7: a machine's turn, or the sentence for why it stopped.
+
+    Pending shows the stage name, the word, and elapsed time since the last
+    ledger row — "and nothing else it would have to invent" (design §4). No
+    percentage, no estimate of how long is left: this stage is one or two
+    model calls whose length nobody here knows, and a progress bar over it
+    would be an animation of a guess.
+
+    Failed shows `WORDING[("outline", reason)]` and a button. The reason key
+    itself never reaches the page (O2) and neither does the exception; both
+    are in the ledger row for an operator. Retrying is offered without a
+    caveat because a failed outline kept nothing — the draft's three files
+    are deleted on every way out but success.
+
+    (`waiting` is a state this wizard cannot write: the scope save appends
+    the request row in the same transaction as the scope. A ledger that
+    somehow held one reads as the pending screen without the refresh, which
+    is the honest rendering of a stage nobody has asked for yet.)
+    """
+    status = flow.status if flow is not None else "waiting"
+    if status == "failed" and flow is not None:
+        worded = onboarding.WORDING.get(
+            ("outline", flow.reason or ""),
+            "That stage stopped and nothing partial was kept.")
+        return Screen(f"""
+  <h1>{STOP_TITLES["outline"]}</h1>
+  <div class="gatebox attention">
+    <p class="stateline">{_chip("failed")}</p>
+    <h2>The outline stopped</h2>
+    <p class="wording">{worded}</p>
+    <form method="post" action="/onboarding/outline/retry">
+      <p class="ask">
+        <button class="pill primary" type="submit">Try again →</button>
+        <span class="aside">Nothing partial was kept, so this starts the
+        stage over rather than resuming it.</span>
+      </p>
+    </form>
+  </div>
+""")
+    since = (f'<span class="elapsed">{elapsed_words(flow.updated_at)}</span>'
+             if flow is not None else "")
+    return Screen(f"""
+  <h1>{STOP_TITLES["outline"]}</h1>
+  <div class="gatebox">
+    <p class="stateline">{_chip(status)}{since}</p>
+    <h2>Reading your profile, and writing a curriculum against it</h2>
+    <p>Two things are being drafted: the phases and units of the course
+    itself, and the shelf of resources it will send you to. Both are checked
+    by the same compiler your own courses go through, and a draft that does
+    not compile is refused rather than shown to you.</p>
+    <p>There is no progress bar here and no estimate of how much longer it
+    will be, because this system would have to invent both. Leave the tab
+    open or close it — the ledger keeps your place either way.</p>
+  </div>
+""", refresh=status == "pending")
+
+
 def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
-    """Stops 6–10: one screen per stage, from the flow the fold folded.
+    """The placeholder for a stop with no screen of its own yet (8–10).
 
     Everything on it comes from the ledger. A stage that is `failed` prints
     the sentence `WORDING` keeps for its `(stage, reason)` pair and never the
@@ -805,6 +1032,66 @@ def claim_lines(form: dict[str, str], field: str) -> list[str]:
     return [line.strip() for line in raw.split("\n") if line.strip()]
 
 
+class InvalidScope(ValueError):
+    """A scope form this wizard refuses rather than completes for you."""
+
+
+def scope_payload(form: dict[str, str]) -> dict:
+    """The `scope_saved` payload, or a refusal naming the box that is empty.
+
+    Every refusal here names a field in the words the form asks it in, because
+    "invalid" is not an instruction. Nothing is defaulted: an unanswered
+    "what done looks like" is the single most load-bearing line in the whole
+    prompt, and a stage briefed with a system-invented answer to it would be
+    building somebody else's course.
+
+    The optional three come back as `""` and `[]` rather than as absences —
+    the payload shape is a wire contract with the gate screen and the worker,
+    and a key that is sometimes missing is a key every consumer has to guard.
+    """
+    def required(name: str) -> str:
+        text = submitted(form, name) or ""
+        if not text:
+            raise InvalidScope(f"{SCOPE_LABELS[name][0]} is required")
+        return text
+
+    def hours(name: str, label: str) -> int:
+        text = submitted(form, name) or ""
+        try:
+            return int(text)
+        except ValueError:
+            raise InvalidScope(f"{label} must be a whole number of hours")
+
+    # Asked in the order the form asks them, so a refusal names the first
+    # box a learner would have to scroll back to rather than an arbitrary one.
+    title, subject = required("title"), required("subject")
+    mode = submitted(form, "mode") or ""
+    if mode not in {value for value, _, _ in MODE_COPY}:
+        raise InvalidScope(f"{SCOPE_LABELS['mode'][0]}: choose one of "
+                           + ", ".join(name for _, name, _ in MODE_COPY))
+    lo = hours("hours_lo", "The low end of your hours a week")
+    hi = hours("hours_hi", "The high end of your hours a week")
+    if lo < 1:
+        raise InvalidScope("A course that asks for under an hour a week is "
+                           "not a course — give it at least one")
+    if hi < lo:
+        raise InvalidScope("The high end of your hours a week cannot be "
+                           "below the low end")
+    done_looks_like = required("done_looks_like")
+    out_of_scope = submitted(form, "out_of_scope") or ""
+    return {
+        "title": title,
+        "subject": subject,
+        "mode": mode,
+        "hours_per_week": [lo, hi],
+        "cadence": submitted(form, "cadence") or "",
+        "done_looks_like": done_looks_like,
+        "out_of_scope": [line.strip() for line in out_of_scope.split("\n")
+                         if line.strip()],
+        "prior_exposure": submitted(form, "prior_exposure") or "",
+    }
+
+
 # --------------------------------------------------------------------------
 # Mounting
 # --------------------------------------------------------------------------
@@ -816,10 +1103,11 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
 
     `courses` is the live course map `create_app` keeps and mutates; the
     wizard reads it and never writes it, so registration stays one process's
-    one job. `courses_dir` is the managed home a later stop mints a course id
-    against. Both are held here rather than fetched, because the app has
-    exactly one of each and passing them is cheaper than a second source of
-    truth for either.
+    one job. `courses_dir` is the managed home, and the two together are what
+    Stop 6 mints a course id against: a name is free only if no served course
+    and no directory in the home already answers to it. Both are held here
+    rather than fetched, because the app has exactly one of each and passing
+    them is cheaper than a second source of truth for either.
 
     `profile_skill_out` is the projection's install path, or None for off —
     the interim home of a setting that wants to be tenant config the day
@@ -858,9 +1146,16 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         if stop != "profile":
             # O1: past the profile stop the fold alone decides, and a
             # `?screen=` in the address bar is not an opinion the wizard has
-            # to have about it.
-            return HTMLResponse(_page(stop, stage_screen(stop, state.active()),
-                                      tenant_slug))
+            # to have about it. One screen per stop, and the stops with no
+            # screen of their own yet keep the placeholder.
+            flow = state.active()
+            if stop == "scope":
+                rendered = scope_screen()
+            elif stop == "outline":
+                rendered = outline_screen(flow)
+            else:
+                rendered = stage_screen(stop, flow)
+            return HTMLResponse(_page(stop, rendered, tenant_slug))
         if screen not in SCREEN_ORDER:
             # A screen the vocabulary does not know is navigation past the
             # frontier: back to the fold's screen, and to a URL that agrees
@@ -1001,3 +1296,87 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         # reload of it must never post the form a second time.
         return RedirectResponse(f"/onboarding/?screen={SCREEN_ORDER[at + 1]}",
                                 status_code=303)
+
+    @app.post("/onboarding/scope")
+    async def save_scope(request: Request) -> Response:
+        """Stop 6: the scope, the course's name, and the request for Stop 7.
+
+        Three writes in one transaction, because there is no human turn
+        between Stops 6 and 7 (design §4): the scope, the request row that
+        says a stage was asked for, and the queued run itself. Either a
+        learner has a course being drafted or they have nothing at all —
+        a scope on the ledger with nothing queued behind it would be a
+        wizard sitting on "Working" forever with no worker to answer it.
+
+        Enqueuing here is this surface's one and only queue privilege: the
+        web app writes request rows and reads outcome rows (design §6), and
+        `scope.runs_insert` is the whole of that. What runs the stage is the
+        second process, and this module has no idea how.
+
+        The id is minted inside the transaction, against the courses this
+        app serves and the directories in the home. It is not reserved
+        anywhere — the `scope_saved` row is the reservation, and the
+        directory that will carry the same name is created by the stage that
+        first writes into it.
+        """
+        # The same rule the profile forms keep, for the same reason: a body
+        # this parser cannot read arrives as no boxes at all, and no boxes is
+        # indistinguishable from a form somebody left blank.
+        if not request.headers.get("content-type", "").startswith(
+                "application/x-www-form-urlencoded"):
+            raise HTTPException(415, "the scope form posts urlencoded")
+        try:
+            form = parse_form(await request.body())
+        except UnicodeDecodeError:
+            raise HTTPException(415, "the scope form posts urlencoded")
+
+        with engine.begin() as conn:
+            if onboarding.load_state(conn, scope).current_stop() != "scope":
+                # O1 for a write: the fold is not at this stop, so this form
+                # is a stale tab. Saving it would start a second course under
+                # a first one, or re-scope a course already being built.
+                raise HTTPException(409, "this setup is not at the scope "
+                                         "stop — reload /onboarding/")
+            try:
+                payload = scope_payload(form)
+            except InvalidScope as exc:
+                # Nothing has been written yet, and the transaction rolls
+                # back regardless: a refused form leaves no half-scoped
+                # course and no run nobody asked for.
+                raise HTTPException(422, str(exc))
+            course_id = coursehome.mint_course_id(
+                payload["title"], coursehome.taken_ids(courses, courses_dir))
+            onboarding.append_event(conn, scope, "scope_saved", course_id,
+                                    payload)
+            onboarding.append_event(conn, scope, "outline_requested",
+                                    course_id, {})
+            conn.execute(scope.runs_insert(course_id, "outline", {}))
+        # 303 to the one URL: what the fold says now is the outline stop.
+        return RedirectResponse("/onboarding/", status_code=303)
+
+    @app.post("/onboarding/outline/retry")
+    def retry_outline() -> Response:
+        """Ask for the outline again. The retry button *is* the scheduler.
+
+        Nothing reschedules a failed stage on its own (design §6) — an
+        automatic retry re-spends a learner's money without being asked — so
+        a stopped outline waits here until a person presses the button. Safe
+        without qualification: a failed outline kept nothing.
+
+        A note from a rejected outline rides along in the `outline_requested`
+        payload, because a retry after a rejection is still that note being
+        answered and the ledger should say so. The queued run itself carries
+        nothing: the note lives in the fold, which is where the stage reads
+        it from, and copying it into two places would be two places to
+        disagree.
+        """
+        with engine.begin() as conn:
+            flow = onboarding.load_state(conn, scope).active()
+            if flow is None or flow.stage != "outline" or flow.status != "failed":
+                raise HTTPException(409, "there is no stopped outline to "
+                                         "retry — reload /onboarding/")
+            onboarding.append_event(conn, scope, "outline_requested",
+                                    flow.course_id,
+                                    {"note": flow.note} if flow.note else {})
+            conn.execute(scope.runs_insert(flow.course_id, "outline", {}))
+        return RedirectResponse("/onboarding/", status_code=303)

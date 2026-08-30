@@ -16,6 +16,8 @@ directions, the route *and* the page, since a rule enforced on one surface
 and forgotten on the other is how a broken course gets published.
 """
 
+import contextlib
+import io
 import os
 import shutil
 import tempfile
@@ -193,12 +195,31 @@ class ServedFromTheHomeTest(unittest.TestCase):
         # paths are the ones that have to swallow the refusal into absence.
         c = self.client([], "home-broken", self.tmp)
         plant(self.tmp, "broken", course_id="broken", broken=True)
-        self.assertEqual(c.get("/c/broken/").status_code, 404)
-        self.assertEqual(c.get("/c/broken/index.html").status_code, 404)
-        page = c.get("/")
+        noise = io.StringIO()
+        with contextlib.redirect_stderr(noise):
+            self.assertEqual(c.get("/c/broken/").status_code, 404)
+            self.assertEqual(c.get("/c/broken/index.html").status_code, 404)
+            page = c.get("/")
         self.assertEqual(page.status_code, 200, page.text)
         self.assertNotIn("/c/broken/", page.text)
         self.assertIn("No courses are configured yet", page.text)
+        # Absent from the page, but not absent from the operator's terminal:
+        # a course that vanishes without a word is indistinguishable from a
+        # course the server never noticed.
+        self.assertIn("not registered", noise.getvalue())
+        self.assertIn("does not compile", noise.getvalue())
+
+    def test_a_directory_whose_course_id_is_not_its_name_is_not_served_as_it(self):
+        # The URL says one thing and the sidecar says another; serving the
+        # course under the name in the URL would publish it under a slug it
+        # never claimed. It registers under its own id and the misnamed
+        # address is an ordinary 404 — not a crash, and not a wrong page.
+        c = self.client([], "home-misnamed", self.tmp)
+        plant(self.tmp, "misnamed", course_id="elsewhere")
+        self.assertEqual(c.get("/c/misnamed/").status_code, 404)
+        under_its_id = c.get("/c/elsewhere/")
+        self.assertEqual(under_its_id.status_code, 200, under_its_id.text)
+        self.assertIn("Interpreters, end to end", under_its_id.text)
 
     def test_a_course_that_stops_compiling_at_startup_stops_the_app(self):
         # Same gate, the loud end of it: at startup there is no page to
@@ -216,6 +237,27 @@ class ServedFromTheHomeTest(unittest.TestCase):
         self.assertIn("tinylang", message)
         self.assertIn(os.path.abspath(TINYLANG), message)
         self.assertIn(home_copy, message)
+
+    def test_two_flag_roots_claiming_one_id_refuse_at_startup(self):
+        # The same refusal, arriving the older way. Last-one-wins would make
+        # the served course a function of argument order, which is a guess.
+        first = plant(self.tmp, "one")
+        second = plant(self.tmp, "two")
+        with self.assertRaises(RuntimeError) as caught:
+            self.client([first, second], "flag-collision", None)
+        message = str(caught.exception)
+        self.assertIn("tinylang", message)
+        self.assertIn(first, message)
+        self.assertIn(second, message)
+
+    def test_one_directory_reached_twice_is_not_two_roots(self):
+        # A symlink into the courses home, or a home under one, is one
+        # course by two names — sameness is the directory, not the spelling.
+        course = plant(self.tmp, "tinylang")
+        link = os.path.join(self.tmp, "by-another-name")
+        os.symlink(course, link)
+        c = self.client([course, link], "flag-symlink", None)
+        self.assertEqual(c.get("/c/tinylang/index.html").status_code, 200)
 
 
 if __name__ == "__main__":

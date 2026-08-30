@@ -35,6 +35,8 @@ import datetime
 import html as html_mod
 import mimetypes
 import os
+import sys
+import threading
 from dataclasses import dataclass
 
 from fastapi import FastAPI, HTTPException, Request
@@ -49,7 +51,7 @@ from .hubrender import render_hub
 from . import refs
 from .profilerender import render_profile_page
 from .resrender import render_resources
-from .schema import Manifest
+from .schema import Manifest, SchemaError
 from .sidecar import load_sidecar
 from .unitrender import render_reader, render_unit
 
@@ -87,6 +89,17 @@ def load_course(root: str) -> CourseHandle:
         slug=manifest.course.id, root=root,
         content_root=os.path.join(root, os.path.dirname(curriculum_rel)),
         manifest=manifest, repo_paths=repo_paths)
+
+
+# The two ways a course root is refused rather than served: the compile came
+# back dirty (load_course raises RuntimeError) or the sidecar violates the
+# contract (SchemaError, out of the strict loader — what a half-written or
+# hand-edited course.yaml in the courses home looks like). Both mean "not a
+# servable course", which the lazy registration paths turn into absence.
+# Anything else — a TypeError out of the compiler, say — is a bug in this
+# repository, and a bug that manifests as courses quietly disappearing is a
+# bug nobody finds.
+REFUSALS = (RuntimeError, SchemaError)
 
 
 # --------------------------------------------------------------------------
@@ -211,6 +224,13 @@ def create_app(course_roots: list[str], tenant_slug: str,
         tenant_id = db.tenant_id_for(conn, tenant_slug)   # fail at startup, T1
     scope = db.for_tenant(tenant_id)
     courses: dict[str, CourseHandle] = {}
+    # Registration happens on request threads now, and uvicorn runs the sync
+    # routes in a threadpool: two requests that miss on the same new course
+    # would otherwise both compile it and race the collision check, which is
+    # a check that only means anything if check-and-insert is one step. The
+    # lock is held across the compile too — the simpler correct shape, and
+    # contention here is two threads at the moment a course first appears.
+    registration = threading.Lock()
 
     def register_course(root: str) -> CourseHandle:
         """Compile one course root and add it to the served map.
@@ -224,16 +244,19 @@ def create_app(course_roots: list[str], tenant_slug: str,
         Two roots claiming one course id is refused rather than resolved.
         Which of them wins would otherwise depend on load order, and a
         served course whose identity depends on argument order is exactly
-        the guess this codebase does not make.
+        the guess this codebase does not make. Sameness is realpath: one
+        directory reached twice, once through a symlink, is one root.
         """
-        h = load_course(root)
-        prior = courses.get(h.slug)
-        if prior is not None and prior.root != h.root:
-            raise RuntimeError(
-                f"two course roots claim the id {h.slug!r}: {prior.root} and "
-                f"{h.root} — refusing to guess which one to serve")
-        courses[h.slug] = h
-        return h
+        with registration:
+            h = load_course(root)
+            prior = courses.get(h.slug)
+            if prior is not None and (os.path.realpath(prior.root)
+                                      != os.path.realpath(h.root)):
+                raise RuntimeError(
+                    f"two course roots claim the id {h.slug!r}: {prior.root} "
+                    f"and {h.root} — refusing to guess which one to serve")
+            courses[h.slug] = h
+            return h
 
     for root in course_roots:
         register_course(root)
@@ -248,6 +271,14 @@ def create_app(course_roots: list[str], tenant_slug: str,
         not compile. The caller gets None and the learner gets a 404 — the
         wizard's own ledger is where a failed build explains itself, not a
         page served to whoever guessed the URL.
+
+        The lookup is by directory name and the answer is by course id, and
+        those are not the same thing: a directory whose sidecar declares
+        some other id registers under that id and is *not* returned here.
+        Serving it under the name in the URL would publish a course under a
+        slug it never claimed, and every link inside the page would then
+        disagree with the address bar. (Minting is what keeps the two equal
+        for wizard-created courses; this is what happens when they aren't.)
         """
         if not courses_dir:
             return None
@@ -256,9 +287,11 @@ def create_app(course_roots: list[str], tenant_slug: str,
         if root not in coursehome.course_roots(courses_dir):
             return None
         try:
-            return register_course(root)
-        except Exception:
+            register_course(root)
+        except REFUSALS as exc:
+            print(f"courses: {root} not registered: {exc}", file=sys.stderr)
             return None
+        return courses.get(slug)
 
     app = FastAPI(title="curricle", docs_url=None, redoc_url=None)
 
@@ -280,8 +313,9 @@ def create_app(course_roots: list[str], tenant_slug: str,
             if os.path.basename(root) not in courses:
                 try:
                     register_course(root)
-                except Exception:
-                    pass
+                except REFUSALS as exc:
+                    print(f"courses: {root} not registered: {exc}",
+                          file=sys.stderr)
         cards = []
         for h in courses.values():
             # One transaction per course. Honest at two, a smell at twenty —

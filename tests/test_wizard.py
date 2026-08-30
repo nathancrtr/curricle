@@ -13,7 +13,7 @@ for one of them can never be a screen drawn from the other's ledger.
 import os
 import unittest
 
-from curricle import db, onboarding, webapp, wizard
+from curricle import db, onboarding, profile, webapp, wizard
 
 from pg import test_engine
 # The lock a live worker holds, taken here by a detached session so the
@@ -56,6 +56,21 @@ class WizardFixture(unittest.TestCase):
         page = self.client.get(f"/onboarding/{query}")
         self.assertEqual(page.status_code, 200, page.text)
         return page.text
+
+    def save(self, number: str, boxes: dict[str, str]):
+        """POST one profile form screen. The redirect is a fact under test,
+        so it is never followed here."""
+        return self.client.post(f"/onboarding/profile/{number}", data=boxes,
+                                follow_redirects=False)
+
+    def profile_rows(self) -> list:
+        """The tenant's profile ledger, whole — the fold is not the record."""
+        with self.engine.begin() as conn:
+            return list(conn.execute(self.scope.profile_select()))
+
+    def profile_state(self) -> profile.ProfileState:
+        with self.engine.begin() as conn:
+            return profile.load_profile(conn, self.scope)
 
 
 class GuardTest(unittest.TestCase):
@@ -134,14 +149,14 @@ class ScreenDispatchTest(WizardFixture):
     def test_the_profile_sub_screens_are_open_at_the_profile_stop(self):
         # O1 in its permissive half: every screen the fold has opened is
         # reachable by navigation, and at the profile stop that is all six.
-        for screen in wizard.PROFILE_SCREENS:
+        for screen in wizard.SCREEN_ORDER:
             with self.subTest(screen=screen):
                 self.assertEqual(
                     self.client.get(f"/onboarding/?screen={screen}").status_code,
                     200)
         self.assertIn("Read it back before you publish",
                       self.screen("?screen=review"))
-        self.assertIn("Profile, screen 3 of 4", self.screen("?screen=3"))
+        self.assertIn("Profile screen 3 of 4", self.screen("?screen=3"))
 
     def test_a_stop_beyond_the_fold_is_unreachable(self):
         # O1 in its strict half: with the fold at "profile", no navigation
@@ -158,6 +173,29 @@ class ScreenDispatchTest(WizardFixture):
                 self.assertEqual(page.headers["location"], "/onboarding/")
         self.assertNotIn(wizard.STOP_TITLES["scope"], self.screen("?screen=scope"))
         self.assertEqual(self.screen("?screen=scope"), self.screen())
+
+
+class ScreenIsIgnoredPastTheProfileTest(WizardFixture):
+    """O1's strictest reading, on its own tenant because the fold moves on.
+
+    The sub-screens are navigation *within* the profile stop. Once the fold
+    is past it, `?screen=` names nothing: a known value — `review`, a profile
+    form — is as inert as an unknown one, because the alternative is a
+    profile form drawn over a course build already running.
+    """
+
+    def test_a_known_screen_value_does_not_survive_the_profile_stop(self):
+        self.append("profile_published")
+        self.append("scope_saved", "greek-104", {"topic": "koine"})
+        self.append("outline_requested", "greek-104")
+        for query in ("?screen=review", "?screen=2", "?screen=welcome"):
+            with self.subTest(query=query):
+                page = self.screen(query)
+                self.assertIn(wizard.PENDING_WORD, page)
+                self.assertIn(wizard.STOP_TITLES["outline"], page)
+                self.assertNotIn("Read it back before you publish", page)
+                self.assertNotIn("Profile screen", page)
+                self.assertNotIn("Let us build you a course.", page)
 
 
 class WelcomeCopyTest(WizardFixture):
@@ -229,6 +267,195 @@ class FailedPlaceholderTest(WizardFixture):
         # the browser to come back, and shows no duration either.
         self.assertNotIn(wizard.META_REFRESH, page)
         self.assertNotIn('<span class="elapsed">', page)
+
+
+class ProfileCopyTest(unittest.TestCase):
+    """Every field that belongs on a form has words; the one that doesn't,
+    doesn't (design §4)."""
+
+    def test_every_field_but_demonstrated_has_a_label_and_two_examples(self):
+        for field in profile.FIELDS:
+            if field == "demonstrated":
+                continue
+            with self.subTest(field=field):
+                explanation, examples = wizard.FIELD_COPY[field]
+                self.assertTrue(explanation.strip())
+                self.assertEqual(len(examples), 2)
+                self.assertTrue(all(x.strip() for x in examples))
+                self.assertTrue(wizard.FIELD_LABELS[field].strip())
+        self.assertEqual(set(wizard.FIELD_COPY),
+                         set(profile.FIELDS) - {"demonstrated"})
+        self.assertNotIn("demonstrated", wizard.FIELD_COPY)
+
+    def test_the_four_screens_between_them_cover_every_field_on_a_form(self):
+        # Plus `meta`, which is screen 1's description line rather than one of
+        # its fields — the one claim identity the wizard never mints.
+        asked = {f for _, _, fields in wizard.PROFILE_SCREENS for f in fields}
+        self.assertEqual(asked | {"meta"}, set(wizard.FIELD_COPY))
+
+    def test_demonstrated_appears_on_no_form_screen(self):
+        # Its absence is the tier system working: that field is written by
+        # course activity through the checkpoint→propose pipe, and a box a
+        # learner types into could only ever hold something attested.
+        for number, _, _ in wizard.PROFILE_SCREENS:
+            with self.subTest(screen=number):
+                body = wizard.form_screen(number, profile.ProfileState()).body
+                self.assertNotIn("demonstrated", body)
+
+
+class KeyMintingRuleTest(unittest.TestCase):
+    """The permanent key-identity contract, as a function."""
+
+    def test_numbers_are_two_digits_and_start_at_one(self):
+        self.assertEqual(wizard.next_key([], "background"), "background-01")
+
+    def test_only_this_field_s_own_numbered_keys_count(self):
+        asserted = [("style", "style-07"), ("background", "swe"),
+                    ("background", "background-02"),
+                    ("background", "background-sub-01")]
+        self.assertEqual(wizard.next_key(asserted, "background"),
+                         "background-03")
+
+
+class ProfileFormRoundTripTest(WizardFixture):
+    """A screen saved is claims on the ledger, in the learner's own voice."""
+
+    def test_two_new_lines_become_two_attested_claims(self):
+        saved = self.save("1", {"new__background": "Eight years of Go.\n\n"
+                                                   "Twenty of Python.\n"})
+        self.assertEqual(saved.status_code, 303)
+        self.assertEqual(saved.headers["location"], "/onboarding/?screen=2")
+        rows = self.profile_rows()
+        self.assertEqual([(r.kind, r.field, r.key) for r in rows],
+                         [("assert", "background", "background-01"),
+                          ("assert", "background", "background-02")])
+        for row in rows:
+            with self.subTest(key=row.key):
+                # The tier comes from provenance — you said it — and the form
+                # names no source, because the source is the person posting.
+                self.assertEqual(row.payload["tier"], "attested")
+                self.assertIsNone(row.payload.get("source"))
+        # The agent proposes and the human publishes; a form is the human,
+        # so a round trip through it leaves no proposal to review.
+        self.assertEqual([r for r in rows if r.kind == "propose"], [])
+        page = self.screen("?screen=1")
+        self.assertIn('name="claim__background__background-01"', page)
+        self.assertIn("Eight years of Go.", page)
+        self.assertIn("Twenty of Python.", page)
+
+    def test_an_unknown_screen_number_is_not_a_screen(self):
+        for number in ("5", "0", "review", "welcome"):
+            with self.subTest(number=number):
+                self.assertEqual(self.save(number, {}).status_code, 404)
+
+
+class ClaimEscapingTest(WizardFixture):
+    """A claim is the one thing on a form screen that came from outside it."""
+
+    def test_a_claim_is_escaped_where_it_is_read_back(self):
+        self.save("2", {"new__style": 'show me <b>the code</b> & the trace'})
+        page = self.screen("?screen=2")
+        self.assertIn("show me &lt;b&gt;the code&lt;/b&gt; &amp; the trace", page)
+        self.assertNotIn("<b>the code</b>", page)
+
+
+class KeyMintingTest(WizardFixture):
+    """Keys are forever: a number that has named a claim is spent."""
+
+    def test_a_retracted_number_is_never_minted_again(self):
+        self.save("1", {"new__background": "first\nsecond"})
+        # Delete one from the middle and add another in the same save.
+        self.save("1", {"claim__background__background-01": "",
+                        "claim__background__background-02": "second",
+                        "new__background": "third"})
+        # Then delete the *highest* number, in a save of its own — the case
+        # that tells the two candidate rules apart. The fold, asked
+        # afterwards, has never heard of background-03 and would hand its
+        # number straight back out; the ledger has not forgotten it.
+        self.save("1", {"claim__background__background-02": "second",
+                        "claim__background__background-03": ""})
+        self.save("1", {"claim__background__background-02": "second",
+                        "new__background": "fourth"})
+        # Asserted against the rows, not the fold: the whole rule is about
+        # the ledger remembering what the fold has dropped.
+        self.assertEqual([(r.kind, r.key) for r in self.profile_rows()],
+                         [("assert", "background-01"),
+                          ("assert", "background-02"),
+                          ("retract", "background-01"),
+                          ("assert", "background-03"),
+                          ("retract", "background-03"),
+                          ("assert", "background-04")])
+        claims = self.profile_state().field_claims("background")
+        self.assertEqual([(c.key, c.text) for c in claims],
+                         [("background-02", "second"),
+                          ("background-04", "fourth")])
+
+
+class ClaimEditTest(WizardFixture):
+    """Editing a box re-asserts its key; leaving it alone writes nothing."""
+
+    def test_a_changed_box_supersedes_and_an_unchanged_one_is_silent(self):
+        self.save("2", {"new__pacing": "four hours a week"})
+        self.save("2", {"claim__pacing__pacing-01": "two hours a week"})
+        self.assertEqual([(r.kind, r.key) for r in self.profile_rows()],
+                         [("assert", "pacing-01"), ("assert", "pacing-01")])
+        claims = self.profile_state().field_claims("pacing")
+        self.assertEqual([(c.key, c.text) for c in claims],
+                         [("pacing-01", "two hours a week")])
+        self.save("2", {"claim__pacing__pacing-01": "two hours a week"})
+        self.assertEqual(len(self.profile_rows()), 2)
+
+
+class MetaDescriptionTest(WizardFixture):
+    """Screen 1's description line writes the key the projection reads."""
+
+    def test_the_description_is_never_a_minted_key(self):
+        self.save("1", {"claim__meta__description": "Learning profile for a "
+                                                    "fictional tester."})
+        self.assertEqual([(r.field, r.key) for r in self.profile_rows()],
+                         [("meta", "description")])
+        self.assertIn("Learning profile for a fictional tester.",
+                      self.screen("?screen=1"))
+        self.save("1", {"claim__meta__description": ""})
+        self.assertEqual([(r.kind, r.key) for r in self.profile_rows()],
+                         [("assert", "description"), ("retract", "description")])
+
+
+class GateDisplayTest(WizardFixture):
+    """The gate, in words on every form screen — shown here, enforced later."""
+
+    def test_the_missing_required_fields_are_named(self):
+        # Screen 2 asks for two of the four, so the sentence itself is read
+        # rather than the page: a label on a form is not the gate speaking.
+        gate = self.screen("?screen=2").split(wizard.GATE_LEAD)[1][:300]
+        for field in onboarding.REQUIRED_PROFILE_FIELDS:
+            with self.subTest(field=field):
+                self.assertIn(wizard.FIELD_LABELS[field], gate)
+        self.save("1", {"new__background": "eight years of backend work"})
+        self.save("2", {"new__style": "learns by implementing",
+                        "new__pacing": "four hours a week"})
+        self.save("3", {"new__calibration": "the failure first, then the "
+                                            "formal statement"})
+        self.assertEqual(onboarding.profile_gate_missing(self.profile_state()), ())
+        for number in ("1", "2", "3", "4"):
+            with self.subTest(screen=number):
+                page = self.screen(f"?screen={number}")
+                self.assertNotIn(wizard.GATE_LEAD, page)
+                self.assertIn("Review and publish", page)
+
+
+class ClosedScreenRefusesTest(WizardFixture):
+    """O1 for a write: a published profile never re-gates, so it never
+    re-saves either."""
+
+    def test_posting_a_form_after_publishing_is_refused(self):
+        self.assertEqual(self.save("1", {"new__background": "before"}).status_code,
+                         303)
+        self.append("profile_published")
+        self.assertEqual(self.save("1", {"new__background": "after"}).status_code,
+                         409)
+        self.assertEqual([r.payload["text"] for r in self.profile_rows()],
+                         ["before"])
 
 
 class StateChipTest(unittest.TestCase):

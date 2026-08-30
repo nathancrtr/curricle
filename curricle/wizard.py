@@ -34,10 +34,12 @@ the wait is over.
 from __future__ import annotations
 
 import html as html_mod
+import re
+import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
 from . import db, onboarding, profile, theme
@@ -65,9 +67,162 @@ NEVER_PROMISES = (
     "the number first.",
 )
 
-# The profile stop's sub-screens, in order. Issues later in this flow
-# replace the placeholder each one renders; the vocabulary is the contract.
-PROFILE_SCREENS = ("welcome", "1", "2", "3", "4", "review")
+# The profile stop's sub-screens, in order: the whole vocabulary `?screen=`
+# is allowed to name, and the order the previous/next links walk.
+SCREEN_ORDER = ("welcome", "1", "2", "3", "4", "review")
+
+# (screen number, heading, fields on it) — design §4's grouping, verbatim.
+# Screen 1 additionally carries the `meta` description, which is one line
+# rather than a list of claims and so is not one of the screen's fields.
+# `demonstrated` is on no screen at all: it is written by course activity
+# through the checkpoint→propose pipe, and a form that offered to type it
+# would be the learner asserting what only their work can demonstrate.
+PROFILE_SCREENS = (
+    ("1", "Who you are", ("background", "education", "tracks")),
+    ("2", "How you learn", ("style", "domain_bias", "pacing")),
+    ("3", "Calibration", ("calibration", "skip", "scaffold")),
+    ("4", "Subjects", ("subject_adapters",)),
+)
+_FORM_FIELDS = {number: fields for number, _, fields in PROFILE_SCREENS}
+
+# The one key the wizard does not mint. `meta` holds a single claim — the
+# skill file's own frontmatter description — under the key the seed and
+# `profilerender.render_skill_md` already read, so the form writes that key
+# rather than starting a numbered series of one.
+META_KEY = "description"
+
+# What each screen is called on a navigation link.
+SCREEN_NAMES = {"welcome": "What this does",
+                **{number: heading for number, heading, _ in PROFILE_SCREENS},
+                "review": "Review and publish"}
+
+# The lede on each form screen. Screen 3's says plainly why those three
+# fields are the product (design §4): a profile that only says who you are
+# calibrates nothing.
+SCREEN_INTROS = {
+    "1": "Where you are coming from — the work and study a course can build "
+         "on instead of repeating. Short claims, in your own words.",
+    "2": "How an explanation has to arrive for it to land, and how much of "
+         "your week a course is allowed to ask for.",
+    "3": "These three are the difference between a course that re-explains "
+         "your degree and one that builds only what you lack.",
+    "4": "One course is being written now, but this profile outlives it. "
+         "What here holds whatever the subject turns out to be?",
+}
+
+# The form's name for each field. Deliberately this surface's own words
+# rather than `/profile`'s section titles: that page titles a section of a
+# document, and this one asks a person a question.
+FIELD_LABELS = {
+    "meta": "Skill description",
+    "background": "Professional background",
+    "education": "Formal education",
+    "tracks": "Prior courses and tracks",
+    "style": "Learning style",
+    "domain_bias": "Domain preferences",
+    "pacing": "Pacing",
+    "calibration": "Calibrating an explanation",
+    "skip": "What to skip",
+    "scaffold": "What to scaffold",
+    "subject_adapters": "Adapting to other subjects",
+}
+
+# field -> (one-line explanation, (example claim, example claim)).
+#
+# The examples are real claims: the ones the corpus already ships in
+# `examples/example-profile-seed.yaml`, abbreviated to the sentence that
+# carries them, with a second one written here for the fields the seed only
+# has one of. They are examples of a *claim*, not a template — the whole
+# point of the form is that the sentences are the learner's, so what these
+# demonstrate is the register and the length, and nothing about the shape.
+FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
+    "meta": (
+        "One sentence naming who this profile is for and when Claude should "
+        "reach for it. This is the only field that holds a single line.",
+        ("Learning profile for a backend engineer with a CS degree studying "
+         "distributed systems and formal methods through hands-on "
+         "implementation.",
+         "Use this whenever the learner asks Claude to teach, explain, tutor, "
+         "design exercises, or review learning progress.")),
+    "background": (
+        "The work you have actually done, read as bridging assets: the "
+        "intuitions a course can name rather than teach from scratch.",
+        ("Eight years building backend services — mostly Go and Python over "
+         "Postgres and Kafka, with real production on-call experience.",
+         "Six years of newsroom data work: scraping, cleaning, and arguing "
+         "with spreadsheets under a deadline.")),
+    "education": (
+        "Formal study in both directions — what it covered and, just as "
+        "usefully, where it stopped.",
+        ("BS in computer science: data structures, algorithms, and complexity "
+         "are solid and need no scaffolding, but the theory sequence stopped "
+         "at automata.",
+         "No degree past secondary school; everything since has come from the "
+         "job, from books, and from reading other people's code.")),
+    "tracks": (
+        "Courses and self-directed tracks you have already worked through — "
+        "including the ones that stalled, which are worth as much.",
+        ("Worked through a Raft implementation from the paper, and about half "
+         "of a database-internals course before it stalled at query planning.",
+         "Finished a lecture series on linear algebra two years ago: the "
+         "notation stuck, the proofs did not.")),
+    "style": (
+        "How understanding actually arrives for you. One habit per claim, "
+        "stated as an instruction a teacher could follow.",
+        ("Learns by implementing — pair every abstract idea with something "
+         "runnable, and treat “show me the code” as always fair.",
+         "Reaches understanding through failure modes: what breaks, and what "
+         "the system does when it breaks, lands harder than the happy path.")),
+    "domain_bias": (
+        "Where examples and exercises should be drawn from when the choice "
+        "is free. A preference, never a requirement.",
+        ("Prefers exercise domains drawn from storage engines, consensus, and "
+         "stream processing.",
+         "Examples from music, language, or games land; examples from finance "
+         "slide straight off.")),
+    "pacing": (
+        "The sizing constant: how much time a week really has in it, so that "
+        "one unit is one honest week of work.",
+        ("Targets roughly 4 hours per week, usually as two evening sessions.",
+         "One long Sunday session rather than daily study — scope units to "
+         "survive a week-long gap.")),
+    "calibration": (
+        "The order an explanation has to arrive in for you. This is the "
+        "procedure a tutor follows before it says anything new.",
+        ("When explaining a new concept: open with the failure it exists to "
+         "prevent, show it concretely, then give the formal statement and "
+         "name it properly.",
+         "Give me the shape of the whole thing before any detail; a lesson "
+         "built strictly bottom-up loses me by the third step.")),
+    "skip": (
+        "What never needs explaining to you again. Every line here is time a "
+        "course spends on something you do not already know.",
+        ("Don't explain what an index is, what a transaction is, how HTTP "
+         "works, or any language-level feature of Go or Python.",
+         "Don't explain big-O, common data structures, or basic algorithm "
+         "analysis — the degree covered these and they held.")),
+    "scaffold": (
+        "What to rebuild from the ground up, assuming nothing stuck. The "
+        "opposite list, and the one people under-report.",
+        ("Probability and statistics: rebuild from zero whenever a "
+         "tail-latency or failure-rate argument needs them.",
+         "Proof technique and formal notation — introduce each notation on "
+         "first use, then use it freely rather than re-explaining it.")),
+    "subject_adapters": (
+        "How the rest of this profile translates when the subject is not the "
+        "one you are starting with today.",
+        ("Subject-agnostic: whatever the material, lead with the failure the "
+         "idea prevents and bridge from hands-on intuition to the formal "
+         "concept.",
+         "For anything mathematical, assume strong engineering judgment and "
+         "weak formal machinery, and keep the tone peer-level.")),
+}
+
+# The gate in words, on every form screen (design §4). Color says nothing
+# here that the sentence does not say first, and the four fields are named
+# because "incomplete" is not an instruction.
+GATE_LEAD = ("Before you can publish your profile, these still need at least "
+             "one claim in your own words:")
 
 # Five seconds is short enough that a finished stage is seen almost at once
 # and long enough that a browser left open overnight is not a load.
@@ -131,6 +286,38 @@ WIZARD_CSS = theme.style("""\
   .ask { display:flex; flex-wrap:wrap; align-items:center; gap:14px;
          margin:28px 0 0; }
   .ask .aside { font-size:13.5px; color:var(--muted); }
+  .screenline { font-size:13.5px; font-weight:600; color:var(--muted);
+                margin:22px 0 0; }
+  .field { padding:20px 24px; margin:22px 0; }
+  .field h3 { font-size:17px; font-weight:700; margin:0 0 5px; }
+  .field .explain { font-size:14.5px; line-height:1.6; color:var(--muted);
+                    margin:0 0 13px; max-width:62ch; }
+  .eg { border-left:2px solid var(--line); padding:1px 0 1px 14px;
+        margin:0 0 16px; }
+  .eg b { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
+          text-transform:uppercase; color:var(--muted); margin:0 0 5px; }
+  .eg p { font-size:13.5px; line-height:1.55; color:var(--muted);
+          margin:0 0 7px; max-width:62ch; }
+  .eg p:last-child { margin-bottom:0; }
+  label.claim { display:block; margin:0 0 13px; }
+  .claimkey { display:block; font-size:11.5px; font-weight:700;
+              letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
+              margin:0 0 5px; }
+  textarea { width:100%; min-height:64px; resize:vertical;
+             font:14px/1.55 """ + theme.FONT_BODY + """;
+             color:var(--ink); background:var(--panel);
+             border:1.5px solid var(--line); border-radius:12px;
+             padding:10px 13px; }
+  /* Placeholder copy is read to be acted on, so it is body text and takes
+     --muted, never the decorative --faint. */
+  textarea::placeholder { color:var(--muted); }
+  textarea:focus { outline:none; border-color:var(--accent); }
+  .hint { font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 13px; }
+  .hint:last-child { margin-bottom:0; }
+  .nav { display:flex; flex-wrap:wrap; gap:12px; margin:30px 0 0; }
+  .gateline { font-size:14.5px; line-height:1.6; color:var(--muted);
+              margin:16px 0 0; max-width:62ch; }
+  .gateline b { color:var(--ink); }
 """)
 
 # The illustration vocabulary this surface owns: three small marks drawn in
@@ -329,19 +516,122 @@ def welcome_screen(*, worker_running: bool) -> Screen:
 """)
 
 
-def form_screen(number: str) -> Screen:
-    """Stops 1–4: the profile forms. Placeholder until they land."""
+def _examples(field: str) -> str:
+    """The two example claims, marked as examples rather than as copy.
+
+    House copy, so unescaped, exactly like the never-promises and the wording
+    sentences: the only text on a form screen that came from anywhere but
+    this module is a claim out of the ledger, and that is escaped where it is
+    interpolated.
+    """
+    _, examples = FIELD_COPY[field]
+    return ('<div class="eg"><b>for example</b>'
+            + "".join(f"<p>{x}</p>" for x in examples) + "</div>")
+
+
+def _claim_box(field: str, key: str, text: str, label: str) -> str:
+    """One textarea over one claim identity, prefilled from the fold."""
+    e = html_mod.escape
+    return (f'<label class="claim"><span class="claimkey">{e(label)}</span>'
+            f'<textarea name="claim__{e(field)}__{e(key)}" rows="3">'
+            f"{e(text)}</textarea></label>")
+
+
+def _field_block(field: str, claims: list[profile.Claim]) -> str:
+    """One field: what it is, what a claim looks like, and what you have said.
+
+    Existing claims come back in fold order, each in its own box under its
+    own key, because the key is the claim's identity for the rest of its
+    life — editing a box re-asserts that key and emptying it retracts it, and
+    both are things the learner should be able to see themselves doing.
+    """
+    explanation, _ = FIELD_COPY[field]
+    boxes = "".join(_claim_box(field, c.key, c.text, c.key) for c in claims)
+    hint = ('<p class="hint">Empty a box to delete that claim.</p>'
+            if claims else "")
+    return f"""
+    <div class="panel field">
+      <h3>{FIELD_LABELS[field]}</h3>
+      <p class="explain">{explanation}</p>
+      {_examples(field)}
+      {boxes}{hint}
+      <label class="claim"><span class="claimkey">Add</span>
+      <textarea name="new__{html_mod.escape(field)}" rows="3"
+      placeholder="One claim per line"></textarea></label>
+    </div>"""
+
+
+def _meta_block(state: profile.ProfileState) -> str:
+    """Screen 1's description line: one box, one key, never a numbered one."""
+    claim = state.claim("meta", META_KEY)
+    explanation, _ = FIELD_COPY["meta"]
+    return f"""
+    <div class="panel field">
+      <h3>{FIELD_LABELS["meta"]}</h3>
+      <p class="explain">{explanation}</p>
+      {_examples("meta")}
+      {_claim_box("meta", META_KEY, claim.text if claim else "", "Description")}
+      <p class="hint">Empty this box to leave the description unset.</p>
+    </div>"""
+
+
+def _screen_nav(number: str, missing: tuple[str, ...]) -> str:
+    """Previous, next, and the gate — the last of those in plain words.
+
+    When a required field is still empty the link onward to the review is not
+    there to be clicked: it is replaced by the sentence naming what is
+    missing, so the reason the path stops is on the same line the path stops
+    at. Refusing to publish is the review screen's job; this only says so.
+    """
+    e = html_mod.escape
+    at = SCREEN_ORDER.index(number)
+    previous, following = SCREEN_ORDER[at - 1], SCREEN_ORDER[at + 1]
+    links = [f'<a class="pill" href="/onboarding/?screen={previous}">'
+             f"← {SCREEN_NAMES[previous]}</a>"]
+    if missing:
+        names = ", ".join(FIELD_LABELS[f] for f in missing)
+        gate = f'<p class="gateline">{GATE_LEAD} <b>{e(names)}</b>.</p>'
+    else:
+        gate = ('<p class="gateline">Every field a course is written against '
+                'has a claim on the record. '
+                '<a href="/onboarding/?screen=review">Review and publish '
+                "→</a></p>")
+    if following != "review" or not missing:
+        links.append(f'<a class="pill" href="/onboarding/?screen={following}">'
+                     f"{SCREEN_NAMES[following]} →</a>")
+    return f'<div class="nav">{"".join(links)}</div>{gate}'
+
+
+def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
+    """Stops 1–4: the profile forms, one `assert` per line you write.
+
+    Everything on the screen is derived per request — the boxes from the
+    profile fold, the gate sentence from the same fold — because the only
+    record of what you have said is the evidence ledger, and a form drawn
+    from anything else would be a second one.
+
+    Plain urlencoded HTML, no JavaScript: the page a learner types their own
+    profile into is the last place to make the typing depend on a script
+    loading. The tier is `attested` and it is not a choice on the form —
+    provenance decides it, and the provenance of a box you typed is you.
+    """
+    e = html_mod.escape
+    heading, fields = next((h, f) for n, h, f in PROFILE_SCREENS if n == number)
+    blocks = [_meta_block(profile_state)] if number == "1" else []
+    blocks += [_field_block(f, profile_state.field_claims(f)) for f in fields]
     return Screen(f"""
-  <h1>Profile, screen {html_mod.escape(number)} of 4</h1>
-  <div class="gatebox">
-    <p class="stateline">{_chip("waiting")}</p>
-    <h2>This form is still being built</h2>
-    <p>It will ask for a handful of short claims in your own words, and save
-    each one as your own assertion — the tier that needs no review.</p>
-    <p>In the meantime the same claims can be written from the command line:
-    <code>python -m curricle profile assert</code>.</p>
-  </div>
-  <p class="ask"><a class="pill" href="/onboarding/">← back to the start</a></p>
+  <p class="screenline">Profile screen {e(number)} of 4</p>
+  <h1>{heading}</h1>
+  <p class="lede">{SCREEN_INTROS[number]}</p>
+  <form method="post" action="/onboarding/profile/{e(number)}">
+    {"".join(blocks)}
+    <p class="ask">
+      <button class="pill primary" type="submit">Save this screen →</button>
+      <span class="aside">Saved in your own voice, and read back to you on
+      your profile page. Nothing here is sent to a model.</span>
+    </p>
+  </form>
+{_screen_nav(number, onboarding.profile_gate_missing(profile_state))}
 """)
 
 
@@ -406,6 +696,69 @@ def stage_screen(stop: str, flow: onboarding.CourseFlow | None) -> Screen:
 
 
 # --------------------------------------------------------------------------
+# Saving a screen
+# --------------------------------------------------------------------------
+
+_NUMBERED_KEY = re.compile(r"^(.+)-(\d+)$")
+
+
+def next_key(asserted: list[tuple[str, str]], field: str) -> str:
+    """The next key for `field`: `{field}-NN`, and NN is never reused.
+
+    The high-water mark is read off the *ledger*, not off the fold: every
+    `{field}-NN` ever asserted counts, including the ones since retracted.
+    Keys are forever in this house, so a number that has ever named a claim
+    has been spent — reusing it would give a deleted claim's identity to a
+    new sentence, and every consumer that remembers a key (the profile page,
+    the MCP tools, an export somebody has already taken) would be wrong about
+    which one it meant.
+    """
+    highest = 0
+    for row_field, key in asserted:
+        match = _NUMBERED_KEY.match(key)
+        if row_field == field and match and match.group(1) == field:
+            highest = max(highest, int(match.group(2)))
+    return f"{field}-{highest + 1:02d}"
+
+
+def parse_form(body: bytes) -> dict[str, str]:
+    """A urlencoded form body as {name: text}, blank values kept.
+
+    Parsed here rather than through `request.form()` because Starlette's
+    parser asks for `python-multipart` whatever the encoding, and these
+    forms are plain urlencoded text with no file input anywhere in them —
+    a dependency to read a body the standard library already reads is a
+    dependency this layer does not need.
+
+    Blank values are kept because a box that arrived empty is a deletion.
+    A repeated name takes its last value, the way a server-side form parser
+    conventionally does; the wizard's own markup emits each name once.
+    """
+    pairs = urllib.parse.parse_qs(body.decode("utf-8"), keep_blank_values=True)
+    return {name: values[-1] for name, values in pairs.items()}
+
+
+def submitted(form: dict[str, str], name: str) -> str | None:
+    """One textarea's text, or None when the form did not carry that box.
+
+    None and "" are different answers and the difference is a claim's life:
+    a box that arrived empty is a deletion, a box that did not arrive at all
+    is a screen that never asked. Newlines are normalized because a browser
+    posts CRLF and the ledger should not record the difference.
+    """
+    raw = form.get(name)
+    if raw is None:
+        return None
+    return raw.replace("\r\n", "\n").strip()
+
+
+def claim_lines(form: dict[str, str], field: str) -> list[str]:
+    """The `new__{field}` box, one claim per non-empty line."""
+    raw = submitted(form, f"new__{field}") or ""
+    return [line.strip() for line in raw.split("\n") if line.strip()]
+
+
+# --------------------------------------------------------------------------
 # Mounting
 # --------------------------------------------------------------------------
 
@@ -439,7 +792,7 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             # to have about it.
             return HTMLResponse(_page(stop, stage_screen(stop, state.active()),
                                       tenant_slug))
-        if screen not in PROFILE_SCREENS:
+        if screen not in SCREEN_ORDER:
             # A screen the vocabulary does not know is navigation past the
             # frontier: back to the fold's screen, and to a URL that agrees
             # with what is on it.
@@ -449,5 +802,82 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         elif screen == "review":
             rendered = review_screen(profile_state)
         else:
-            rendered = form_screen(screen)
+            rendered = form_screen(screen, profile_state)
         return HTMLResponse(_page(stop, rendered, tenant_slug))
+
+    @app.post("/onboarding/profile/{number}")
+    async def save_profile_screen(number: str, request: Request) -> Response:
+        """Save one form screen: an `assert` per claim, in the learner's voice.
+
+        One transaction for the whole screen, and the fold is re-read inside
+        it — the boxes the browser posted describe claims as they were when
+        the page was drawn, and the events written here are computed against
+        the ledger as it is now.
+
+        Nothing on this path judges a claim. The tier is `attested` because
+        of where the words came from, not because of how much the system
+        believes them, and `profile.validate_profile_event` remains the only
+        thing that can refuse one: a refusal arrives as a 422 rather than as
+        a second opinion written here.
+        """
+        if number not in _FORM_FIELDS:
+            raise HTTPException(404)
+        if not request.headers.get("content-type", "").startswith(
+                "application/x-www-form-urlencoded"):
+            # Refuse rather than guess: a body in some other encoding would
+            # parse to no boxes at all, which is indistinguishable from a
+            # screen the learner cleared, and clearing is a retract.
+            raise HTTPException(415, "the profile forms post urlencoded")
+        form = parse_form(await request.body())
+        with engine.begin() as conn:
+            if onboarding.load_state(conn, scope).current_stop() != "profile":
+                # O1 for a write: the fold has closed this screen — a tenant
+                # who has published a profile never re-gates (design §4, Stop
+                # 10), so a form posted from a stale tab is refused rather
+                # than replayed into a ledger that has moved on.
+                raise HTTPException(409, "the profile stop is behind you; "
+                                         "edit your claims on /profile")
+            state = profile.load_profile(conn, scope)
+            # Every key this tenant has ever asserted, for the minting rule.
+            # The fold cannot answer this question: a retracted claim leaves
+            # the fold entirely and its number must still never come back.
+            asserted = [(r.field, r.key)
+                        for r in conn.execute(scope.profile_select())
+                        if r.kind == "assert"]
+
+            def save(field: str, key: str, claim: profile.Claim | None) -> None:
+                text = submitted(form, f"claim__{field}__{key}")
+                current = claim.text.strip() if claim is not None else ""
+                if text is None or text == current:
+                    return                      # never asked, or untouched
+                if not text:
+                    if claim is not None:
+                        profile.append_profile_event(conn, scope, "retract",
+                                                     field, key)
+                    return
+                profile.append_profile_event(
+                    conn, scope, "assert", field, key,
+                    {"text": text, "tier": "attested"})
+
+            try:
+                if number == "1":
+                    save("meta", META_KEY, state.claim("meta", META_KEY))
+                for field in _FORM_FIELDS[number]:
+                    for claim in state.field_claims(field):
+                        save(field, claim.key, claim)
+                    for line in claim_lines(form, field):
+                        key = next_key(asserted, field)
+                        # Minted inside the loop and remembered here, so two
+                        # new lines in one box get two consecutive numbers.
+                        asserted.append((field, key))
+                        profile.append_profile_event(
+                            conn, scope, "assert", field, key,
+                            {"text": line, "tier": "attested"})
+            except profile.InvalidProfileEvent as exc:
+                raise HTTPException(422, str(exc))
+
+        at = SCREEN_ORDER.index(number)
+        # 303: the save is done, and what follows is a page to look at — a
+        # reload of it must never post the form a second time.
+        return RedirectResponse(f"/onboarding/?screen={SCREEN_ORDER[at + 1]}",
+                                status_code=303)

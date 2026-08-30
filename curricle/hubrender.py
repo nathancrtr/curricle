@@ -27,6 +27,7 @@ import posixpath
 
 from . import theme
 from .inlinemd import inline_html
+from .refs import RefResolver
 from .schema import Manifest
 
 STYLE = theme.style("""\
@@ -351,10 +352,11 @@ def render_hub(mf: Manifest, *, api: str | None = None,
                  '<div class="spine" id="phases"></div>')
 
     def material_href(m) -> str:
-        # Served markdown reads in the themed reader; everything else opens
-        # at its own path. Standalone has no reader and keeps raw links.
-        return ("read/" + m.path if api and m.path.endswith(".md")
-                else m.path)
+        # Served markdown reads in the themed reader (an exercise opens as
+        # its brief, task.md); everything else opens at its own path.
+        # Standalone has no reader and keeps raw links. Same resolution the
+        # unit page uses (refs.RefResolver.material_href).
+        return RefResolver(mf, served=api is not None).material_href(m)
 
     for t in mf.tracks:
         cadence = f' <span class="sub" style="font-size:14px">({e(t.cadence)})</span>' \

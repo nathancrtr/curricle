@@ -436,6 +436,42 @@ class ScopeBeforeTheProfileTest(WizardFixture):
         self.assertEqual(self.current_stop(), "profile")
 
 
+class ScopePastTheStopTest(WizardFixture):
+    """O1 for a write, from the near side: the stop is open no longer.
+
+    A published profile is not what opens this form — the *fold's stop* is.
+    A tenant whose outline is already being drafted has published a profile
+    too, and a second scope from a stale tab would start a second course
+    under the first one and queue a run nobody watching this page asked for.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course, payload in (
+                    ("profile_published", "", {}),
+                    ("scope_saved", "greek-106", {"title": "Greek"}),
+                    ("outline_requested", "greek-106", {})):
+                onboarding.append_event(conn, cls.scope, kind, course, payload)
+
+    def test_a_second_scope_from_a_stale_tab_is_refused(self):
+        before = len(self.onboarding_rows())
+        self.assertEqual(self.current_stop(), "outline")
+        refused = self.client.post("/onboarding/scope",
+                                   data=ScopeSaveTest.FORM,
+                                   follow_redirects=False)
+        self.assertEqual(refused.status_code, 409)
+        self.assertEqual(len(self.onboarding_rows()), before)
+        with self.engine.begin() as conn:
+            self.assertEqual(
+                list(conn.execute(sa.select(db.factory_runs.c.id)
+                                  .where(db.factory_runs.c.tenant_id
+                                         == self.tenant))), [])
+        # And the fold is where it was: the stale post moved nothing.
+        self.assertEqual(self.current_stop(), "outline")
+
+
 class ScopeRefusalTest(WizardFixture):
     """Refuse rather than guess — and refuse without leaving half a course."""
 
@@ -495,7 +531,15 @@ class ScopeRefusalTest(WizardFixture):
 
 
 class OutlineRetryTest(WizardFixture):
-    """A stopped outline says why in a sentence, and waits for a person."""
+    """A stopped outline says why in a sentence, and waits for a person.
+
+    The fold is the fuller history on purpose: an outline that was drafted,
+    rejected with a note, redrafted and then failed. That is the shape in
+    which a note is live at a retry, and the note is the one thing the retry
+    has to carry forward.
+    """
+
+    NOTE = "Eight weeks is too many — I have four."
 
     @classmethod
     def setUpClass(cls):
@@ -505,6 +549,10 @@ class OutlineRetryTest(WizardFixture):
                     ("profile_published", "", {}),
                     ("scope_saved", "greek-103", {"title": "Greek"}),
                     ("outline_requested", "greek-103", {}),
+                    ("outline_ready", "greek-103",
+                     {"plan": {"phase_id": "p1"}, "estimate_usd": "1.20"}),
+                    ("outline_rejected", "greek-103", {"note": cls.NOTE}),
+                    ("outline_requested", "greek-103", {"note": cls.NOTE}),
                     ("outline_failed", "greek-103",
                      {"reason": "compile_failed", "detail": "SchemaError: …"})):
                 onboarding.append_event(conn, cls.scope, kind, course, payload)
@@ -532,8 +580,12 @@ class OutlineRetryTest(WizardFixture):
                                    follow_redirects=False)
         self.assertEqual(retried.status_code, 303, retried.text)
         self.assertEqual(retried.headers["location"], "/onboarding/")
-        self.assertEqual([r.kind for r in self.onboarding_rows()][-1],
-                         "outline_requested")
+        # The row says what this run was asked to do differently: the note
+        # the learner rejected the last outline with, carried forward rather
+        # than dropped on the way to the second attempt.
+        requested = self.onboarding_rows()[-1]
+        self.assertEqual(requested.kind, "outline_requested")
+        self.assertEqual(requested.payload, {"note": self.NOTE})
         self.assertEqual([(r.stage, r.status) for r in self.runs()],
                          [("outline", "queued")])
         # The flow is a machine's turn again, so the screen says so — and a

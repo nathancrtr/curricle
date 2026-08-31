@@ -420,14 +420,17 @@ class OutlineStageTest(WorkerFixture):
                     os.path.join(self.draft(self.COURSE), rel)))
 
         # The plan's keys are BuildSpec's field names, so the approved plan
-        # reaches the build with nothing in between to mistranslate it.
+        # reaches the build with nothing in between to mistranslate it. The
+        # bank is off because a brand-new course has no question bank for a
+        # section to be appended to — the plan does not name what promotion
+        # could not keep, and the estimate below is priced accordingly.
         plan = payload["plan"]
         self.assertEqual(
             factory.BuildSpec(**plan),
             factory.BuildSpec(
                 phase_id="p1", lesson_unit="u1", widget_unit="u2",
                 widget_concept="The compiler refuses rather than guesses.",
-                exercise_unit="u2", quiz=True, bank=True))
+                exercise_unit="u2", quiz=True, bank=False))
         # A number the gate can print and the approval row can carry.
         self.assertGreater(Decimal(payload["estimate_usd"]), 0)
         self.assertRegex(payload["estimate_usd"], r"^\d+\.\d\d$")
@@ -1008,6 +1011,350 @@ class BuildStageTest(WorkerFixture):
         self.assertNotIn("build_ready", self.kinds())
         self.assertNotIn("build_failed", self.kinds())
         self.assertEqual(self.token_rows(), [])
+
+
+class PromoteStageTest(WorkerFixture):
+    """Stop 10: the built draft becomes the course, or nothing happens.
+
+    Built rather than planted, wherever a test needs a promoted phase: the
+    draft these tests publish is the one the build stage really wrote, and
+    the promotion is the run `CHAINS_TO` queued in the build's own outcome
+    transaction. A fixture that hand-made a checkpoint manifest would be
+    proving this handler against a file nothing else in the system produces.
+
+    The tests that have nothing to do with the phase's materials skip the
+    build entirely and plant a bare draft, which is not a shortcut but the
+    state a promotion that already moved its materials leaves behind: the
+    checkpoint is gone, so step one is passed over and the retry runs the
+    move, the compile and the row.
+
+    No network and no key, ever: the runner arrives through
+    `worker.RUNNER_FACTORY`, and `CURRICLE_COURSES_DIR` is patched in every
+    test so the suite can never write into a real courses home.
+    """
+
+    COURSE = "tiny-demo"
+    # The plan a wizard course really reaches this stage with. `bank` is off
+    # because `default_build_plan` will not buy a section for a course that
+    # has no question bank to append it to — so the phase's artifacts are
+    # four files, every one of which promotion has to move somewhere.
+    PLAN = dict(BUILD_PLAN, bank=False)
+    APPROVAL = {"plan": PLAN, "estimate_usd": "1.37"}
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="curricle-promote-")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        patched = mock.patch.dict(os.environ, {coursehome.ENV_DIR: self.tmp})
+        patched.start()
+        self.addCleanup(patched.stop)
+        # A tenant per test, and an empty queue per test, for the reasons the
+        # build stage's fixture gives: the course id is the sidecar's own, and
+        # a successful build leaves a promotion queued that the next test's
+        # worker would otherwise claim instead of its own.
+        with self.engine.begin() as conn:
+            conn.execute(sa.update(db.factory_runs)
+                         .where(db.factory_runs.c.status.in_(("queued",
+                                                              "running")))
+                         .values(status="done", finished_at=sa.func.now()))
+            self.tenant = db.create_tenant(conn, f"worker-promote-{self.id()}")
+        self.scope = db.for_tenant(self.tenant)
+
+    def course_root(self) -> str:
+        return os.path.join(self.tmp, self.COURSE)
+
+    def draft_root(self) -> str:
+        return os.path.join(self.course_root(), worker.DRAFT_DIR)
+
+    def plant(self, sidecar: str = GOOD_SIDECAR) -> None:
+        """The compiled outline, where the outline stage would have left it."""
+        os.makedirs(os.path.join(self.draft_root(), "learning"))
+        for rel, body in zip(factory.OUTLINE_FILES,
+                             (GOOD_CURRICULUM, sidecar, GOOD_SHELF)):
+            with open(os.path.join(self.draft_root(), rel), "w",
+                      encoding="utf-8") as f:
+                f.write(body)
+
+    def approved(self) -> None:
+        """The fold of a tenant whose outline was approved and asked to build."""
+        rows = [("profile_published", "", {}),
+                ("scope_saved", self.COURSE, dict(SCOPE, title="Tiny demo")),
+                ("outline_requested", self.COURSE, {}),
+                ("outline_ready", self.COURSE, self.APPROVAL),
+                ("outline_approved", self.COURSE, self.APPROVAL),
+                ("build_requested", self.COURSE, {})]
+        with self.engine.begin() as conn:
+            for kind, course, payload in rows:
+                onboarding.append_event(conn, self.scope, kind, course, payload)
+
+    def through_the_build(self) -> None:
+        """Run the real build stage, which queues the promotion behind it.
+
+        The checkpoint manifest is read here and kept, because promotion
+        deletes it: it is the full inventory of what the phase bought, and
+        it is what the course at the far end has to be checked against.
+        """
+        self.plant()
+        self.approved()
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with mock.patch.object(
+                worker, "RUNNER_FACTORY",
+                lambda engine, scope: llm.Runner(engine, scope,
+                                                 send=FakeBuildSend())):
+            self.assertTrue(worker.run_once(self.engine))
+        self.assertEqual(self.kinds()[-1], "build_ready")
+        with open(os.path.join(self.draft_root(), "learning", "interactive",
+                               f".draft-{worker.PHASE_ID}", "manifest.json"),
+                  encoding="utf-8") as f:
+            self.checkpoint = json.load(f)
+
+    def promote(self) -> None:
+        """Claim and run the queued promotion.
+
+        The runner refuses to exist while it runs, which is the assertion
+        this helper carries into every test that uses it: publishing moves
+        files and compiles them, and a stage that asked for a model here
+        would be spending money on a decision that was taken two stops ago.
+        """
+        def never(engine, scope):
+            raise AssertionError("publishing a course calls no model")
+        with mock.patch.object(worker, "RUNNER_FACTORY", never):
+            self.assertTrue(worker.run_once(self.engine))
+
+    def kinds(self) -> list[str]:
+        return [k for k, _ in self.ledger(self.tenant, self.COURSE)]
+
+    def stage_and_status(self) -> tuple[str, str]:
+        with self.engine.begin() as conn:
+            flow = onboarding.load_state(conn, self.scope).flows[self.COURSE]
+        return flow.stage, flow.status
+
+    # ---- the happy path: the tree moves and the row lands after it -------
+
+    def test_the_draft_becomes_the_course_and_the_ledger_says_so(self):
+        self.through_the_build()
+        self.promote()
+
+        # The draft is gone, not copied out of: a course does not exist twice
+        # on disk, even for the instant a copy would take.
+        self.assertFalse(os.path.exists(self.draft_root()))
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.course_root(), "learning", "course.yaml")))
+        # The checkpoint the materials were staged in is gone with the draft.
+        interactive = os.path.join(self.course_root(), "learning", "interactive")
+        self.assertEqual([n for n in os.listdir(interactive)
+                          if n.startswith(".draft-")], [])
+
+        # The final compile is clean at the final location, which is the gate
+        # the `promoted` row is on the far side of.
+        manifest, _ = compile_draft(self.course_root())
+        self.assertIsNotNone(manifest)
+        # And the directory's name is the id the manifest declares —
+        # registration keys on the basename, so a course whose two names
+        # disagree is one nothing can serve.
+        self.assertEqual(os.path.basename(self.course_root()),
+                         manifest.course.id)
+
+        # The *whole* inventory arrived, checked against the checkpoint
+        # rather than against a path this test happens to know: every
+        # artifact the phase bought is a file (or a directory, for an
+        # exercise) under the course, and every material it registers is in
+        # the compiled manifest. A promotion that moved the lesson and
+        # forgot the rest passes every other assertion here and fails this.
+        artifacts = self.checkpoint["artifacts"]
+        self.assertEqual(len(artifacts), 4)
+        material_ids = {m.id for m in manifest.materials}
+        for artifact in artifacts:
+            with self.subTest(artifact=artifact["rel_path"] or artifact["note"]):
+                self.assertTrue(artifact["rel_path"])   # no bank in this plan
+                self.assertTrue(os.path.exists(os.path.join(
+                    self.course_root(), "learning", artifact["rel_path"])))
+                self.assertIn(artifact["material"]["id"], material_ids)
+
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload), ("promoted", {"course_id": self.COURSE}))
+        self.assertEqual(self.stage_and_status(), ("done", "waiting"))
+        build, promote = self.runs(self.tenant)
+        self.assertEqual((build.stage, build.status), ("build", "done"))
+        self.assertEqual((promote.stage, promote.status, promote.reason),
+                         ("promote", "done", None))
+
+    def test_a_second_promotion_appends_nothing(self):
+        # Idempotence at the writer, never by deleting a row: the ledger is
+        # append-only, so a promotion that finds the course already published
+        # returns no outcome at all rather than saying it happened twice.
+        self.through_the_build()
+        self.promote()
+        run, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+
+        self.assertIsNone(worker._promote(self.engine, self.scope, run))
+        self.assertEqual(self.kinds().count("promoted"), 1)
+        self.assertEqual(self.stage_and_status(), ("done", "waiting"))
+
+    def test_an_emptied_draft_directory_is_a_finished_move(self):
+        # The one instant `_install` is not atomic across: every child has
+        # been renamed into the course and the empty shell survives the
+        # worker that was about to remove it. Read as a draft it would be a
+        # draft with no sidecar, which is a refusal the retry would hit
+        # again forever — so an empty draft is a move that already happened.
+        self.through_the_build()
+        self.promote()
+        self.assertEqual(self.kinds()[-1], "promoted")
+        os.makedirs(self.draft_root())
+
+        # The wizard's retry, over the state a crash in that window leaves.
+        # (The `promoted` row is torn out here and nowhere else: the writer's
+        # own idempotence would otherwise answer this before the filesystem
+        # got a chance to, and it is the filesystem under test.)
+        with self.engine.begin() as conn:
+            conn.execute(sa.delete(db.onboarding_events).where(
+                db.onboarding_events.c.tenant_id == self.tenant,
+                db.onboarding_events.c.kind == "promoted"))
+            onboarding.append_event(conn, self.scope, "promote_requested",
+                                    self.COURSE, {})
+        self.enqueue(self.tenant, self.COURSE, "promote")
+        self.promote()
+
+        row = [r for r in self.runs(self.tenant) if r.stage == "promote"][-1]
+        self.assertEqual((row.status, row.reason), ("done", None))
+        self.assertEqual(self.kinds()[-1], "promoted")
+        self.assertFalse(os.path.exists(self.draft_root()))
+        self.assertEqual(self.stage_and_status(), ("done", "waiting"))
+
+    # ---- the refusals, and what each of them leaves behind ---------------
+
+    def test_a_bank_section_with_nowhere_to_go_is_refused_not_dropped(self):
+        # The belt behind `default_build_plan`: a plan that buys a bank
+        # section for a course with no question bank is one nothing can now
+        # produce, and `factory.promote` would pass the section over in
+        # silence. Reached here by approving that plan by hand — the day a
+        # regression makes it reachable for real, the learner gets a refusal
+        # they can see rather than a loss nobody can.
+        self.APPROVAL = {"plan": dict(BUILD_PLAN, bank=True),
+                         "estimate_usd": "1.37"}
+        self.through_the_build()
+        self.assertIn("append to question bank",
+                      [a["rel_path"] or a["note"]
+                       for a in self.checkpoint["artifacts"]])
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason),
+                         ("failed", "validation_failed"))
+        _, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertIn("question bank", payload["detail"])
+        self.assertNotIn("promoted", self.kinds())
+        self.assertEqual(os.listdir(self.course_root()), [worker.DRAFT_DIR])
+
+    def test_a_dirty_final_compile_publishes_nothing_and_the_retry_finishes(self):
+        # The interrupted promotion, from the outside: the draft holds no
+        # checkpoint (its materials were moved on an earlier attempt), so the
+        # move and the compile are all that is left to run — and the compile
+        # is the gate. Dirty means no `promoted`, whatever else happened.
+        self.plant(sidecar=BROKEN_SIDECAR)
+        self.approved()
+        self.enqueue(self.tenant, self.COURSE, "promote")
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason), ("failed", "compile_failed"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("promote_failed", "compile_failed"))
+        self.assertIn("u9", payload["detail"])          # operator's copy
+        self.assertNotIn("promoted", self.kinds())
+        self.assertEqual(self.stage_and_status(), ("promote", "failed"))
+        # O2: the screen has a sentence for it.
+        self.assertIn(("promote", "compile_failed"), onboarding.WORDING)
+
+        # The move is done and the row is not, which is exactly the state the
+        # sequence is ordered to leave: the retry re-runs the compile and the
+        # row and nothing else.
+        self.assertFalse(os.path.exists(self.draft_root()))
+        sidecar = os.path.join(self.course_root(), "learning", "course.yaml")
+        with open(sidecar, "w", encoding="utf-8") as f:
+            f.write(GOOD_SIDECAR)
+
+        # The wizard's retry button, spelled as the route spells it.
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, self.scope, "promote_requested",
+                                    self.COURSE, {})
+        self.enqueue(self.tenant, self.COURSE, "promote")
+        self.promote()
+
+        self.assertEqual(self.kinds()[-1], "promoted")
+        self.assertEqual(self.stage_and_status(), ("done", "waiting"))
+
+    def test_a_course_whose_sidecar_disagrees_with_its_directory_is_refused(self):
+        # Registration keys on the directory basename and serves the course
+        # under the id its sidecar declares. A course whose two names differ
+        # would 404 and be recompiled on every front-door render, so it is
+        # refused before the move rather than guessed at after it.
+        self.plant(sidecar=GOOD_SIDECAR.replace("id: tiny-demo",
+                                                "id: somewhere-else"))
+        self.approved()
+        self.enqueue(self.tenant, self.COURSE, "promote")
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason),
+                         ("failed", "validation_failed"))
+        _, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertIn("somewhere-else", payload["detail"])
+        self.assertIn(self.COURSE, payload["detail"])
+        self.assertNotIn("promoted", self.kinds())
+        # Nothing moved: the draft is where it was, and the course directory
+        # holds nothing but it.
+        self.assertEqual(os.listdir(self.course_root()), [worker.DRAFT_DIR])
+
+    def test_a_promotion_the_compile_gate_refuses_moves_nothing_into_place(self):
+        # Promotion's own gate, inside the draft tree: the built materials
+        # broke the course, so they are refused rather than published. The
+        # course directory is still empty of everything but the draft.
+        self.through_the_build()
+        with open(os.path.join(self.draft_root(), factory.OUTLINE_FILES[1]),
+                  "w", encoding="utf-8") as f:
+            f.write(BROKEN_SIDECAR)
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason), ("failed", "compile_failed"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("promote_failed", "compile_failed"))
+        self.assertNotIn("promoted", self.kinds())
+        self.assertEqual(os.listdir(self.course_root()), [worker.DRAFT_DIR])
+
+    def test_a_draft_still_holding_unpromoted_materials_is_not_published(self):
+        # A checkpoint for some other phase, left where nothing promoted it.
+        # Publishing over that would serve a course quietly missing materials
+        # the learner paid for, which is worse than any refusal.
+        self.through_the_build()
+        os.makedirs(os.path.join(self.draft_root(), "learning", "interactive",
+                                 ".draft-p2"))
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason),
+                         ("failed", "validation_failed"))
+        _, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertIn(".draft-p2", payload["detail"])
+        self.assertNotIn("promoted", self.kinds())
+        self.assertEqual(os.listdir(self.course_root()), [worker.DRAFT_DIR])
+
+    def test_a_promotion_with_nothing_to_publish_is_a_worker_error(self):
+        # No draft and no course: a run enqueued for a flow that never built
+        # anything, which is a bug in whoever enqueued it rather than a stage
+        # the learner can act on.
+        self.approved()
+        self.enqueue(self.tenant, self.COURSE, "promote")
+        self.promote()
+
+        row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]
+        self.assertEqual((row.status, row.reason), ("failed", "worker_error"))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]),
+                         ("promote_failed", "worker_error"))
+        self.assertIn(("promote", "worker_error"), onboarding.WORDING)
 
 
 class LivenessTest(WorkerFixture):

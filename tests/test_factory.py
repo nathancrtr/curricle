@@ -156,6 +156,17 @@ BROKEN_SIDECAR = GOOD_SIDECAR + """\
   gloss: A unit that exists only in the sidecar.
 """
 
+# The one material a phase-1 plan asks the *course* about rather than the
+# phase: a question bank is what a bank section gets appended to, so a
+# sidecar carrying this is a course `default_build_plan` may buy one for.
+BANK_MATERIAL = """
+materials:
+- id: bank
+  kind: question-bank
+  title: Question bank
+  path: interactive/quizzes/question-bank.md
+"""
+
 # `hours_per_week` as a scalar: the loader subscripts it and raises TypeError
 # rather than returning a where-bearing Issue. A finding, not a traceback.
 CRASHING_SIDECAR = GOOD_SIDECAR.replace("hours_per_week: [4, 4]",
@@ -934,13 +945,20 @@ class ShelfAgreementTest(unittest.TestCase):
 class BuildPlanTest(unittest.TestCase):
     """The plan the outline gate shows, and what it says the build will cost."""
 
-    def manifest_for(self, curriculum, sidecar):
+    def manifest_for(self, curriculum, sidecar, files=None):
+        """Compile a draft. `files` plants extra content under `learning/`,
+        for the materials a sidecar declares and the compiler checks for."""
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         os.makedirs(os.path.join(tmp.name, "learning"))
         for rel, body in zip(factory.OUTLINE_FILES,
                              (curriculum, sidecar, GOOD_SHELF)):
             with open(os.path.join(tmp.name, rel), "w", encoding="utf-8") as f:
+                f.write(body)
+        for rel, body in (files or {}).items():
+            path = os.path.join(tmp.name, "learning", rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
                 f.write(body)
         manifest, issues = compile_draft(tmp.name)
         self.assertIsNotNone(manifest, [str(i) for i in issues])
@@ -952,14 +970,47 @@ class BuildPlanTest(unittest.TestCase):
         self.assertEqual(plan, {
             "phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
             "widget_concept": "The compiler refuses rather than guesses.",
-            "exercise_unit": "u2", "quiz": True, "bank": True})
+            "exercise_unit": "u2", "quiz": True, "bank": False})
         # The keys are BuildSpec's fields: an approved plan reaches the build
         # with nothing in between to mistranslate it.
         self.assertEqual(factory.BuildSpec(**plan),
                          factory.BuildSpec(phase_id="p1", lesson_unit="u1",
                                            widget_unit="u2",
                                            widget_concept=plan["widget_concept"],
-                                           exercise_unit="u2"))
+                                           exercise_unit="u2", bank=False))
+
+    def test_a_course_with_no_question_bank_does_not_plan_a_bank_section(self):
+        # A bank section is text appended to an existing question bank, not a
+        # file of its own — so a course that has no bank has nowhere to put
+        # one, and promotion drops it in silence. The plan says what will be
+        # bought, so it may not name what cannot be kept.
+        plan = factory.default_build_plan(
+            self.manifest_for(GOOD_CURRICULUM, GOOD_SIDECAR))
+        self.assertFalse(plan["bank"])
+        # The key stays and only the value moves: `BuildSpec(**plan)` is the
+        # whole contract between the gate and the build, and it still holds.
+        self.assertIn("bank", plan)
+        self.assertFalse(factory.BuildSpec(**plan).bank)
+
+        # And the estimate stops charging for it, so the number the learner
+        # approves stays the number of what will actually be bought.
+        config = load_models_config()
+        input_tokens, output_tokens = factory.ESTIMATE_TOKENS["bank-author"]
+        self.assertEqual(
+            factory.estimate_build_cost(config, {**plan, "bank": True})
+            - factory.estimate_build_cost(config, plan),
+            config.cost(config.model_for_role("bank-author"),
+                        input_tokens, output_tokens))
+
+    def test_a_course_that_has_a_question_bank_still_plans_a_section(self):
+        # The same lookup `build_phase` uses to find `bank_target`: a
+        # question-bank material in the manifest. There is somewhere to
+        # append to, so the section is planned and priced as before.
+        manifest = self.manifest_for(
+            GOOD_CURRICULUM, GOOD_SIDECAR + BANK_MATERIAL,
+            files={"interactive/quizzes/question-bank.md":
+                   "# Bank\n\n## Unit 1\nA question.\n"})
+        self.assertTrue(factory.default_build_plan(manifest)["bank"])
 
     def test_one_unit_phase_gets_no_widget(self):
         curriculum = GOOD_CURRICULUM[:GOOD_CURRICULUM.index("### Unit 2")] + (

@@ -22,7 +22,10 @@ holds unchanged: a course that does not compile is an absence, never a page.
 A tenant who has neither published a profile nor got a course is not shown
 an empty front door: the gate below redirects every learner-facing route to
 `/onboarding/`, where `wizard.py` draws the setup screens (mounted here, so
-this module still owns every route the app answers). `/profile` stays
+this module still owns every route the app answers). The gate is the third
+registration path, and only in the instant before it redirects — while it
+fires, the front door's rescan is the thing it is standing in front of, so
+a course copied into the home by hand would otherwise wait for a restart. `/profile` stays
 reachable from every state of the account — no state of your account is a
 state where your data is hostage — and a tenant with a course configured is
 never gated at all.
@@ -312,6 +315,27 @@ def create_app(course_roots: list[str], tenant_slug: str,
             return None
         return courses.get(slug)
 
+    def scan_home() -> None:
+        """Register every course in the home this app has not loaded yet.
+
+        The pull path's wide end: a directory nobody asked for by name, but
+        which appeared since the last time anyone looked — the promotion
+        that finished in the worker process, or a course somebody copied in
+        by hand. Only unknown directories are compiled, so a loaded course
+        is never recompiled, and a refusal leaves that course off the app as
+        it was off it a moment ago rather than taking the caller down.
+
+        Synchronous, and the compile inside it can be a real amount of work:
+        every caller from the event loop hands it to the threadpool.
+        """
+        for root in (coursehome.course_roots(courses_dir) if courses_dir else ()):
+            if os.path.basename(root) not in courses:
+                try:
+                    register_course(root)
+                except REFUSALS as exc:
+                    print(f"courses: {root} not registered: {exc}",
+                          file=sys.stderr)
+
     app = FastAPI(title="curricle", docs_url=None, redoc_url=None)
     wizard.mount(app, engine=engine, scope=scope, tenant_slug=tenant_slug,
                  courses=courses, courses_dir=courses_dir,
@@ -335,6 +359,19 @@ def create_app(course_roots: list[str], tenant_slug: str,
         307 rather than 302 so a POST arrives at the wizard as a POST — a
         gated write that silently became a GET would look to the caller like
         a write that succeeded.
+
+        The one thing this does beyond deciding is scan the courses home,
+        and only in the moment it is about to redirect. While the gate fires
+        it is the front door's lazy rescan that never runs, so a tenant who
+        skipped the wizard and copied a course into the home would stay
+        gated until somebody restarted the process — an honest bug with a
+        dishonest symptom, since their course is sitting right there. One
+        scan at that exact point costs nothing on any other request, and it
+        goes through the threadpool and through `register_course`'s lock
+        like every other registration: a compile on the event loop would
+        stall every request in the process, which is a worse bug than the
+        one being fixed. (Wizard users never reach it — publishing gives
+        them a course, and a published profile turns the gate off anyway.)
         """
         path = request.url.path
         if not courses and not any(path == prefix or path.startswith(prefix + "/")
@@ -348,7 +385,9 @@ def create_app(course_roots: list[str], tenant_slug: str,
                     return onboarding.load_state(conn, scope).profile_published
 
             if not await run_in_threadpool(published):
-                return RedirectResponse("/onboarding/", status_code=307)
+                await run_in_threadpool(scan_home)
+                if not courses:
+                    return RedirectResponse("/onboarding/", status_code=307)
         return await call_next(request)
 
     def handle(slug: str) -> CourseHandle:
@@ -361,17 +400,8 @@ def create_app(course_roots: list[str], tenant_slug: str,
     def index() -> str:
         e = html_mod.escape
         # The front door is where a course finished since the last request
-        # first appears, so it rescans the home before drawing. Only unknown
-        # directories are compiled — a loaded course is never recompiled to
-        # render a card — and a compile that fails simply leaves the course
-        # off the page, as it was off it a moment ago.
-        for root in (coursehome.course_roots(courses_dir) if courses_dir else ()):
-            if os.path.basename(root) not in courses:
-                try:
-                    register_course(root)
-                except REFUSALS as exc:
-                    print(f"courses: {root} not registered: {exc}",
-                          file=sys.stderr)
+        # first appears, so it rescans the home before drawing.
+        scan_home()
         cards = []
         for h in courses.values():
             # One transaction per course. Honest at two, a smell at twenty —

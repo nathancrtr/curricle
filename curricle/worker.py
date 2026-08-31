@@ -82,6 +82,12 @@ Handler = Callable[[sa.Engine, db.TenantScope, sa.Row],
 # boundary — the wizard cannot import this module (L1's grep guard).
 DRAFT_DIR = ".draft-onboarding"
 
+# The phase the wizard builds and promotes. Onboarding writes phase 1 and
+# only phase 1 (design §4, Stop 9), so the checkpoint promotion reads is
+# `interactive/.draft-p1/` — and `_unpromoted` below refuses to move a tree
+# that still holds any other, rather than publishing a draft nobody promoted.
+PHASE_ID = "p1"
+
 # What an outcome queues behind itself, in the same transaction as the
 # outcome event. Design §4 rejected a second human gate over the built
 # materials, so `build_ready` is not a stop: the decision to publish was
@@ -333,8 +339,219 @@ def _remaining(spec: factory.BuildSpec, content_root: str) -> factory.BuildSpec:
     return dataclasses.replace(spec, **bought)
 
 
+def _sidecar_at(root: str) -> str | None:
+    """Where this course keeps its sidecar, or None if it keeps none yet.
+
+    The same two names, in the same order, that `webapp.load_course` looks
+    in — a course the app would refuse to read is not one this stage may
+    call published.
+    """
+    for name in coursehome.SIDECAR_NAMES:
+        path = os.path.join(root, name)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+def _unpromoted(content_root: str) -> list[str]:
+    """Checkpoint directories still sitting in the draft's `interactive/`.
+
+    `factory.promote` deletes the checkpoint it promoted, so anything left
+    here is a phase whose artifacts were bought and never moved into the
+    course. Publishing over that would serve a course quietly missing the
+    materials the learner paid for, which is the one outcome worse than a
+    refusal — so the tree is refused and the draft is left where it is.
+    """
+    interactive = os.path.join(content_root, "interactive")
+    if not os.path.isdir(interactive):
+        return []
+    return sorted(name for name in os.listdir(interactive)
+                  if name.startswith(".draft-"))
+
+
+def _bank_would_be_lost(checkpoint_path: str) -> bool:
+    """A bank section in the checkpoint with nowhere to append it?
+
+    The bank is the one artifact that is not a file: it is text appended to
+    the course's existing question bank, so it carries no `rel_path` and
+    `factory.promote` finds its destination in the checkpoint's own
+    `bank_target`. When that is None the section is passed over in silence —
+    material the learner paid for, gone with no row anywhere saying so.
+
+    `factory.default_build_plan` no longer buys a bank for a course that has
+    none, so this cannot happen on the mainline; it is here so that the day
+    something regresses, a learner gets a refusal they can see rather than a
+    loss nobody can. An unreadable checkpoint is not this function's
+    business — the compile gate below has the honest word for that.
+    """
+    try:
+        with open(checkpoint_path, encoding="utf-8") as f:
+            build = json.load(f)
+    except (OSError, ValueError):
+        return False
+    if build.get("bank_target"):
+        return False
+    return any(not a.get("rel_path") for a in build.get("artifacts", []))
+
+
+def _move_into(src_dir: str, dst_dir: str) -> None:
+    """Move every child of `src_dir` into `dst_dir`, merging directories.
+
+    Renames rather than copies, so a course does not exist twice on disk
+    even for an instant. The merge is not generality for its own sake: a
+    worker that died halfway through this loop left some children already
+    in place, and the retry has to finish the move rather than trip over
+    its own predecessor's progress.
+    """
+    for name in sorted(os.listdir(src_dir)):
+        src, dst = os.path.join(src_dir, name), os.path.join(dst_dir, name)
+        if os.path.isdir(src) and os.path.isdir(dst):
+            _move_into(src, dst)
+            os.rmdir(src)
+        else:
+            os.replace(src, dst)
+
+
+def _install(draft_root: str, course_root: str, course_id: str) -> None:
+    """Step 2: the draft's contents become the course, under its own name.
+
+    Three refusals before anything moves, because everything after the move
+    is harder to undo than to prevent. Nothing may be left unpromoted; the
+    tree must still carry a sidecar; and the id in that sidecar must be
+    exactly the directory's name. That last one is not fussiness: every
+    registration path in the app looks a course up by directory basename and
+    serves it under the id its sidecar declares, so a course whose two names
+    disagree is one nothing can serve and everything recompiles. Minting
+    makes them equal by construction — this refuses rather than guesses on
+    the day something has made them differ.
+    """
+    left = _unpromoted(os.path.join(draft_root, "learning"))
+    if left:
+        raise StageFailed(
+            "validation_failed",
+            f"the draft still holds unpromoted materials in {', '.join(left)}")
+    sidecar_path = _sidecar_at(draft_root)
+    if sidecar_path is None:
+        raise StageFailed("compile_failed",
+                          f"the draft at {draft_root} carries no sidecar")
+    try:
+        declared = load_sidecar(sidecar_path).course.id
+    except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
+        raise StageFailed("compile_failed",
+                          f"{type(exc).__name__}: {exc}") from exc
+    if declared != course_id:
+        raise StageFailed(
+            "validation_failed",
+            f"the drafted course calls itself {declared!r} but the directory "
+            f"it would be published into is {course_id!r} — refusing to "
+            "publish a course under a name it never claimed")
+    _move_into(draft_root, course_root)
+    os.rmdir(draft_root)
+
+
+def _promote(engine: sa.Engine, scope: db.TenantScope,
+             run: sa.Row) -> tuple[str, dict] | None:
+    """Stop 10: the built draft becomes the course, or nothing happens.
+
+    Four steps, ordered so that an interruption leaves a state the retry can
+    finish rather than one somebody has to reconstruct by hand: the existing
+    promotion mechanics *inside the draft tree*, then the move into place,
+    then the final compile at the final location, then the row that says the
+    course exists. The last two are the point of the order — `promoted` is
+    appended only after a compile of the course where it will actually be
+    served, because "only promotion touches a course, and it aborts unless
+    the compile stays clean" has to gate the ledger row and not merely print
+    beside it.
+
+    Every step is skippable by the state it already found, which is what
+    makes the retry safe. A flow that already has a `promoted` row returns
+    None and appends nothing — the ledger is append-only and a duplicate is
+    suppressed at the writer, never deleted afterwards. A draft with no
+    checkpoint left in it has been promoted once already, so that step is
+    passed over; a draft directory that is gone — or that is still there
+    with nothing left in it, which is the crash window between the last
+    child moving and the directory being removed — was already moved, so the
+    move is too, and the compile and the row run on their own.
+
+    What this handler never reads is the `build_ready` payload. That row
+    lists what one run bought, and a resumed build honestly reports only its
+    own part — the full inventory is the checkpoint manifest in the draft,
+    which is what the promotion mechanics read for themselves.
+    """
+    with engine.begin() as conn:
+        rows = list(conn.execute(scope.onboarding_select()))
+    if any(r.kind == "promoted" and r.course == run.course for r in rows):
+        # Two runs queued behind one build, or a retry over a promotion that
+        # got further than its worker survived to report. The course is
+        # published either way, and a second row saying so would be the
+        # ledger claiming it happened twice.
+        return None
+
+    # Asked before anything else, like the two stages before it: a courses
+    # home nobody configured fails the run rather than being guessed at.
+    course_root = os.path.join(coursehome.courses_dir(), run.course)
+    draft_root = os.path.join(course_root, DRAFT_DIR)
+    if os.path.isdir(draft_root) and not os.listdir(draft_root):
+        # The one instant `_install` is not atomic across: every child has
+        # been renamed into the course and the empty shell has not been
+        # removed yet. An empty draft is a finished move, not a draft — and
+        # read as a draft it would be one with no sidecar, which is a
+        # refusal the retry would hit again forever.
+        os.rmdir(draft_root)
+    if os.path.isdir(draft_root):
+        content_root = os.path.join(draft_root, "learning")
+        checkpoint = os.path.join(content_root, "interactive",
+                                  f".draft-{PHASE_ID}", "manifest.json")
+        if os.path.isfile(checkpoint):
+            if _bank_would_be_lost(checkpoint):
+                raise StageFailed(
+                    "validation_failed",
+                    "the built phase holds a question-bank section and this "
+                    "course has no question bank to append it to — refusing "
+                    "to publish materials that would be dropped in silence")
+            try:
+                factory.promote(draft_root, content_root,
+                                os.path.join(draft_root,
+                                             factory.OUTLINE_FILES[1]),
+                                PHASE_ID)
+            except factory.ValidationFailed as exc:
+                # Promotion's own compile gate, refusing inside the draft:
+                # the materials broke the course, so they are not moved.
+                raise StageFailed("compile_failed", str(exc)) from exc
+            except (OSError, ValueError, TypeError, KeyError,
+                    yaml.YAMLError) as exc:
+                raise StageFailed("worker_error",
+                                  f"{type(exc).__name__}: {exc}") from exc
+        _install(draft_root, course_root, run.course)
+    elif _sidecar_at(course_root) is None:
+        # No draft and no course: there is nothing here to publish, which is
+        # a run enqueued for a flow that never built anything.
+        raise StageFailed("worker_error",
+                          f"nothing to publish: no draft at {draft_root} and "
+                          f"no course at {course_root}")
+
+    sidecar_path = _sidecar_at(course_root)
+    if sidecar_path is None:
+        raise StageFailed("compile_failed",
+                          f"the promoted course at {course_root} carries no "
+                          "sidecar")
+    try:
+        manifest, issues = compile_course(course_root, load_sidecar(sidecar_path))
+    except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
+        raise StageFailed("compile_failed",
+                          f"{type(exc).__name__}: {exc}") from exc
+    if manifest is None:
+        raise StageFailed("compile_failed",
+                          "\n".join(str(i) for i in issues if i.level == "error"))
+    # Registration is nobody's job here. This process and `serve` share a
+    # database and a filesystem and nothing else, so nothing can call into
+    # the app: the course is picked up by the front door's rescan and the
+    # route miss, and this handler's work ends at the row.
+    return "promoted", {"course_id": run.course}
+
+
 HANDLERS: dict[str, Handler] = {"noop": _noop, "outline": _outline,
-                                "build": _build}
+                                "build": _build, "promote": _promote}
 
 # What a stage says in the ledger when it fails — because its handler
 # raised, because the outcome it returned was refused, or because the worker

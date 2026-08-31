@@ -55,6 +55,12 @@ python -m curricle serve --course examples/tinylang --tenant example --port 8765
 
 Pass `--course` more than once to serve several courses from one front door.
 
+`python -m curricle mcp --course <course_root> --tenant …` exports the same
+course to your own assistant as an MCP server over stdio — the manifest, the
+profile, progress, lesson guides and the question bank as tools it can call.
+The config block to paste, and what the tutor may read and write, are in
+[`docs/mcp-config.md`](docs/mcp-config.md).
+
 `python -m curricle import-progress <course_root> --tenant … --json '<paste>'`
 is a one-time migration helper: it takes a JSON dump of a hand-built course
 page's `localStorage` and replays it into the ledger. You need it only if you

@@ -748,12 +748,26 @@ def default_build_plan(manifest: Manifest) -> dict:
     """What phase 1 gets built, derived from the outline rather than asked for.
 
     A lesson on the phase's first unit, a widget on its second, an exercise
-    on its last, the checkpoint quiz and a bank section. Deterministic beats
-    another model call: the learner reads the plan at the gate and can
-    regenerate the phase if it is wrong.
+    on its last, the checkpoint quiz, and a bank section only if there is a
+    bank to append it to. Deterministic beats another model call: the learner
+    reads the plan at the gate and can regenerate the phase if it is wrong.
+
+    The bank is the one entry that asks a question about the course rather
+    than about the phase, and it is the same question `build_phase` asks to
+    find `bank_target`: a question-bank material in the manifest. A section
+    is not a file — it is text appended to somebody else's — so a course
+    with no bank has nowhere to put one, and `promote` silently drops it.
+    Planning it anyway would bill a learner for an artifact that cannot
+    survive publication, which is the honest reading of this being a *plan*:
+    it says what will be bought, so it may not name what cannot be kept.
+    (A brand-new wizard course has no bank yet, so it gets `False` here and
+    `estimate_build_cost` stops charging for it — the number at the gate and
+    what the build buys stay the same thing. Minting a bank file for a new
+    course is the proper fix and is its own issue.)
 
     The keys are `BuildSpec`'s field names, so an approved plan reaches the
-    build as `BuildSpec(**plan)` with nothing in between to mistranslate.
+    build as `BuildSpec(**plan)` with nothing in between to mistranslate —
+    which is why the bank's key stays and only its value moves.
     """
     phase = next((p for p in manifest.phases if p.num == 1), None)
     if phase is None:
@@ -770,7 +784,7 @@ def default_build_plan(manifest: Manifest) -> dict:
         "widget_concept": (widget.gloss or widget.title) if widget else None,
         "exercise_unit": entries[-1].id,
         "quiz": True,
-        "bank": True,
+        "bank": any(m.kind == "question-bank" for m in manifest.materials),
     }
 
 

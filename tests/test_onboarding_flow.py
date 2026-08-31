@@ -21,6 +21,7 @@ would be seven copies of the same walk. The methods below assert against
 what that walk recorded and against the database it left behind.
 """
 
+import json
 import os
 import shutil
 import tempfile
@@ -30,7 +31,9 @@ from unittest import mock
 
 import sqlalchemy as sa
 
-from curricle import (coursehome, db, llm, onboarding, webapp, worker)
+from curricle import coursehome, db, llm, onboarding, webapp, worker
+from curricle.compiler import compile_course
+from curricle.sidecar import load_sidecar
 
 from pg import test_engine
 # The scripted transports and the artifacts they answer with, reused rather
@@ -39,12 +42,17 @@ from pg import test_engine
 from test_factory import (GOOD_SHELF, FakeBuildSend, FakeOutlineSend,
                           designer_json)
 
-# The five roles a phase-1 build buys, and the two the outline buys. Every
-# one of them is a real contract under roles/ — the audit below asserts that
-# every metered row names one, which is what makes "the fake runner's call
-# log is the only spend" a claim about the ledger and not about the fake.
-BUILD_ROLES = frozenset({"bank-author", "exercise-author", "lesson-writer",
-                         "quiz-author", "widget-builder"})
+# The roles a phase-1 build buys for a brand-new course, and the two the
+# outline buys. Every one of them is a real contract under roles/ — the audit
+# below asserts that every metered row names one, which is what makes "the
+# fake runner's call log is the only spend" a claim about the ledger and not
+# about the fake.
+#
+# `bank-author` is deliberately not among them: a bank section is appended to
+# an existing question bank, a new course has none, so `default_build_plan`
+# does not buy one and the estimate at the gate does not charge for one.
+BUILD_ROLES = frozenset({"exercise-author", "lesson-writer", "quiz-author",
+                         "widget-builder"})
 OUTLINE_ROLES = frozenset({"curriculum-designer", "resource-curator"})
 
 # The title the scope form is filled in with, and the id minting turns it
@@ -153,13 +161,20 @@ class OnboardingFlowTest(unittest.TestCase):
     # ---- the walk -------------------------------------------------------
 
     @classmethod
-    def drain(cls) -> None:
-        """Run the worker to idle, with the scripted transport in its hand."""
+    def drain(cls, once: bool = False) -> None:
+        """Run the worker to idle, with the scripted transport in its hand.
+
+        `once` stops after a single claimed run, for the one place this walk
+        has to see the disk between two stages: promotion deletes the phase's
+        checkpoint manifest, and that manifest is the inventory the published
+        course gets checked against.
+        """
         with mock.patch.object(
                 worker, "RUNNER_FACTORY",
                 lambda engine, scope: llm.Runner(engine, scope, send=cls.send)):
             while worker.run_once(cls.engine):
-                pass
+                if once:
+                    return
 
     @classmethod
     def walk(cls) -> None:
@@ -184,7 +199,15 @@ class OnboardingFlowTest(unittest.TestCase):
         cls.approved = c.post("/onboarding/outline/approve",
                               follow_redirects=False)
 
-        # 5. The build, and the promotion chained behind it.
+        # 5. The build, then the promotion chained behind it — claimed one
+        #    run at a time so the phase's checkpoint can be read between
+        #    them. It is the full inventory of what was bought, and
+        #    promotion deletes it on its way through.
+        cls.drain(once=True)
+        with open(os.path.join(cls.tmp, COURSE_ID, worker.DRAFT_DIR, "learning",
+                               "interactive", f".draft-{worker.PHASE_ID}",
+                               "manifest.json"), encoding="utf-8") as f:
+            cls.checkpoint = json.load(f)
         cls.drain()
 
         # 6. The course as a learner meets it, and the front door listing it.
@@ -250,14 +273,15 @@ class OnboardingFlowTest(unittest.TestCase):
     def test_step_5_the_build_and_the_promotion_reach_promoted(self):
         self.assertEqual(self.kinds()[-1], "promoted")
         self.assertEqual(self.payload("promoted"), {"course_id": COURSE_ID})
-        # The five roles a phase-1 build buys, and the draft gone from disk.
+        # The roles a phase-1 build buys for a new course, and no bank
+        # section — the plan the learner approved did not name one, because
+        # this course has no question bank for it to be appended to.
         self.assertEqual(sorted(set(self.send.roles()) & BUILD_ROLES),
                          sorted(BUILD_ROLES))
+        self.assertNotIn("bank-author", self.send.roles())
+        self.assertFalse(self.payload("outline_ready")["plan"]["bank"])
         self.assertFalse(os.path.exists(
             os.path.join(self.tmp, COURSE_ID, worker.DRAFT_DIR)))
-        self.assertTrue(os.path.isfile(os.path.join(
-            self.tmp, COURSE_ID, "learning", "interactive", "lessons",
-            "unit-01-lesson.md")))
         with self.engine.begin() as conn:
             runs = [(r.stage, r.status, r.reason) for r in conn.execute(
                 sa.select(db.factory_runs)
@@ -266,6 +290,27 @@ class OnboardingFlowTest(unittest.TestCase):
         self.assertEqual(runs, [("outline", "done", None),
                                 ("build", "done", None),
                                 ("promote", "done", None)])
+
+    def test_step_5_every_artifact_the_phase_bought_is_in_the_course(self):
+        # The inventory, whole, checked against the checkpoint rather than
+        # against paths this test happens to know: promotion moves what the
+        # phase bought, all of it, and registers each material in the
+        # sidecar the compile then reads back. A promotion that moved the
+        # lesson and forgot the rest passes every other step here.
+        root = os.path.join(self.tmp, COURSE_ID)
+        sidecar_path = os.path.join(root, *coursehome.SIDECAR_NAMES[0].split(os.sep))
+        manifest, issues = compile_course(root, load_sidecar(sidecar_path))
+        self.assertIsNotNone(manifest, [str(i) for i in issues])
+        material_ids = {m.id for m in manifest.materials}
+
+        artifacts = self.checkpoint["artifacts"]
+        self.assertEqual(len(artifacts), len(BUILD_ROLES))
+        for artifact in artifacts:
+            with self.subTest(artifact=artifact["rel_path"] or artifact["note"]):
+                self.assertTrue(artifact["rel_path"])   # no bank in this plan
+                self.assertTrue(os.path.exists(
+                    os.path.join(root, "learning", artifact["rel_path"])))
+                self.assertIn(artifact["material"]["id"], material_ids)
 
     def test_step_6_the_course_is_served_and_the_front_door_lists_it(self):
         # Registration is the pull path: nothing called into this process,

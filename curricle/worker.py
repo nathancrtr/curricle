@@ -369,6 +369,31 @@ def _unpromoted(content_root: str) -> list[str]:
                   if name.startswith(".draft-"))
 
 
+def _bank_would_be_lost(checkpoint_path: str) -> bool:
+    """A bank section in the checkpoint with nowhere to append it?
+
+    The bank is the one artifact that is not a file: it is text appended to
+    the course's existing question bank, so it carries no `rel_path` and
+    `factory.promote` finds its destination in the checkpoint's own
+    `bank_target`. When that is None the section is passed over in silence —
+    material the learner paid for, gone with no row anywhere saying so.
+
+    `factory.default_build_plan` no longer buys a bank for a course that has
+    none, so this cannot happen on the mainline; it is here so that the day
+    something regresses, a learner gets a refusal they can see rather than a
+    loss nobody can. An unreadable checkpoint is not this function's
+    business — the compile gate below has the honest word for that.
+    """
+    try:
+        with open(checkpoint_path, encoding="utf-8") as f:
+            build = json.load(f)
+    except (OSError, ValueError):
+        return False
+    if build.get("bank_target"):
+        return False
+    return any(not a.get("rel_path") for a in build.get("artifacts", []))
+
+
 def _move_into(src_dir: str, dst_dir: str) -> None:
     """Move every child of `src_dir` into `dst_dir`, merging directories.
 
@@ -443,8 +468,10 @@ def _promote(engine: sa.Engine, scope: db.TenantScope,
     None and appends nothing — the ledger is append-only and a duplicate is
     suppressed at the writer, never deleted afterwards. A draft with no
     checkpoint left in it has been promoted once already, so that step is
-    passed over; a draft directory that is gone entirely was already moved,
-    so the move is too, and the compile and the row run on their own.
+    passed over; a draft directory that is gone — or that is still there
+    with nothing left in it, which is the crash window between the last
+    child moving and the directory being removed — was already moved, so the
+    move is too, and the compile and the row run on their own.
 
     What this handler never reads is the `build_ready` payload. That row
     lists what one run bought, and a resumed build honestly reports only its
@@ -464,10 +491,24 @@ def _promote(engine: sa.Engine, scope: db.TenantScope,
     # home nobody configured fails the run rather than being guessed at.
     course_root = os.path.join(coursehome.courses_dir(), run.course)
     draft_root = os.path.join(course_root, DRAFT_DIR)
+    if os.path.isdir(draft_root) and not os.listdir(draft_root):
+        # The one instant `_install` is not atomic across: every child has
+        # been renamed into the course and the empty shell has not been
+        # removed yet. An empty draft is a finished move, not a draft — and
+        # read as a draft it would be one with no sidecar, which is a
+        # refusal the retry would hit again forever.
+        os.rmdir(draft_root)
     if os.path.isdir(draft_root):
         content_root = os.path.join(draft_root, "learning")
-        if os.path.isfile(os.path.join(content_root, "interactive",
-                                       f".draft-{PHASE_ID}", "manifest.json")):
+        checkpoint = os.path.join(content_root, "interactive",
+                                  f".draft-{PHASE_ID}", "manifest.json")
+        if os.path.isfile(checkpoint):
+            if _bank_would_be_lost(checkpoint):
+                raise StageFailed(
+                    "validation_failed",
+                    "the built phase holds a question-bank section and this "
+                    "course has no question bank to append it to — refusing "
+                    "to publish materials that would be dropped in silence")
             try:
                 factory.promote(draft_root, content_root,
                                 os.path.join(draft_root,

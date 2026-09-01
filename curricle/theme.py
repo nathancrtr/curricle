@@ -24,6 +24,9 @@ House rules encoded here:
   always carry their text label; tint is reinforcement, never the message.
 - Radii are generous (cards 18px, controls a full pill) — the rounded
   geometry *is* the warmth; borders stay hairline so it never turns toy.
+  A decorative hairline is `--line`; the edge of a control a learner types
+  into is `--edge`, computed against the 3:1 non-text floor, because a box
+  whose boundary cannot be seen is a box that is not there.
 - Type: a humanist sans stack (SF Rounded where the platform has it, then
   Avenir Next, then the system face). No serif display, no letterspaced
   mono eyebrows — that was the bookish status quo this direction replaces.
@@ -39,7 +42,7 @@ import re
 
 LIGHT_VARS = """\
   --bg:#FDF6EF; --panel:#FFFFFF; --ink:#3B2A1E; --muted:#6D5B4E; --faint:#8A7767;
-  --line:#EFDFD2; --line-soft:#F5EAE0;
+  --line:#EFDFD2; --line-soft:#F5EAE0; --edge:#A68A73;
   --accent:#E06A4E; --accent-text:#B8432A; --accent-strong:#C6492E;
   --accent-soft:#FBE9E2; --on-accent:#FFFFFF;
   --good:#3D7A4A; --good-text:#2F6B3C; --good-soft:#E4F0E5;
@@ -51,7 +54,7 @@ LIGHT_VARS = """\
 
 DARK_VARS = """\
   --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
-  --line:#42352A; --line-soft:#382C22;
+  --line:#42352A; --line-soft:#382C22; --edge:#836D5A;
   --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
   --accent-soft:#43291F; --on-accent:#221A14;
   --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
@@ -141,6 +144,13 @@ BASE_CSS = f"""\
           border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
           background:var(--panel); cursor:pointer;
           transition:border-color .2s, color .2s, background .2s; }}
+  /* A pill is a button whether the element under it is one or is an anchor,
+     so the anchor half gives up its underline here rather than in whichever
+     surface happens to notice: an underlined label inside a button is a link
+     wearing a button's clothes. The front door had this rule locally and the
+     wizard did not, which is exactly the drift a shared sheet exists to
+     stop. */
+  a.pill {{ text-decoration:none; }}
   .pill:hover {{ border-color:var(--accent); color:var(--ink); }}
   .pill[aria-pressed="true"] {{ background:var(--accent-strong);
           border-color:var(--accent-strong); color:var(--on-accent); }}

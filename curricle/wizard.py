@@ -52,6 +52,7 @@ and L1 still holds on every route here.
 from __future__ import annotations
 
 import html as html_mod
+import math
 import os
 import re
 import urllib.parse
@@ -441,42 +442,63 @@ WIZARD_CSS = theme.style("""\
                     margin:0 0 13px; max-width:62ch; }
   .eg { border-left:2px solid var(--line); padding:1px 0 1px 14px;
         margin:0 0 16px; }
-  .eg b { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
-          text-transform:uppercase; color:var(--muted); margin:0 0 5px; }
+  /* Captions over a learner's own words, in the .stepline register:
+     sentence case, no tracking, no small caps. The letterspaced uppercase
+     eyebrow is the bookish vocabulary DIRECTION.md retired, and this was the
+     one surface that had brought it back — over the learner's own sentences,
+     which is the worst place in the product for it. */
+  .eg b, .claimkey { display:block; font-size:13.5px; font-weight:600;
+          color:var(--muted); margin:0 0 5px; }
   .eg p { font-size:13.5px; line-height:1.55; color:var(--muted);
           margin:0 0 7px; max-width:62ch; }
   .eg p:last-child { margin-bottom:0; }
   label.claim { display:block; margin:0 0 13px; }
-  .claimkey { display:block; font-size:11.5px; font-weight:700;
-              letter-spacing:.06em; text-transform:uppercase; color:var(--muted);
-              margin:0 0 5px; }
-  textarea { width:100%; min-height:64px; resize:vertical;
+  /* --edge, not --line: a hairline is decoration and computes 1.30 against
+     the panel a box sits on, which is a control boundary nobody can see. And
+     `field-sizing` grows the box to the text it holds — the read-back screen
+     that slices a learner's own last line in half is not a read-back — with
+     `min-height` still the floor and `rows` (set from the saved length) the
+     fallback where the property is not supported. */
+  textarea { width:100%; min-height:64px; field-sizing:content;
+             resize:vertical;
              font:14px/1.55 """ + theme.FONT_BODY + """;
              color:var(--ink); background:var(--panel);
-             border:1.5px solid var(--line); border-radius:12px;
+             border:1.5px solid var(--edge); border-radius:12px;
              padding:10px 13px; }
   /* Placeholder copy is read to be acted on, so it is body text and takes
      --muted, never the decorative --faint. */
   textarea::placeholder { color:var(--muted); }
-  textarea:focus { outline:none; border-color:var(--accent); }
+  /* No `outline:none` here: the base sheet's :focus-visible ring is the
+     system's focus, and a 1.5px border swap in its place is thinner than the
+     ring it replaced. The border colour stays as reinforcement. */
+  textarea:focus { border-color:var(--accent); }
   /* The scope form's one-line answers, in the same box as the many-line
      ones: a title and a number are typed into the same kind of field a
      claim is, because they are the same kind of answer. */
   input[type=text], input[type=number] { font:14px/1.55 """
              + theme.FONT_BODY + """; color:var(--ink);
-             background:var(--panel); border:1.5px solid var(--line);
+             background:var(--panel); border:1.5px solid var(--edge);
              border-radius:12px; padding:9px 13px; }
   input[type=text] { width:100%; }
   input[type=number] { width:88px; }
-  input:focus { outline:none; border-color:var(--accent); }
+  input:focus { border-color:var(--accent); }
+  /* The one accent, on the one control that picks the course's shape: with
+     no accent-color a checked radio comes out in the browser's blue, which
+     would be the only cool colour in the product. Sized like the hub's
+     checkboxes, because they are the same control at the same size. */
+  input[type=radio] { accent-color:var(--accent-strong); width:17px;
+             height:17px; }
   .hours { display:flex; flex-wrap:wrap; align-items:center; gap:10px;
            margin:0 0 13px; }
   .hours span { font-size:14px; color:var(--muted); }
-  .choice { display:block; border:1.5px solid var(--line); border-radius:12px;
+  .choice { display:block; border:1.5px solid var(--edge); border-radius:12px;
             padding:11px 14px; margin:0 0 10px; }
   .choice b { font-size:14.5px; }
+  /* 25px is the radio (17px, above) plus its own right margin: the sentence
+     hangs under the mode's name, not under the control. Resizing the radio
+     means moving this. */
   .choice span { display:block; font-size:13.5px; line-height:1.55;
-                 color:var(--muted); margin:4px 0 0 22px; max-width:58ch; }
+                 color:var(--muted); margin:4px 0 0 25px; max-width:58ch; }
   .choice input { margin:0 8px 0 0; }
   .hint { font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 13px; }
   .hint:last-child { margin-bottom:0; }
@@ -498,6 +520,9 @@ WIZARD_CSS = theme.style("""\
   .gatebox p.plan { font-size:14.5px; line-height:1.6; color:var(--ink);
           margin:16px 0 0; max-width:62ch; }
   .nav { display:flex; flex-wrap:wrap; gap:12px; margin:30px 0 0; }
+  /* The way back is not the action the screen is for, so it is a text link
+     and not a pill: one forward action per screen, and it is Save. */
+  .nav .back { font-size:14px; font-weight:600; }
   .gateline { font-size:14.5px; line-height:1.6; color:var(--muted);
               margin:16px 0 0; max-width:62ch; }
   .gateline b { color:var(--ink); }
@@ -662,13 +687,44 @@ def _page(stop: str, screen: Screen, tenant_slug: str) -> str:
   </header>
   {screen.body}
   <footer>
-    Your place is kept in the onboarding ledger, not in this page — close the
-    tab whenever you like and come back to exactly this screen.
+    Your saved screens are kept; you can close this tab and pick up where you
+    left off.
   </footer>
 </div>
 </body>
 </html>
 """
+
+
+def default_screen(profile_state: profile.ProfileState) -> str:
+    """Which sub-screen a bare `/onboarding/` opens at during the profile stop.
+
+    Every redirect in this module lands on `/onboarding/` with nothing after
+    it, and the footer promises you can close the tab and pick up where you
+    left off, so this function is the whole of whether that sentence is true.
+    It used to answer "welcome" always, which made the promise false on every
+    screen but the first.
+
+    Derived, like everything else here. A profile with nothing in it has not
+    been left off anywhere, so it opens at the welcome. Otherwise the learner
+    stopped at the first screen still carrying a gate field with no claim on
+    it — `profile_gate_missing` is the same rule the gate sentence and the
+    publish refusal already ask. And a profile whose gate is satisfied is one
+    screen from being published, so it opens at the review.
+
+    Screen 4 is deliberately unreachable this way: it carries no gate field,
+    so nothing about it can be *missing*. It is reached by saving screen 3,
+    by the review's "edit your claims" link, or by naming it — `?screen=`
+    still opens any screen the fold has opened, and this is only the answer
+    to a URL that names none.
+    """
+    if not any(profile_state.field_claims(f) for f in profile.FIELDS):
+        return "welcome"
+    missing = onboarding.profile_gate_missing(profile_state)
+    for number, _, fields in PROFILE_SCREENS:
+        if any(f in missing for f in fields):
+            return number
+    return "review"
 
 
 # --------------------------------------------------------------------------
@@ -739,16 +795,59 @@ def _examples(field: str) -> str:
     interpolated.
     """
     _, examples = FIELD_COPY[field]
-    return ('<div class="eg"><b>for example</b>'
+    return ('<div class="eg"><b>For example</b>'
             + "".join(f"<p>{x}</p>" for x in examples) + "</div>")
 
 
-def _claim_box(field: str, key: str, text: str, label: str) -> str:
-    """One textarea over one claim identity, prefilled from the fold."""
+def box_rows(text: str) -> int:
+    """How many rows a box holding `text` opens at.
+
+    `field-sizing:content` is what actually fits a box to what is in it, so
+    where a browser has that property this number is only the opening
+    guess. Where it does not, this is the whole of the fix: a saved claim
+    four lines long came back in a three-row box with its last line sliced
+    through the x-height, on the one screen whose promise is that your own
+    words are read back to you. Eighty columns is about what the box holds
+    at this column width; an empty box opens at two, because a one-sentence
+    claim sitting in three rows is two blank lines of nothing.
+
+    Wrapping is counted per *line*, not over the whole text, and that is
+    load-bearing rather than fussy: a claim of six short lines is 101
+    characters, and a count over the string would open it at two rows and
+    clip four of them — the same defect, on the same screen. The box beside
+    this one now says in words that line breaks stay inside a claim, so the
+    fallback has to be able to hold what that sentence invites. An empty
+    line still occupies a row, which is why the length of one floors at 1.
+    """
+    return max(2, sum(math.ceil(max(len(line), 1) / 80)
+                      for line in text.split("\n")))
+
+
+def _claim_box(field: str, key: str, text: str, label: str,
+               aria: str) -> str:
+    """One textarea over one claim identity, prefilled from the fold.
+
+    The caption a learner reads is the claim's position in its field — "Claim
+    2" — and never the key it is filed under. The key is the claim's identity
+    and it is forever, but `SUBJECT_ADAPTERS-02` set over somebody's own
+    sentence reads as a database admin screen rather than as hospitality. It
+    rides in `title`, for an operator who wants it, and in the `name` the
+    POST reads back, which is where it was always doing the work.
+
+    `aria` is what that caption costs and what pays it back. "Claim 1" is the
+    right words on screen and the wrong accessible name: screen 1 carries
+    three fields, so a form list read aloud would be "Claim 1, Claim 1, Claim
+    1" where the old key at least told them apart. The `<h3>` naming the
+    field is not associated with the box, so the field's own heading is
+    carried into the name here — "Professional background, claim 1" — with
+    the visible words inside it, which is the rule about labels and names.
+    """
     e = html_mod.escape
-    return (f'<label class="claim"><span class="claimkey">{e(label)}</span>'
-            f'<textarea name="claim__{e(field)}__{e(key)}" rows="3">'
-            f"{e(text)}</textarea></label>")
+    return (f'<label class="claim" title="{e(key)}">'
+            f'<span class="claimkey">{e(label)}</span>'
+            f'<textarea name="claim__{e(field)}__{e(key)}" '
+            f'aria-label="{e(aria)}" '
+            f'rows="{box_rows(text)}">{e(text)}</textarea></label>')
 
 
 def _field_block(field: str, claims: list[profile.Claim]) -> str:
@@ -758,9 +857,21 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
     own key, because the key is the claim's identity for the rest of its
     life — editing a box re-asserts that key and emptying it retracts it, and
     both are things the learner should be able to see themselves doing.
+
+    Two identical-looking boxes keep opposite rules about the Enter key: the
+    saved ones hold their newlines inside one claim, and the Add box splits
+    on every line. There is no script on this page to make them one control
+    and the parsing is not the thing to change, so each box says its own rule
+    directly under or over itself — a learner who presses Enter in a saved
+    box was otherwise told the opposite by the placeholder below it.
     """
     explanation, _ = FIELD_COPY[field]
-    boxes = "".join(_claim_box(field, c.key, c.text, c.key) for c in claims)
+    boxes = "".join(
+        _claim_box(field, c.key, c.text, f"Claim {n}",
+                   f"{FIELD_LABELS[field]}, claim {n}")
+        for n, c in enumerate(claims, 1))
+    rule = ('<p class="hint">A box is one claim; line breaks stay inside '
+            "it.</p>" if claims else "")
     hint = ('<p class="hint">Empty a box to delete that claim.</p>'
             if claims else "")
     return f"""
@@ -768,10 +879,13 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
       <h3>{FIELD_LABELS[field]}</h3>
       <p class="explain">{explanation}</p>
       {_examples(field)}
-      {boxes}{hint}
-      <label class="claim"><span class="claimkey">Add</span>
-      <textarea name="new__{html_mod.escape(field)}" rows="3"
+      {rule}{boxes}{hint}
+      <label class="claim"><span class="claimkey">Add a claim</span>
+      <textarea name="new__{html_mod.escape(field)}"
+      aria-label="{html_mod.escape(FIELD_LABELS[field])}, add a claim"
+      rows="{box_rows('')}"
       placeholder="One claim per line"></textarea></label>
+      <p class="hint">Each line becomes its own claim.</p>
     </div>"""
 
 
@@ -784,36 +898,42 @@ def _meta_block(state: profile.ProfileState) -> str:
       <h3>{FIELD_LABELS["meta"]}</h3>
       <p class="explain">{explanation}</p>
       {_examples("meta")}
-      {_claim_box("meta", META_KEY, claim.text if claim else "", "Description")}
+      {_claim_box("meta", META_KEY, claim.text if claim else "",
+                  "Description", FIELD_LABELS["meta"])}
       <p class="hint">Empty this box to leave the description unset.</p>
     </div>"""
 
 
 def _screen_nav(number: str, missing: tuple[str, ...]) -> str:
-    """Previous, next, and the gate — the last of those in plain words.
+    """The way back, and the gate in plain words. No way forward but Save.
 
-    When a required field is still empty the link onward to the review is not
-    there to be clicked: it is replaced by the sentence naming what is
-    missing, so the reason the path stops is on the same line the path stops
-    at. Refusing to publish is the review screen's job; this only says so.
+    One forward action per screen, and it is the Save button inside the
+    form. The next-screen pill that used to sit here was a second forward
+    arrow forty pixels under the first, outside the `<form>`, and pressing
+    it discarded whatever had just been typed — on a page whose footer
+    invites you to leave. The arrow is the accent's one meaning, "your next
+    action", and it cannot mean two of them. Saving a screen you have not
+    touched writes nothing and moves you on, so nothing was lost with the
+    pill. Back stays, as a quiet text link, because it is not what the
+    screen is for.
+
+    When a required field is still empty the gate is the sentence naming
+    what is missing, so the reason the path stops is on the line the path
+    stops at. Refusing to publish is the review screen's job; this only says
+    so — and it says it once, rather than trailing a second link to the
+    review behind a Save button that already goes there.
     """
     e = html_mod.escape
-    at = SCREEN_ORDER.index(number)
-    previous, following = SCREEN_ORDER[at - 1], SCREEN_ORDER[at + 1]
-    links = [f'<a class="pill" href="/onboarding/?screen={previous}">'
-             f"← {SCREEN_NAMES[previous]}</a>"]
+    previous = SCREEN_ORDER[SCREEN_ORDER.index(number) - 1]
+    back = (f'<a class="back" href="/onboarding/?screen={previous}">'
+            f"← {SCREEN_NAMES[previous]}</a>")
     if missing:
         names = ", ".join(FIELD_LABELS[f] for f in missing)
         gate = f'<p class="gateline">{GATE_LEAD} <b>{e(names)}</b>.</p>'
     else:
         gate = ('<p class="gateline">Every field a course is written against '
-                'has a claim on the record. '
-                '<a href="/onboarding/?screen=review">Review and publish '
-                "→</a></p>")
-    if following != "review" or not missing:
-        links.append(f'<a class="pill" href="/onboarding/?screen={following}">'
-                     f"{SCREEN_NAMES[following]} →</a>")
-    return f'<div class="nav">{"".join(links)}</div>{gate}'
+                "has a claim on the record.</p>")
+    return f'<div class="nav">{back}</div>{gate}'
 
 
 def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
@@ -920,7 +1040,7 @@ def _scope_line(name: str) -> str:
 
 
 def _scope_box(name: str, placeholder: str, required: bool) -> str:
-    return (f'<textarea id="f-{name}" name="{name}" rows="3" '
+    return (f'<textarea id="f-{name}" name="{name}" rows="{box_rows("")}" '
             f'placeholder="{placeholder}"'
             f'{" required" if required else ""}></textarea>')
 
@@ -1286,7 +1406,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     <p>{REJECT_HINT}</p>
     <form method="post" action="/onboarding/outline/reject">
       <label class="claim"><span class="claimkey">{REJECT_LEAD}</span>
-      <textarea name="note" rows="3" required
+      <textarea name="note" rows="{box_rows('')}" required
       placeholder="Eight weeks on the front end is too many — I have four."
       ></textarea></label>
       <p class="ask">
@@ -1728,7 +1848,7 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         profilerender.write_skill_md(state, profile_skill_out)
 
     @app.get("/onboarding/")
-    def onboarding_page(screen: str = "welcome",
+    def onboarding_page(screen: str | None = None,
                         course: str | None = None) -> Response:
         # One transaction for the three questions a screen can ask: where the
         # fold says you are, what your profile holds, and whether the second
@@ -1777,6 +1897,11 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             else:
                 rendered = stage_screen(stop, flow)
             return HTMLResponse(_page(stop, rendered, tenant_slug))
+        if screen is None:
+            # No `?screen=` at all is a learner arriving or coming back, and
+            # the fold says where they left off rather than this page always
+            # saying "welcome" — which is the promise the footer makes.
+            screen = default_screen(profile_state)
         if screen not in SCREEN_ORDER:
             # A screen the vocabulary does not know is navigation past the
             # frontier: back to the fold's screen, and to a URL that agrees

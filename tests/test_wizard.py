@@ -12,6 +12,7 @@ for one of them can never be a screen drawn from the other's ledger.
 
 import html
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -207,6 +208,60 @@ class ScreenDispatchTest(WizardFixture):
                 self.assertEqual(page.headers["location"], "/onboarding/")
         self.assertNotIn(wizard.STOP_TITLES["scope"], self.screen("?screen=scope"))
         self.assertEqual(self.screen("?screen=scope"), self.screen())
+
+
+class DefaultScreenTest(WizardFixture):
+    """F10: a bare `/onboarding/` opens where the learner left off.
+
+    The footer promises you can close the tab and pick up where you left
+    off, and every redirect in this module lands on `/onboarding/` with
+    nothing after it, so `default_screen` is the whole of whether that
+    sentence is true. It used to answer "welcome" always, which made the
+    promise false on five of the profile stop's six screens.
+
+    One method rather than three, because the three cases are one profile
+    growing: an empty one, one with the first gate field answered, and one
+    with all four.
+    """
+
+    def test_a_url_with_no_screen_resolves_from_the_fold(self):
+        # Nothing said yet, so there is nowhere to be resumed to.
+        self.assertEqual(wizard.default_screen(self.profile_state()),
+                         "welcome")
+        self.assertIn("Let us build you a course.", self.screen())
+
+        # Screen 1's gate field is answered; screen 2 is now the first
+        # screen still carrying one that is not.
+        self.save("1", {"new__background": "Nine years of backend work."})
+        self.assertEqual(wizard.default_screen(self.profile_state()), "2")
+        self.assertIn("Profile screen 2 of 4", self.screen())
+
+        # Every gate field answered: what is left to come back to is the
+        # read-back, which is the screen the publish button is on.
+        self.save("2", {"new__style": "Learns by implementing.",
+                        "new__pacing": "Four hours a week, two evenings."})
+        self.save("3", {"new__calibration": "The failure it prevents first."})
+        self.assertEqual(
+            onboarding.profile_gate_missing(self.profile_state()), ())
+        self.assertEqual(wizard.default_screen(self.profile_state()), "review")
+        self.assertIn("Read it back before you publish", self.screen())
+
+
+class ExplicitScreenOutranksTheDefaultTest(WizardFixture):
+    """The default answers a URL that names no screen, and nothing else.
+
+    Its own tenant, because it needs a profile that has been started and the
+    case above needs one that has not.
+    """
+
+    def test_a_named_screen_is_still_the_screen_that_is_drawn(self):
+        self.save("1", {"new__background": "Nine years of backend work."})
+        self.assertEqual(wizard.default_screen(self.profile_state()), "2")
+        self.assertIn("Let us build you a course.",
+                      self.screen("?screen=welcome"))
+        self.assertIn("Profile screen 4 of 4", self.screen("?screen=4"))
+        self.assertIn("Read it back before you publish",
+                      self.screen("?screen=review"))
 
 
 class ScreenIsIgnoredPastTheProfileTest(WizardFixture):
@@ -1447,6 +1502,188 @@ class KeyMintingRuleTest(unittest.TestCase):
         self.assertEqual(wizard.next_key(spent, "background"), "background-03")
 
 
+class BoxRowsTest(unittest.TestCase):
+    """F2: a box opens at the size of what it holds, not at a fixed three.
+
+    `field-sizing:content` does the real work wherever a browser has the
+    property; this is the fallback, and it is what stops a four-line saved
+    claim coming back sliced through its last line on the one screen whose
+    whole promise is that your own words are read back to you.
+    """
+
+    def test_an_empty_box_opens_at_two_rows(self):
+        # Three rows around one sentence is two blank lines of nothing.
+        self.assertEqual(wizard.box_rows(""), 2)
+
+    def test_a_short_claim_keeps_the_floor(self):
+        self.assertEqual(wizard.box_rows("Four hours a week."), 2)
+
+    def test_a_long_claim_gets_a_row_for_every_eighty_columns(self):
+        self.assertEqual(wizard.box_rows("x" * 160), 2)
+        self.assertEqual(wizard.box_rows("x" * 161), 3)
+        self.assertEqual(wizard.box_rows("x" * 400), 5)
+
+    def test_a_short_claim_of_many_lines_is_counted_by_its_lines(self):
+        # 101 characters over six lines. Counted over the whole string it
+        # would open at two rows and clip four of them — and the box beside
+        # this one says in words that line breaks stay inside a claim, so
+        # the fallback has to hold what that sentence invites.
+        claim = "\n".join(["Tokens become s-expressions."] * 6)[:101]
+        self.assertEqual(len(claim), 101)
+        self.assertEqual(wizard.box_rows(claim), 4)
+        self.assertEqual(
+            wizard.box_rows("\n".join(["Tokens become s-expressions."] * 6)), 6)
+
+    def test_a_blank_line_still_occupies_a_row(self):
+        self.assertEqual(wizard.box_rows("one\n\ntwo"), 3)
+
+
+def box_sizes(page: str) -> dict[str, int]:
+    """{textarea name: its `rows`} for every box on a rendered screen.
+
+    Read off the markup rather than asserted as a substring, because the
+    property under test is that the number *varies with the text* — and a
+    substring assertion for one size happily passes against a page where
+    every box is that size.
+    """
+    sizes = {}
+    for tag in re.findall(r"<textarea\b[^>]*>", page):
+        name = re.search(r'name="([^"]+)"', tag)
+        rows = re.search(r'rows="(\d+)"', tag)
+        if name and rows:
+            sizes[name.group(1)] = int(rows.group(1))
+    return sizes
+
+
+class SavedBoxSizeTest(WizardFixture):
+    """The same rule, where it is spent: on the read-back screen itself.
+
+    One method, because the three sizes have to be on one screen at once:
+    two saved claims of different lengths and an empty Add box. And none of
+    the three may be three, which is what `rows` used to be for all of them —
+    a box that happens to come out at the old constant pins nothing.
+    """
+
+    SHORT = "Nine years as a backend engineer, mostly Python over Postgres."
+    LONG = ("Nine years as a backend engineer, mostly Python services over "
+            "Postgres and Kafka, with a couple of years of Go and a long "
+            "stretch of production on-call that taught me more about "
+            "distributed systems than any amount of the reading ever did, "
+            "and rather more about pager fatigue than I wanted to know.")
+
+    def test_each_box_comes_back_at_the_size_of_what_it_holds(self):
+        self.assertEqual((wizard.box_rows(self.LONG),
+                          wizard.box_rows(self.SHORT)), (4, 2))
+        self.save("1", {"new__background": self.LONG})
+        self.save("1", {"new__background": self.SHORT})
+        sizes = box_sizes(self.screen("?screen=1"))
+        self.assertEqual(sizes["claim__background__background-01"], 4)
+        self.assertEqual(sizes["claim__background__background-02"], 2)
+        # ...and the Add box under them holds nothing, so it opens at the
+        # floor. Nothing on the screen is the three every box used to be.
+        self.assertEqual(sizes["new__background"], 2)
+        self.assertNotIn(3, sizes.values())
+
+
+class ClaimLabelTest(WizardFixture):
+    """F5 and F3: what a box is called, and which newline rule it keeps."""
+
+    def test_a_claim_is_labelled_by_position_and_identified_by_its_key(self):
+        self.save("1", {"new__background": "Nine years of backend work.\n"
+                                           "Plenty of parsers, all by hand."})
+        page = self.screen("?screen=1")
+        self.assertIn('<span class="claimkey">Claim 1</span>', page)
+        self.assertIn('<span class="claimkey">Claim 2</span>', page)
+        # The key is still the identity — it names the box the POST reads
+        # back — and it rides in `title` for an operator who wants it. What
+        # it no longer does is caption a learner's own sentence.
+        self.assertIn('name="claim__background__background-01"', page)
+        self.assertIn('title="background-02"', page)
+        self.assertNotIn("BACKGROUND-01", page)
+        self.assertNotIn("text-transform:uppercase", page)
+
+    def test_every_box_on_a_screen_has_an_accessible_name_of_its_own(self):
+        # "Claim 1" is the right words on screen and the wrong accessible
+        # name: screen 1 carries three fields, so a form list read aloud
+        # would be "Claim 1, Claim 1, Claim 1" — worse than the key it
+        # replaced. The field's own heading rides in `aria-label`, with the
+        # visible words inside it.
+        self.save("1", {"new__background": "Nine years of backend work.",
+                        "new__education": "BS in information systems."})
+        page = self.screen("?screen=1")
+        for name in ('aria-label="Professional background, claim 1"',
+                     'aria-label="Formal education, claim 1"',
+                     'aria-label="Professional background, add a claim"',
+                     'aria-label="Formal education, add a claim"',
+                     'aria-label="Prior courses and tracks, add a claim"',
+                     'aria-label="Skill description"'):
+            with self.subTest(name=name):
+                self.assertEqual(page.count(name), 1)
+
+    def test_both_newline_rules_are_printed_where_each_one_applies(self):
+        # Two identical boxes with opposite rules: the one above splits on
+        # nothing, the Add box splits on every line. Words, since there is
+        # no script on this page to make them one control.
+        self.save("1", {"new__background": "Nine years of backend work."})
+        page = self.screen("?screen=1")
+        self.assertIn('<span class="claimkey">Add a claim</span>', page)
+        self.assertIn("<b>For example</b>", page)
+        # Placement is the whole finding: each rule has to sit by the box it
+        # is true of, or the two sentences have simply swapped the lie.
+        self.assertLess(page.index("A box is one claim; line breaks stay "
+                                   "inside it."),
+                        page.index('name="claim__background__'))
+        self.assertLess(page.index('name="new__background"'),
+                        page.index("Each line becomes its own claim."))
+
+
+class OneForwardActionTest(WizardFixture):
+    """F4: Save is the only way forward, and saving nothing costs nothing.
+
+    The forward pill sat outside the `<form>`, forty pixels under the submit
+    button, wearing the same arrow; pressing it after typing discarded the
+    typing without a word. Dropping it is only safe because a screen
+    submitted untouched writes no rows and still moves the learner on, so
+    that property is asserted here rather than assumed.
+    """
+
+    def test_the_only_forward_link_is_the_submit_button(self):
+        page = self.screen("?screen=2")
+        self.assertIn("Save this screen →", page)
+        self.assertIn('<a class="back" href="/onboarding/?screen=1">', page)
+        self.assertNotIn('href="/onboarding/?screen=3"', page)
+
+    def test_saving_an_untouched_screen_writes_nothing_and_moves_on(self):
+        before = len(self.profile_rows())
+        posted = self.save("2", {"new__style": "", "new__domain_bias": "",
+                                 "new__pacing": ""})
+        self.assertEqual(posted.status_code, 303)
+        self.assertEqual(posted.headers["location"], "/onboarding/?screen=3")
+        self.assertEqual(len(self.profile_rows()), before)
+
+
+class ScreenFourForwardActionTest(WizardFixture):
+    """F4's worst case, on its own tenant because it needs a met gate.
+
+    Screen 4 carried three ways to the review at once: the Save button, a
+    "Review and publish →" pill in the nav row, and a second copy of the
+    same link trailing the gate sentence. Save is the whole of it now.
+    """
+
+    def test_the_review_is_reached_by_saving_and_by_nothing_else(self):
+        self.satisfy_the_gate()
+        self.assertEqual(
+            onboarding.profile_gate_missing(self.profile_state()), ())
+        page = self.screen("?screen=4")
+        self.assertIn("Save this screen →", page)
+        self.assertIn('<a class="back" href="/onboarding/?screen=3">', page)
+        self.assertNotIn('href="/onboarding/?screen=review"', page)
+        self.assertNotIn("Review and publish", page)
+        # ...and Save is genuinely that way through.
+        posted = self.save("4", {"new__subject_adapters": ""})
+        self.assertEqual(posted.headers["location"], "/onboarding/?screen=review")
+
+
 class ProfileFormRoundTripTest(WizardFixture):
     """A screen saved is claims on the ledger, in the learner's own voice."""
 
@@ -1614,7 +1851,12 @@ class GateDisplayTest(WizardFixture):
             with self.subTest(screen=number):
                 page = self.screen(f"?screen={number}")
                 self.assertNotIn(wizard.GATE_LEAD, page)
-                self.assertIn("Review and publish", page)
+                # A satisfied gate says so and stops there. It used to trail
+                # a second "Review and publish →" link, which was a third
+                # forward route on a screen whose one forward action is Save
+                # (F4); the sentence is the whole of what this line says now.
+                self.assertIn("has a claim on the record", page)
+                self.assertNotIn("Review and publish", page)
 
 
 class ClosedScreenRefusesTest(WizardFixture):

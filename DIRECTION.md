@@ -108,7 +108,8 @@ ground, browner panels, coral lifted two steps for contrast.
 | `--ink` | `#3B2A1E` | `#F5EAE0` | body text |
 | `--muted` | `#6D5B4E` | `#C4AE9D` | secondary text (AA at any size) |
 | `--faint` | `#8A7767` | `#A78F7C` | decorative marks only (see contrast note) |
-| `--line` / `--line-soft` | `#EFDFD2` / `#F5EAE0` | `#42352A` / `#382C22` | hairlines |
+| `--line` / `--line-soft` | `#EFDFD2` / `#F5EAE0` | `#42352A` / `#382C22` | decorative hairlines |
+| `--edge` | `#A68A73` | `#836D5A` | edges of controls you type into |
 | `--accent` | `#E06A4E` | `#F0754F` | accent borders & hovers (next-row ring) |
 | `--accent-text` | `#B8432A` | `#FFA184` | links & small accent text |
 | `--accent-strong` | `#C6492E` | `#F0754F` | button fills carrying `--on-accent` text; lit waypath stones (v2) |
@@ -119,10 +120,14 @@ ground, browner panels, coral lifted two steps for contrast.
 | `--stone` | `#EBD9C8` | `#4A3A2C` | unlit waypath stone |
 
 Spacing/radii/elevation: cards 18px radius + `--shadow` (two quiet layers);
-controls are pills with ≥34–38px hit height; checkboxes 17–18px with
-`accent-color`. Dark theme ships under both `prefers-color-scheme` and an
-explicit `data-theme` attribute (same tokens; the attribute exists so a
-toggle or a test can pin either theme).
+controls are pills with ≥34–38px hit height; checkboxes and radios 17–18px
+with `accent-color`. **Control edges are `--edge`, never `--line`** — a
+text box, a number box and the wizard's radio cards draw their boundary with
+a token computed against the 3:1 non-text floor, while `--line` stays the
+decorative hairline it was validated as (it computes 1.30 light / 1.31 dark
+on `--panel`, which is a box you cannot see). Dark theme ships under both
+`prefers-color-scheme` and an explicit `data-theme` attribute (same tokens;
+the attribute exists so a toggle or a test can pin either theme).
 
 ## Contrast — computed, not eyeballed
 
@@ -154,6 +159,8 @@ against its floor. A token edit that breaks a floor fails the suite.
 | lit stone (accent-strong) vs bg (v2) | **4.46** | **6.01** | 3.0 |
 | hot ring (accent-strong) vs milestone fill (good-soft) | **4.07** | **4.35** | 3.0 |
 | faint on bg (decorative only) | 3.99 | 5.60 | — |
+| edge on panel (control boundary) | **3.23** | **3.18** | 3.0 |
+| edge on bg (control boundary) | **3.01** | **3.51** | 3.0 |
 
 Two audit-driven fixes: every small-text use of `--faint` (eyebrow labels,
 citations, row labels, unit numbers, sources) was promoted to `--muted`

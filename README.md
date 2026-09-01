@@ -55,6 +55,35 @@ python -m curricle serve --course examples/tinylang --tenant example --port 8765
 
 Pass `--course` more than once to serve several courses from one front door.
 
+### Your first course
+
+A tenant with no courses lands in the onboarding wizard at `/onboarding/`:
+four profile forms in your own words, a read-back you publish, a scope form,
+an outline the model drafts and shows you behind a cost estimate, and then —
+only after you approve that number — the first phase of materials, built,
+compiled and put in place. Two things beyond the block above make it work: a
+managed directory the wizard writes new courses into, and a second process
+that runs the model-calling stages so the web app never does.
+
+```bash
+export CURRICLE_DATABASE_URL="postgresql+psycopg:///curricle"
+export CURRICLE_COURSES_DIR="$HOME/curricle-courses"   # no default; new courses land here
+export ANTHROPIC_API_KEY=…                              # or put the key in local/anthropic-key
+alembic upgrade head
+python -m curricle tenant create you
+python -m curricle serve --tenant you --port 8765       # no --course: the wizard creates one
+python -m curricle work                                  # in a second terminal: the worker
+# then: http://localhost:8765/
+```
+
+Two stages spend money — drafting the outline, which is cheap, and building
+phase 1, which is the expensive one — and each refuses to spend past its
+configured ceiling. The profile forms call no model. A twelve-unit course cost
+about three dollars end to end at today's prices. Role contracts and prices
+are read from `roles/` and `models.yaml` at the checkout root, so this is a
+checkout-mode feature: an installed package has the compiler and the app but
+must be told where those live (`CURRICLE_HOME`).
+
 `python -m curricle mcp --course <course_root> --tenant …` exports the same
 course to your own assistant as an MCP server over stdio — the manifest, the
 profile, progress, lesson guides and the question bank as tools it can call.
@@ -207,9 +236,11 @@ gitignored `local/` — seeds, API keys — is not reachable through the app.
 ## Status
 
 Phases 0–4 are built: the manifest compiler, the progress service, the profile
-pipeline, the course factory, and the design system. What is not here yet: auth,
-multi-tenant serving, and a background job queue — the factory runs from the
-CLI. See [`docs/platform-design.md`](docs/platform-design.md) §9 for the
+pipeline, the course factory, the design system, and the onboarding wizard
+that takes an empty tenant to a first course. What is not here yet: auth,
+multi-tenant serving, and a real background job queue — the factory runs from
+the CLI or from the single `work` process, which is a thin slice of the queue
+to come. See [`docs/platform-design.md`](docs/platform-design.md) §9 for the
 roadmap.
 
 ## License

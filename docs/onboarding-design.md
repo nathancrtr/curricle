@@ -250,6 +250,26 @@ ledger; nothing that costs tokens runs without such a row upstream.
 Rejecting with a note re-runs Stop 7 with the note in the prompt; the note
 is a ledger row too.
 
+**Two numbers, and a receipt for both.** The estimate alone turned out to
+be the wrong shape for this decision: a display-size figure with cents on it
+reads as a price, and the first live walk came in at $2.02 against "$1.70
+estimated" — an honest 19% over that nonetheless read as a wrong price. So
+the gate shows the estimate *and* the ceiling, at the same size, each with
+the word that says which it is: the estimate is an expectation at today's
+rates, the ceiling is the configured refusal the runner stops at. The
+ceiling is not a price this module reads — `models.yaml` stays the one file
+that names one — it rides to the gate in the `outline_ready` payload, summed
+by the worker over the roles the plan will actually run, and the approval
+row then echoes *both* figures, so O3's "the number the learner was shown"
+is the whole of what they were shown. The gate also prints what the drafting
+stage has already cost, from `token_ledger` (a database read; L1 is about
+model calls, not queries), because that money was spent on the strength of
+an aside calling it the cheap one and no screen had ever named it. The
+landing closes the loop with the receipt: total, split into draft and build,
+beside the estimate the build was approved at. Two-decimal precision belongs
+there, where it is a bill, rather than on an estimate, where it is a claim
+the system cannot keep.
+
 (Rejected: a second human gate on the generated materials themselves. The
 outline is where a human's five minutes change the outcome; the materials
 are guarded by the existing refusal-grade validators — exercise tests

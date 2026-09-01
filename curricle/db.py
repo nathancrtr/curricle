@@ -314,6 +314,20 @@ class TenantScope:
         ).where(token_ledger.c.tenant_id == self.tenant_id,
                 token_ledger.c.stage == stage)
 
+    def ledger_costs(self) -> sa.Select:
+        """What this tenant has paid, per call: the cost and when it happened.
+
+        Cost *and* time, because the ledger has no course column and is not
+        getting one on the strength of a receipt. A stage is a role, a role
+        is bought by more than one course over a tenant's life, and what a
+        given course cost is therefore the rows falling inside that course's
+        own window in the onboarding ledger — which only a reader holding
+        both can say. The window is the reader's business; this is the rows.
+        """
+        return (sa.select(token_ledger.c.cost_usd, token_ledger.c.created_at)
+                .where(token_ledger.c.tenant_id == self.tenant_id)
+                .order_by(token_ledger.c.id))
+
     def onboarding_select(self) -> sa.Select:
         return (
             sa.select(onboarding_events.c.id, onboarding_events.c.kind,

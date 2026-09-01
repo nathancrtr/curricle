@@ -55,6 +55,7 @@ import json
 import os
 import sys
 import time
+from decimal import Decimal
 from typing import Callable
 
 import sqlalchemy as sa
@@ -193,7 +194,29 @@ def _outline(engine: sa.Engine, scope: db.TenantScope,
         # worker breaking, so it is worded as such and the retry is offered.
         raise StageFailed("validation_failed", str(exc)) from exc
     estimate = factory.estimate_build_cost(runner.config, plan)
-    return "outline_ready", {"plan": plan, "estimate_usd": f"{estimate:.2f}"}
+    return "outline_ready", {"plan": plan,
+                             "estimate_usd": f"{estimate:.2f}",
+                             "ceiling_usd": f"{_build_ceiling(runner, plan):.2f}"}
+
+
+def _build_ceiling(runner: llm.Runner, plan: dict) -> Decimal:
+    """What the build's stages are configured to refuse past, added up.
+
+    The estimate is an expectation and the gate now says so, which leaves
+    the learner needing the other number: not what the build is likely to
+    cost but what it is *allowed* to. This stage already holds it — the
+    runner's config is the same one the estimate is priced from — so the
+    ceiling rides to the gate in the `outline_ready` payload beside the
+    estimate, and the wizard goes on never reading a price for itself.
+
+    Summed over the roles this plan will actually run, because a budget is
+    per stage and a stage is a role: charging the learner's expectations
+    against ceilings for artifacts nobody is buying would overstate the
+    promise by exactly the artifacts the plan skipped.
+    """
+    return sum((runner.config.budget_for_stage(role)
+                for key, role in factory.PLAN_ROLES if plan.get(key)),
+               Decimal(0))
 
 
 def _build(engine: sa.Engine, scope: db.TenantScope,

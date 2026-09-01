@@ -431,9 +431,26 @@ class OutlineStageTest(WorkerFixture):
                 phase_id="p1", lesson_unit="u1", widget_unit="u2",
                 widget_concept="The compiler refuses rather than guesses.",
                 exercise_unit="u2", quiz=True, bank=False))
-        # A number the gate can print and the approval row can carry.
-        self.assertGreater(Decimal(payload["estimate_usd"]), 0)
-        self.assertRegex(payload["estimate_usd"], r"^\d+\.\d\d$")
+        # Two numbers the gate can print and the approval row can carry: what
+        # building this plan is expected to cost, and what its stages are
+        # configured to refuse past. The ceiling travels in the payload
+        # because the wizard may never read the model configuration itself,
+        # and this stage already holds the config the estimate is priced from.
+        for number in ("estimate_usd", "ceiling_usd"):
+            with self.subTest(number=number):
+                self.assertGreater(Decimal(payload[number]), 0)
+                self.assertRegex(payload[number], r"^\d+\.\d\d$")
+        # Summed over the roles this plan actually runs — the bank is off, so
+        # the bank author's ceiling is not part of the promise.
+        config = llm.load_models_config()
+        self.assertEqual(
+            Decimal(payload["ceiling_usd"]),
+            sum((config.budget_for_stage(role)
+                 for key, role in factory.PLAN_ROLES if plan.get(key)),
+                Decimal(0)))
+        self.assertLess(Decimal(payload["ceiling_usd"]),
+                        sum((config.budget_for_stage(role)
+                             for _, role in factory.PLAN_ROLES), Decimal(0)))
 
         # T1 where it matters: the stage was briefed with *this* tenant's two
         # folds, not with empty state that would have produced a generic

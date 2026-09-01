@@ -10,6 +10,7 @@ Two tenants per fixture (T5): an app is built per tenant, so a screen drawn
 for one of them can never be a screen drawn from the other's ledger.
 """
 
+import dataclasses
 import html
 import os
 import re
@@ -328,7 +329,9 @@ class PendingPlaceholderTest(WizardFixture):
         self.append("outline_requested", "greek-101")
         page = self.screen()
         self.assertIn(wizard.PENDING_WORD, page)
-        self.assertIn("seconds elapsed", page)          # elapsed, never a forecast
+        # Elapsed, never a forecast — and under a minute in words, because
+        # a figure in seconds is precision this screen cannot keep.
+        self.assertIn("less than a minute elapsed", page)
         self.assertIn(wizard.META_REFRESH, page)
         self.assertIn(wizard.STOP_TITLES["outline"], page)
         self.assertNotIn(wizard.WAITING_WORD, page)
@@ -355,7 +358,7 @@ class FailedPlaceholderTest(WizardFixture):
         # Polling stops on its own: a screen that is not pending does not ask
         # the browser to come back, and shows no duration either.
         self.assertNotIn(wizard.META_REFRESH, page)
-        self.assertNotIn('<span class="elapsed">', page)
+        self.assertNotIn('class="elapsed"', page)
 
 
 class ScopeCopyTest(unittest.TestCase):
@@ -682,7 +685,7 @@ class OutlinePendingCopyTest(WizardFixture):
         page = self.screen()
         self.assertIn(wizard.STOP_TITLES["outline"], page)
         self.assertIn(wizard.PENDING_WORD, page)
-        self.assertIn("seconds elapsed", page)          # elapsed, not a forecast
+        self.assertIn("less than a minute elapsed", page)   # never a forecast
         self.assertIn(wizard.META_REFRESH, page)
         # And it says so, rather than leaving the absence to be noticed: the
         # one number on the screen is the one the ledger already knows.
@@ -712,6 +715,10 @@ class GateFixture(WizardFixture):
             "widget_concept": "precedence as a table of binding powers",
             "exercise_unit": "u2", "quiz": True, "bank": True}
     ESTIMATE = "1.37"
+    # The other half of what the learner is shown: what the build's stages
+    # are configured to refuse past, summed by the worker over the roles this
+    # plan runs and carried here in the same payload as the estimate.
+    CEILING = "20.00"
     BROKEN = False        # a draft that will not compile
     MISSING = False       # a draft deleted by hand between two screens
 
@@ -731,7 +738,8 @@ class GateFixture(WizardFixture):
                     ("scope_saved", {"title": "Interpreters, end to end"}),
                     ("outline_requested", {}),
                     ("outline_ready", {"plan": cls.PLAN,
-                                       "estimate_usd": cls.ESTIMATE})):
+                                       "estimate_usd": cls.ESTIMATE,
+                                       "ceiling_usd": cls.CEILING})):
                 onboarding.append_event(
                     conn, cls.scope, kind,
                     "" if kind == "profile_published" else cls.COURSE,
@@ -777,57 +785,135 @@ class OutlineGateScreenTest(GateFixture):
         self.assertIn('href="https://craftinginterpreters.com/"', page)
         self.assertIn("The spine of this course, and the rare technical book",
                       page)
-        # A phase's entries carry milestone ids beside unit ids, and a
-        # side-quest is not a unit: it has no number and no gloss, and a line
-        # for it would be a unit the course does not have.
+        # A phase's entries carry milestone ids beside unit ids, and both
+        # get a line: the hub tracks milestones as checkable stones, so an
+        # outline that showed only the units would be an approval of fewer
+        # things than the course is about to ask for. The id itself never
+        # reaches the page, like every other id here.
+        self.assertIn("Error messages worth reading", page)
+        self.assertIn("Milestone · side-quest", page)
         self.assertNotIn("m-errors", page)
+        # The steps of a stepped unit, under the unit that owns them — the
+        # three the hub will check off one at a time in phase 0.
+        self.assertIn("Project skeleton with one passing test", page)
+        self.assertIn("REPL echoes a line and exits cleanly", page)
+        # And the count line, in the hub's own arithmetic: the gate used to
+        # read back 12 units over a course the hub greeted as 16 steps.
+        self.assertIn("3 phases · 5 units · 1 milestone · 8 steps", page)
         # Your turn, so nothing here is watching a machine.
         self.assertIn(wizard.WAITING_WORD, page)
         self.assertNotIn(wizard.META_REFRESH, page)
 
-    def test_the_number_on_the_screen_is_the_number_in_the_ledger(self):
-        # O3's first half. The estimate is not recomputed for the screen and
-        # not reformatted for it either: the bytes the outline stage wrote
-        # are the bytes a learner reads, or the row the approval carries
-        # would be a number nobody was shown.
-        page = self.screen()
-        estimate = self.outline_ready_payload()["estimate_usd"]
-        self.assertEqual(estimate, self.ESTIMATE)
-        self.assertIn(f"${estimate} estimated", page)
+    def test_the_count_line_is_the_hubs_own_arithmetic(self):
+        # Not "the same rule, written out twice" — the hub's actual rows, off
+        # the hub's actual page. The gate read back 12 units over a course
+        # the hub then greeted as "16 steps from here to done", and the only
+        # way that stays fixed is if the two counts come from one place.
+        from curricle.hubrender import render_hub
+        from test_hubrender import payload
 
-    def test_the_plan_is_a_sentence_derived_from_its_own_keys(self):
-        page = self.screen()
-        self.assertIn("Unit 1 gets a Socratic lesson", page)
-        self.assertIn("unit 2 gets a widget (precedence as a table of binding "
-                      "powers)", page)
-        self.assertIn("unit 2 gets a scaffolded exercise", page)
-        self.assertIn("plus the phase 1 checkpoint quiz and the "
-                      "question-bank section", page)
+        manifest = wizard.draft_manifest(self.tmp, self.COURSE)
+        phases = payload(render_hub(manifest, api="api/events"), "PHASES")
+        stones = [row for phase in phases for row in phase["units"]]
+        units = {u.id: u for u in manifest.units}
+        entries = [e for phase in manifest.phases for e in phase.entries]
+        self.assertEqual(
+            wizard.count_line(manifest),
+            f"{len(phases)} phases · "
+            f"{sum(1 for e in entries if e in units)} units · "
+            f"{sum(1 for row in stones if row[-1:] == ['m'])} milestone · "
+            f"{len(stones)} steps")
 
-    def test_a_skipped_artifact_is_printed_as_skipped(self):
+    def test_a_term_with_nothing_under_it_is_left_out(self):
+        # "0 milestones" is a fact about a shape nobody has; the line says
+        # what the course is made of, not what it is missing.
+        manifest = wizard.draft_manifest(self.tmp, self.COURSE)
+        plain = dataclasses.replace(
+            manifest,
+            phases=tuple(dataclasses.replace(p, entries=tuple(
+                e for e in p.entries if e.startswith("u")))
+                for p in manifest.phases))
+        self.assertNotIn("milestone", wizard.count_line(plain))
+
+    def test_the_numbers_on_the_screen_are_the_numbers_in_the_ledger(self):
+        # O3's first half, now for both figures. Neither is recomputed for
+        # the screen and neither is reformatted for it: the bytes the outline
+        # stage wrote are the bytes a learner reads, or the row the approval
+        # carries would be a number nobody was shown.
+        page = self.screen()
+        payload = self.outline_ready_payload()
+        self.assertEqual(payload["estimate_usd"], self.ESTIMATE)
+        self.assertEqual(payload["ceiling_usd"], self.CEILING)
+        self.assertIn(f"about ${payload['estimate_usd']}", page)
+        self.assertIn(f"${payload['ceiling_usd']}", page)
+        # And each is printed with the word that says which one it is: the
+        # expectation and the promise are not distinguishable by size here,
+        # because they are the same size on purpose.
+        self.assertIn(wizard.GATE_ESTIMATE_WORD, page)
+        self.assertIn(wizard.GATE_CEILING_WORD, page)
+
+    def test_the_plan_is_a_list_derived_from_its_own_keys(self):
+        page = self.screen()
+        self.assertIn("Unit 1 · a Socratic lesson", page)
+        self.assertIn("Unit 2 · a widget", page)
+        self.assertIn("precedence as a table of binding powers", page)
+        self.assertIn("Unit 2 · a scaffolded exercise", page)
+        self.assertIn("Phase 1 checkpoint quiz", page)
+        self.assertIn("Question bank · a new section", page)
+
+    def test_a_concept_that_is_the_gloss_again_is_not_printed_twice(self):
+        # The designer role has filled `widget_concept` with the unit's own
+        # gloss verbatim. The gloss is three panels up the same page; a
+        # parenthetical repeating it is text a learner reads to find out it
+        # said nothing.
+        manifest = wizard.draft_manifest(self.tmp, self.COURSE)
+        gloss = next(u.gloss for u in manifest.units if u.id == "u2")
+        items = wizard.plan_items(dict(self.PLAN, widget_concept=gloss),
+                                  manifest)
+        widget = next(i for i in items if i.name == "the widget")
+        self.assertEqual(widget.detail, "")
+        self.assertEqual(widget.label, "Unit 2 · a widget")
+
+    def test_a_skipped_artifact_keeps_its_line_and_says_why(self):
         # "No widget" is part of what the estimate is an estimate of, so it
         # is said rather than left out — a plan listing only what it does buy
-        # reads as a shorter course rather than a cheaper build.
-        sentence = wizard.plan_sentence(
+        # reads as a shorter course rather than a cheaper build. And the
+        # reason is a reason: "skipped" reads as something that went wrong.
+        items = {i.name: i for i in wizard.plan_items(
             dict(self.PLAN, widget_unit=None, widget_concept=None, bank=False),
-            None)
-        self.assertIn("a widget — skipped", sentence)
-        self.assertIn("the question-bank section — skipped", sentence)
+            None)}
+        self.assertFalse(items["the widget"].bought)
+        self.assertEqual(items["the widget"].detail, wizard.UNPLANNED_REASON)
+        self.assertFalse(items["the question bank"].bought)
+        self.assertEqual(items["the question bank"].detail, "not built for a "
+                                                            "new course")
+        for item in items.values():
+            with self.subTest(item=item.name):
+                self.assertNotIn("skipped", item.detail)
 
     def test_the_estimate_comes_before_the_button(self):
         # Stop 0's third never-promise, kept on the screen it was about: the
         # number is above the decision, not under it.
         page = self.screen()
-        self.assertLess(page.index(f"${self.ESTIMATE} estimated"),
+        self.assertLess(page.index(f"about ${self.ESTIMATE}"),
                         page.index('action="/onboarding/outline/approve"'))
 
-    def test_the_ceiling_is_named_without_naming_a_price(self):
-        # The wizard never reads the model configuration, so the sentence
-        # about the hard ceiling says what it is rather than what it is set
-        # to. The only number on this page is the ledger's own.
+    def test_the_ceiling_is_a_figure_the_wizard_never_priced(self):
+        # The module still reads no model configuration: the ceiling on this
+        # page is the one the worker computed and wrote into the ledger row,
+        # and a draft made before the worker carried one prints no figure
+        # rather than inventing a number to fill the gap.
         page = self.screen()
         self.assertIn(wizard.GATE_CEILING, page)
-        self.assertEqual(page.count("$"), 1)
+        blind = wizard.outline_gate_screen(
+            onboarding.CourseFlow(
+                course_id=self.COURSE, stage="outline_gate", status="waiting",
+                outline={"plan": self.PLAN, "estimate_usd": self.ESTIMATE}),
+            wizard.draft_manifest(self.tmp, self.COURSE)).body
+        self.assertIn(f"about ${self.ESTIMATE}", blind)
+        self.assertIn(wizard.GATE_CEILING, blind)
+        self.assertNotIn("None", blind)
+        self.assertEqual(blind.count("$"), 1)
 
     def test_both_decisions_are_offered_and_the_note_is_required(self):
         page = self.screen()
@@ -882,14 +968,17 @@ class OutlineApproveTest(GateFixture):
     Invariant O3 (design §5): "no token is spent without an upstream ledger
     row recording the learner's approval and the estimate they were shown."
     The approval echoes `outline_ready`'s payload rather than reading a
-    number off the form, so the estimate on the screen and the estimate in
+    number off the form, so the numbers on the screen and the numbers in
     the ledger are the same bytes by construction — which is what the
-    byte-equality assertion below is pinning.
+    byte-equality assertions below are pinning. Both of them: the screen now
+    shows an estimate *and* the ceiling it stops at, and a row echoing half
+    of what was shown is half a record of the decision.
 
     Its own tenant, because approving is a one-way move of this ledger.
     """
 
-    def test_approving_records_the_estimate_shown_and_queues_the_build(self):
+    def test_approving_records_the_numbers_shown_and_queues_the_build(self):
+        page = self.screen()
         approved = self.client.post("/onboarding/outline/approve",
                                     follow_redirects=False)
         self.assertEqual(approved.status_code, 303, approved.text)
@@ -900,11 +989,15 @@ class OutlineApproveTest(GateFixture):
         self.assertEqual([r.kind for r in rows],
                          ["outline_approved", "build_requested"])
         approval = rows[0].payload
-        # O3, byte for byte: not a number computed again at approval time,
-        # and not one posted by the form — the one the ledger already held.
-        self.assertEqual(approval["estimate_usd"],
-                         self.outline_ready_payload()["estimate_usd"])
-        self.assertIsInstance(approval["estimate_usd"], str)
+        # O3, byte for byte: not numbers computed again at approval time,
+        # and not ones posted by the form — the ones the ledger already held
+        # and the screen had just printed.
+        outline = self.outline_ready_payload()
+        for number in ("estimate_usd", "ceiling_usd"):
+            with self.subTest(number=number):
+                self.assertEqual(approval[number], outline[number])
+                self.assertIsInstance(approval[number], str)
+                self.assertIn(f"${approval[number]}", page)
         # The plan travels with it: what gets built is what was approved.
         self.assertEqual(approval["plan"], self.PLAN)
         self.assertEqual(rows[1].payload, {})
@@ -921,7 +1014,7 @@ class OutlineApproveTest(GateFixture):
         self.assertIn(wizard.STOP_TITLES["build"], page)
         self.assertIn("Building your phase-1 materials", page)
         self.assertIn(wizard.PENDING_WORD, page)
-        self.assertIn("seconds elapsed", page)      # elapsed, not a forecast
+        self.assertIn("less than a minute elapsed", page)   # never a forecast
         self.assertIn(wizard.META_REFRESH, page)
         self.assertNotIn("This screen is still being built", page)
         self.assertNotIn('action="/onboarding/outline/approve"', page)
@@ -932,6 +1025,49 @@ class OutlineApproveTest(GateFixture):
         self.assertEqual(again.status_code, 409)
         self.assertEqual([(r.stage, r.status) for r in self.queued()],
                          [("build", "queued")])
+
+
+class PlanAgreementTest(GateFixture):
+    """The gate and the build screen cannot describe different builds.
+
+    They did: the gate said the question bank was skipped and the build
+    screen, two clicks later, named it among "the lesson, the widget, the
+    exercise, the checkpoint quiz and the question bank you approved". One
+    was a sentence somebody typed; the other was derived. Now both come out
+    of `plan_items`, so this fixture buys no bank — the shape a brand-new
+    course actually gets — and asserts that neither screen offers one.
+    """
+
+    COURSE = "tinylang"
+    PLAN = dict(GateFixture.PLAN, bank=False)
+
+    def test_the_gate_names_the_bank_only_to_say_why_it_is_not_bought(self):
+        page = self.screen()
+        self.assertIn("Question bank", page)
+        self.assertIn("not built for a new course", page)
+        self.assertNotIn("Question bank · a new section", page)
+
+    def test_then_the_build_screen_lists_exactly_what_the_gate_listed(self):
+        self.client.post("/onboarding/outline/approve", follow_redirects=False)
+        page = self.screen()
+        self.assertIn(wizard.STOP_TITLES["build"], page)
+        bought = [item.name for item in wizard.plan_items(self.PLAN, None)
+                  if item.bought]
+        self.assertEqual(bought, ["the lesson", "the widget", "the exercise",
+                                  "the checkpoint quiz"])
+        self.assertIn("The lesson, the widget, the exercise and the checkpoint "
+                      "quiz you approved are being written", page)
+        # The defect this test exists for: nothing on the waiting screen
+        # claims the learner approved something the gate refused to sell.
+        self.assertNotIn("question bank", page)
+
+    def test_an_approval_with_no_plan_still_says_something_true(self):
+        # A ledger that somehow carries an approval without a plan is a row
+        # this screen must still render: it names the artifacts it cannot
+        # list rather than listing artifacts nobody bought.
+        self.assertEqual(wizard.build_inventory({}),
+                         "The materials you approved are being written and "
+                         "checked one at a time.")
 
 
 class BuildFailedTest(WizardFixture):
@@ -1068,7 +1204,7 @@ class PromotePendingTest(WizardFixture):
         self.assertIn(wizard.STOP_TITLES["promote"], page)
         self.assertIn("Installing your course", page)
         self.assertIn(wizard.PENDING_WORD, page)
-        self.assertIn("seconds elapsed", page)      # elapsed, not a forecast
+        self.assertIn("less than a minute elapsed", page)   # never a forecast
         self.assertIn(wizard.META_REFRESH, page)
         self.assertNotIn("This screen is still being built", page)
         self.assertNotIn("<button", page)
@@ -1228,6 +1364,40 @@ class LandingCardTest(WizardFixture):
         self.assertIn("&quot;mcp&quot;", block)
         # And the committed page is named, for the day the tab is closed.
         self.assertIn(wizard.MCP_DOC, page)
+
+    def test_the_block_says_where_it_goes_before_it_says_what_it_is(self):
+        # A filled-in config with no destination is an answer to a question
+        # the card never asked. The sentence names no file: `docs/mcp-
+        # config.md` names none either, and a path this repository has never
+        # seen is not one to send a stranger to edit.
+        page = self.screen()
+        self.assertIn(wizard.MCP_DEST, page)
+        self.assertLess(page.index(wizard.MCP_DEST),
+                        page.index('<pre class="snippet">'))
+        for invented in ("~/.claude.json", "claude_desktop_config.json"):
+            with self.subTest(invented=invented):
+                self.assertNotIn(invented, page)
+
+    def test_only_the_path_can_wrap_in_the_snippet(self):
+        # One argument per line at two-space indents. Column-aligned
+        # continuations put the course path at column 15 of a block that
+        # wraps at 400px, so the one value nobody can eyeball broke across
+        # three lines and read as corrupt.
+        block = wizard.mcp_config("/home/someone/curricle-courses/a-course",
+                                  "someone")
+        lines = block.splitlines()
+        for line in lines:
+            indent = len(line) - len(line.lstrip(" "))
+            with self.subTest(line=line):
+                self.assertEqual(indent % 2, 0)
+        self.assertIn('        "-m",', lines)
+        self.assertIn('        "--course",', lines)
+        self.assertIn('        "/home/someone/curricle-courses/a-course",',
+                      lines)
+        # Every line but the path's is short enough that nothing else can be
+        # the thing that wraps.
+        self.assertTrue(all(len(line) <= 32 for line in lines
+                            if "curricle-courses" not in line), lines)
 
     def test_the_card_can_be_asked_for_by_name(self):
         # A card is a page you can come back to, not a moment that passes.
@@ -2058,6 +2228,201 @@ class ProjectionHookOffTest(unittest.TestCase):
             self.assertEqual(os.listdir(empty), [])
 
 
+class StatusRouteTest(WizardFixture):
+    """The waiting screens' poll: three fields off the same fold.
+
+    The route exists so that eleven minutes of building is eleven minutes of
+    a page holding still rather than a hundred and thirty full reloads. What
+    it returns is what a waiting page needs to know whether anything has
+    happened, and nothing else — no course content, no payloads, no plan.
+    """
+
+    def test_the_status_is_the_fold_in_three_fields(self):
+        self.assertEqual(self.client.get("/onboarding/status").json(),
+                         {"stop": "profile", "status": "waiting",
+                          "elapsed": "just started"})
+        self.append("profile_published")
+        self.append("scope_saved", "greek-120", {"title": "Greek"})
+        self.append("outline_requested", "greek-120")
+        status = self.client.get("/onboarding/status")
+        self.assertEqual(status.status_code, 200, status.text)
+        self.assertEqual(status.headers["content-type"], "application/json")
+        self.assertEqual(status.json(),
+                         {"stop": "outline", "status": "pending",
+                          "elapsed": "less than a minute elapsed"})
+
+    def test_then_the_answer_moves_when_the_fold_does(self):
+        # Named to run after the outline above: the fold moves, and so does
+        # the answer — which is the whole of what the script watches for.
+        self.append("outline_ready", "greek-120",
+                    {"plan": {"phase_id": "p1"}, "estimate_usd": "1.10"})
+        self.assertEqual(self.client.get("/onboarding/status").json()["stop"],
+                         "outline_gate")
+        self.assertEqual(self.client.get("/onboarding/status").json()["status"],
+                         "waiting")
+
+
+class StatusRouteIsScopedTest(unittest.TestCase):
+    """T5, on the newest route: one app, one tenant, one answer.
+
+    Two apps over the same database, each built for its own tenant. The
+    route takes no argument naming a tenant and could not be pointed at
+    another one if it did — the scope is the app's, resolved at startup.
+    """
+
+    def test_each_apps_status_is_its_own_tenants(self):
+        engine = test_engine()
+        mine = client(engine, "wizard-status-mine")
+        theirs = client(engine, "wizard-status-theirs")
+        with engine.begin() as conn:
+            scope = db.for_tenant(db.tenant_id_for(conn, "wizard-status-mine"))
+            onboarding.append_event(conn, scope, "profile_published", "", {})
+            onboarding.append_event(conn, scope, "scope_saved", "mine",
+                                    {"title": "Mine"})
+            onboarding.append_event(conn, scope, "outline_requested",
+                                    "mine", {})
+        self.assertEqual(mine.get("/onboarding/status").json()["stop"],
+                         "outline")
+        self.assertEqual(theirs.get("/onboarding/status").json()["stop"],
+                         "profile")
+
+
+class WaitingScreenPollTest(WizardFixture):
+    """F12/F25: the page holds still, and the meta refresh is the fallback.
+
+    The rule the wizard keeps is that the *forms* carry no JavaScript — "the
+    page a learner types into". A waiting screen has no inputs, and a full
+    reload every five seconds under an eleven-minute wait resets scroll,
+    selection and focus every time, which `prefers-reduced-motion` cannot
+    govern. So this screen polls, swaps the elapsed line in place, and
+    navigates only when the ledger says there is another screen to be on.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        walked = (("profile_published", ""), ("scope_saved", "greek-121"),
+                  ("outline_requested", "greek-121"))
+        with cls.engine.begin() as conn:
+            for kind, course in walked:
+                onboarding.append_event(conn, cls.scope, kind, course,
+                                        {"title": "Greek"} if course else {})
+
+    def test_a_watching_screen_polls_and_falls_back_to_the_meta_tag(self):
+        page = self.screen()
+        self.assertIn(wizard.NOSCRIPT_REFRESH, page)
+        self.assertIn('content="30"', page)
+        self.assertIn(wizard.POLL_JS, page)
+        # The two facts the script compares against, from the fold the page
+        # was drawn from — not spliced into the script's source.
+        self.assertIn('data-stop="outline"', page)
+        self.assertIn('data-status="pending"', page)
+        self.assertIn('id="wait-elapsed"', page)
+
+    def test_the_script_asks_the_route_that_exists(self):
+        # Two spellings of one path — the route's and the script's literal —
+        # held together here rather than by hope.
+        self.assertIn(wizard.STATUS_PATH, wizard.POLL_JS)
+        self.assertEqual(self.client.get(wizard.STATUS_PATH).status_code, 200)
+
+    def test_then_a_screen_that_is_not_waiting_carries_neither(self):
+        # The polling stops by construction, script or no script.
+        self.append("outline_ready", "greek-121",
+                    {"plan": {"phase_id": "p1"}, "estimate_usd": "1.10"})
+        page = self.screen()
+        self.assertNotIn(wizard.META_REFRESH, page)
+        self.assertNotIn("<script", page)
+        self.assertNotIn('id="wait-elapsed"', page)
+
+
+class SpendTest(unittest.TestCase):
+    """The receipt's arithmetic, over rows from the two ledgers.
+
+    The token ledger has no course column, so what a course cost is the
+    metered rows inside that course's own window in the onboarding ledger,
+    split at the approval. This is that windowing, on synthetic rows: a
+    stage bought before the course started, one after it was published, and
+    the two the course actually paid for.
+    """
+
+    @staticmethod
+    def rows(*pairs):
+        from types import SimpleNamespace
+        return [SimpleNamespace(kind=kind, created_at=when)
+                for kind, when in pairs]
+
+    @staticmethod
+    def ledger(*pairs):
+        from decimal import Decimal
+        from types import SimpleNamespace
+        return [SimpleNamespace(cost_usd=Decimal(cost), created_at=when)
+                for cost, when in pairs]
+
+    def setUp(self):
+        from datetime import datetime, timedelta, timezone
+        self.t0 = datetime(2026, 9, 1, 12, 0, tzinfo=timezone.utc)
+        self.at = lambda minutes: self.t0 + timedelta(minutes=minutes)
+
+    def test_the_split_is_the_approval_and_the_window_is_the_course(self):
+        from decimal import Decimal
+        spend = wizard.course_spend(
+            self.rows(("scope_saved", self.at(0)),
+                      ("outline_ready", self.at(7)),
+                      ("outline_approved", self.at(9)),
+                      ("promoted", self.at(21))),
+            self.ledger(("0.40", self.at(-30)),    # another course, earlier
+                        ("0.91", self.at(3)),      # the designer
+                        ("0.18", self.at(6)),      # the curator
+                        ("2.02", self.at(15)),     # the build
+                        ("5.00", self.at(40))))    # another course, later
+        self.assertEqual(spend.draft, Decimal("1.09"))
+        self.assertEqual(spend.build, Decimal("2.02"))
+        self.assertEqual(spend.total, Decimal("3.11"))
+
+    def test_before_the_approval_everything_is_drafting(self):
+        # Two drafts and a rejection between them: money spent answering a
+        # note is money spent drafting, and the gate says so before the
+        # decision rather than after it.
+        from decimal import Decimal
+        spend = wizard.course_spend(
+            self.rows(("scope_saved", self.at(0)),
+                      ("outline_rejected", self.at(8))),
+            self.ledger(("1.09", self.at(4)), ("1.05", self.at(12))))
+        self.assertEqual(spend.draft, Decimal("2.14"))
+        self.assertEqual(spend.build, Decimal(0))
+
+    def test_a_course_with_no_rows_totals_nothing_rather_than_everything(self):
+        from decimal import Decimal
+        spend = wizard.course_spend([], self.ledger(("9.99", self.at(1))))
+        self.assertEqual((spend.draft, spend.build, spend.total),
+                         (Decimal(0), Decimal(0), Decimal(0)))
+
+    def test_the_total_is_the_two_printed_figures_added(self):
+        # A total rounded from the raw sum can come out a cent away from the
+        # two figures printed beside it; a receipt whose own arithmetic does
+        # not check is worse than no receipt.
+        from decimal import Decimal
+        spend = wizard.Spend(Decimal("1.085"), Decimal("2.015"))
+        self.assertEqual(wizard.dollars(spend.draft), "$1.09")
+        self.assertEqual(wizard.dollars(spend.build), "$2.02")
+        self.assertEqual(wizard.dollars(spend.total), "$3.11")
+
+    def test_the_receipt_names_the_estimate_it_was_approved_at(self):
+        from decimal import Decimal
+        line = wizard.receipt_line(wizard.Spend(Decimal("1.09"),
+                                                Decimal("2.02")), "1.70")
+        self.assertIn("<b>$3.11</b>", line)
+        self.assertIn("$1.09 to draft", line)
+        self.assertIn("$2.02 to build", line)
+        self.assertIn("approved at about $1.70", line)
+
+    def test_a_ledger_with_nothing_in_it_says_so_rather_than_zeroes(self):
+        from decimal import Decimal
+        self.assertEqual(wizard.receipt_line(wizard.Spend(Decimal(0),
+                                                          Decimal(0)), "1.70"),
+                         wizard.RECEIPT_NONE)
+
+
 class StateChipTest(unittest.TestCase):
     """Design §5: always mark *and* word, never one without the other.
 
@@ -2084,7 +2449,11 @@ class ElapsedWordsTest(unittest.TestCase):
 
         now = datetime.now(timezone.utc)
         cases = {
-            timedelta(seconds=3): "3 seconds elapsed",
+            # Under a minute is words, not a figure: a second-precision
+            # count is precision a page refreshed every five seconds cannot
+            # keep, and it read as a stuck clock when it tried.
+            timedelta(seconds=3): "less than a minute elapsed",
+            timedelta(seconds=59): "less than a minute elapsed",
             timedelta(seconds=61): "1 minute elapsed",
             timedelta(minutes=9): "9 minutes elapsed",
             timedelta(hours=1, minutes=1): "1 hour 1 minute elapsed",

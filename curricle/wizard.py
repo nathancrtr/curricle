@@ -810,11 +810,21 @@ def box_rows(text: str) -> int:
     words are read back to you. Eighty columns is about what the box holds
     at this column width; an empty box opens at two, because a one-sentence
     claim sitting in three rows is two blank lines of nothing.
+
+    Wrapping is counted per *line*, not over the whole text, and that is
+    load-bearing rather than fussy: a claim of six short lines is 101
+    characters, and a count over the string would open it at two rows and
+    clip four of them — the same defect, on the same screen. The box beside
+    this one now says in words that line breaks stay inside a claim, so the
+    fallback has to be able to hold what that sentence invites. An empty
+    line still occupies a row, which is why the length of one floors at 1.
     """
-    return max(2, math.ceil(len(text) / 80))
+    return max(2, sum(math.ceil(max(len(line), 1) / 80)
+                      for line in text.split("\n")))
 
 
-def _claim_box(field: str, key: str, text: str, label: str) -> str:
+def _claim_box(field: str, key: str, text: str, label: str,
+               aria: str) -> str:
     """One textarea over one claim identity, prefilled from the fold.
 
     The caption a learner reads is the claim's position in its field — "Claim
@@ -823,11 +833,20 @@ def _claim_box(field: str, key: str, text: str, label: str) -> str:
     sentence reads as a database admin screen rather than as hospitality. It
     rides in `title`, for an operator who wants it, and in the `name` the
     POST reads back, which is where it was always doing the work.
+
+    `aria` is what that caption costs and what pays it back. "Claim 1" is the
+    right words on screen and the wrong accessible name: screen 1 carries
+    three fields, so a form list read aloud would be "Claim 1, Claim 1, Claim
+    1" where the old key at least told them apart. The `<h3>` naming the
+    field is not associated with the box, so the field's own heading is
+    carried into the name here — "Professional background, claim 1" — with
+    the visible words inside it, which is the rule about labels and names.
     """
     e = html_mod.escape
     return (f'<label class="claim" title="{e(key)}">'
             f'<span class="claimkey">{e(label)}</span>'
             f'<textarea name="claim__{e(field)}__{e(key)}" '
+            f'aria-label="{e(aria)}" '
             f'rows="{box_rows(text)}">{e(text)}</textarea></label>')
 
 
@@ -847,8 +866,10 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
     box was otherwise told the opposite by the placeholder below it.
     """
     explanation, _ = FIELD_COPY[field]
-    boxes = "".join(_claim_box(field, c.key, c.text, f"Claim {n}")
-                    for n, c in enumerate(claims, 1))
+    boxes = "".join(
+        _claim_box(field, c.key, c.text, f"Claim {n}",
+                   f"{FIELD_LABELS[field]}, claim {n}")
+        for n, c in enumerate(claims, 1))
     rule = ('<p class="hint">A box is one claim; line breaks stay inside '
             "it.</p>" if claims else "")
     hint = ('<p class="hint">Empty a box to delete that claim.</p>'
@@ -860,7 +881,9 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
       {_examples(field)}
       {rule}{boxes}{hint}
       <label class="claim"><span class="claimkey">Add a claim</span>
-      <textarea name="new__{html_mod.escape(field)}" rows="{box_rows('')}"
+      <textarea name="new__{html_mod.escape(field)}"
+      aria-label="{html_mod.escape(FIELD_LABELS[field])}, add a claim"
+      rows="{box_rows('')}"
       placeholder="One claim per line"></textarea></label>
       <p class="hint">Each line becomes its own claim.</p>
     </div>"""
@@ -875,7 +898,8 @@ def _meta_block(state: profile.ProfileState) -> str:
       <h3>{FIELD_LABELS["meta"]}</h3>
       <p class="explain">{explanation}</p>
       {_examples("meta")}
-      {_claim_box("meta", META_KEY, claim.text if claim else "", "Description")}
+      {_claim_box("meta", META_KEY, claim.text if claim else "",
+                  "Description", FIELD_LABELS["meta"])}
       <p class="hint">Empty this box to leave the description unset.</p>
     </div>"""
 

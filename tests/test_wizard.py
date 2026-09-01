@@ -12,6 +12,7 @@ for one of them can never be a screen drawn from the other's ledger.
 
 import html
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -1522,21 +1523,66 @@ class BoxRowsTest(unittest.TestCase):
         self.assertEqual(wizard.box_rows("x" * 161), 3)
         self.assertEqual(wizard.box_rows("x" * 400), 5)
 
+    def test_a_short_claim_of_many_lines_is_counted_by_its_lines(self):
+        # 101 characters over six lines. Counted over the whole string it
+        # would open at two rows and clip four of them — and the box beside
+        # this one says in words that line breaks stay inside a claim, so
+        # the fallback has to hold what that sentence invites.
+        claim = "\n".join(["Tokens become s-expressions."] * 6)[:101]
+        self.assertEqual(len(claim), 101)
+        self.assertEqual(wizard.box_rows(claim), 4)
+        self.assertEqual(
+            wizard.box_rows("\n".join(["Tokens become s-expressions."] * 6)), 6)
+
+    def test_a_blank_line_still_occupies_a_row(self):
+        self.assertEqual(wizard.box_rows("one\n\ntwo"), 3)
+
+
+def box_sizes(page: str) -> dict[str, int]:
+    """{textarea name: its `rows`} for every box on a rendered screen.
+
+    Read off the markup rather than asserted as a substring, because the
+    property under test is that the number *varies with the text* — and a
+    substring assertion for one size happily passes against a page where
+    every box is that size.
+    """
+    sizes = {}
+    for tag in re.findall(r"<textarea\b[^>]*>", page):
+        name = re.search(r'name="([^"]+)"', tag)
+        rows = re.search(r'rows="(\d+)"', tag)
+        if name and rows:
+            sizes[name.group(1)] = int(rows.group(1))
+    return sizes
+
 
 class SavedBoxSizeTest(WizardFixture):
-    """The same rule, where it is spent: on the read-back screen itself."""
+    """The same rule, where it is spent: on the read-back screen itself.
 
-    def test_a_saved_claim_comes_back_in_a_box_that_holds_it(self):
-        claim = ("Nine years as a backend engineer, mostly Python services "
-                 "over Postgres and Kafka, with a couple of years of Go and "
-                 "a long stretch of production on-call that taught me more "
-                 "about distributed systems than any of the reading did.")
-        self.save("1", {"new__background": claim})
-        page = self.screen("?screen=1")
-        self.assertGreater(wizard.box_rows(claim), 2)
-        self.assertIn(f'rows="{wizard.box_rows(claim)}"', page)
-        # ...and the Add box under it holds nothing, so it opens at the floor.
-        self.assertIn('name="new__background" rows="2"', page)
+    One method, because the three sizes have to be on one screen at once:
+    two saved claims of different lengths and an empty Add box. And none of
+    the three may be three, which is what `rows` used to be for all of them —
+    a box that happens to come out at the old constant pins nothing.
+    """
+
+    SHORT = "Nine years as a backend engineer, mostly Python over Postgres."
+    LONG = ("Nine years as a backend engineer, mostly Python services over "
+            "Postgres and Kafka, with a couple of years of Go and a long "
+            "stretch of production on-call that taught me more about "
+            "distributed systems than any amount of the reading ever did, "
+            "and rather more about pager fatigue than I wanted to know.")
+
+    def test_each_box_comes_back_at_the_size_of_what_it_holds(self):
+        self.assertEqual((wizard.box_rows(self.LONG),
+                          wizard.box_rows(self.SHORT)), (4, 2))
+        self.save("1", {"new__background": self.LONG})
+        self.save("1", {"new__background": self.SHORT})
+        sizes = box_sizes(self.screen("?screen=1"))
+        self.assertEqual(sizes["claim__background__background-01"], 4)
+        self.assertEqual(sizes["claim__background__background-02"], 2)
+        # ...and the Add box under them holds nothing, so it opens at the
+        # floor. Nothing on the screen is the three every box used to be.
+        self.assertEqual(sizes["new__background"], 2)
+        self.assertNotIn(3, sizes.values())
 
 
 class ClaimLabelTest(WizardFixture):
@@ -1556,16 +1602,39 @@ class ClaimLabelTest(WizardFixture):
         self.assertNotIn("BACKGROUND-01", page)
         self.assertNotIn("text-transform:uppercase", page)
 
+    def test_every_box_on_a_screen_has_an_accessible_name_of_its_own(self):
+        # "Claim 1" is the right words on screen and the wrong accessible
+        # name: screen 1 carries three fields, so a form list read aloud
+        # would be "Claim 1, Claim 1, Claim 1" — worse than the key it
+        # replaced. The field's own heading rides in `aria-label`, with the
+        # visible words inside it.
+        self.save("1", {"new__background": "Nine years of backend work.",
+                        "new__education": "BS in information systems."})
+        page = self.screen("?screen=1")
+        for name in ('aria-label="Professional background, claim 1"',
+                     'aria-label="Formal education, claim 1"',
+                     'aria-label="Professional background, add a claim"',
+                     'aria-label="Formal education, add a claim"',
+                     'aria-label="Prior courses and tracks, add a claim"',
+                     'aria-label="Skill description"'):
+            with self.subTest(name=name):
+                self.assertEqual(page.count(name), 1)
+
     def test_both_newline_rules_are_printed_where_each_one_applies(self):
         # Two identical boxes with opposite rules: the one above splits on
         # nothing, the Add box splits on every line. Words, since there is
         # no script on this page to make them one control.
         self.save("1", {"new__background": "Nine years of backend work."})
         page = self.screen("?screen=1")
-        self.assertIn("A box is one claim; line breaks stay inside it.", page)
-        self.assertIn("Each line becomes its own claim.", page)
         self.assertIn('<span class="claimkey">Add a claim</span>', page)
         self.assertIn("<b>For example</b>", page)
+        # Placement is the whole finding: each rule has to sit by the box it
+        # is true of, or the two sentences have simply swapped the lie.
+        self.assertLess(page.index("A box is one claim; line breaks stay "
+                                   "inside it."),
+                        page.index('name="claim__background__'))
+        self.assertLess(page.index('name="new__background"'),
+                        page.index("Each line becomes its own claim."))
 
 
 class OneForwardActionTest(WizardFixture):
@@ -1591,6 +1660,28 @@ class OneForwardActionTest(WizardFixture):
         self.assertEqual(posted.status_code, 303)
         self.assertEqual(posted.headers["location"], "/onboarding/?screen=3")
         self.assertEqual(len(self.profile_rows()), before)
+
+
+class ScreenFourForwardActionTest(WizardFixture):
+    """F4's worst case, on its own tenant because it needs a met gate.
+
+    Screen 4 carried three ways to the review at once: the Save button, a
+    "Review and publish →" pill in the nav row, and a second copy of the
+    same link trailing the gate sentence. Save is the whole of it now.
+    """
+
+    def test_the_review_is_reached_by_saving_and_by_nothing_else(self):
+        self.satisfy_the_gate()
+        self.assertEqual(
+            onboarding.profile_gate_missing(self.profile_state()), ())
+        page = self.screen("?screen=4")
+        self.assertIn("Save this screen →", page)
+        self.assertIn('<a class="back" href="/onboarding/?screen=3">', page)
+        self.assertNotIn('href="/onboarding/?screen=review"', page)
+        self.assertNotIn("Review and publish", page)
+        # ...and Save is genuinely that way through.
+        posted = self.save("4", {"new__subject_adapters": ""})
+        self.assertEqual(posted.headers["location"], "/onboarding/?screen=review")
 
 
 class ProfileFormRoundTripTest(WizardFixture):

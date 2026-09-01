@@ -10,6 +10,7 @@ import tempfile
 import textwrap
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 import sqlalchemy as sa
 
@@ -529,6 +530,63 @@ class ConfigLocationTest(unittest.TestCase):
             with self.assertRaises(FactoryConfigMissing) as caught:
                 load_role("quiz-author")
         self.assertIn("quiz-author", str(caught.exception))
+
+
+class CredentialTest(unittest.TestCase):
+    """Whether there is a key at all — asked before anything is called.
+
+    A fresh checkout with no key is the likeliest way somebody's first run
+    ends, and the SDK's own answer to it is a `TypeError` from a constructor
+    ("could not resolve authentication method"), which nothing upstream can
+    classify. So the transport asks first, and the worker has a reason key
+    for the answer. Nothing here writes, reads or asserts a real credential:
+    the environment is emptied and `REPO_ROOT` is pointed at a temp
+    directory, so the machine's own key can neither pass nor fail these.
+    """
+
+    def keyless(self):
+        """No key in the environment. (The file is the caller's to place or
+        leave out — every test here points REPO_ROOT at an empty temp dir.)"""
+        return mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""})
+
+    def test_no_key_anywhere_is_visible_without_a_call(self):
+        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
+                mock.patch.object(llm, "REPO_ROOT", tmp):
+            self.assertFalse(llm.have_api_key())
+
+    def test_a_key_in_the_environment_is_the_sdks_to_find(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "x"}), \
+                mock.patch.object(llm, "REPO_ROOT", tmp):
+            self.assertTrue(llm.have_api_key())
+            # Which is why `_api_key` answers None to an environment key:
+            # the client is left to its own credential chain.
+            self.assertIsNone(llm._api_key())
+
+    def test_a_file_beside_the_checkout_counts_and_an_empty_one_does_not(self):
+        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
+                mock.patch.object(llm, "REPO_ROOT", tmp):
+            os.makedirs(os.path.join(tmp, "local"))
+            path = os.path.join(tmp, "local", "anthropic-key")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("   \n")
+            self.assertFalse(llm.have_api_key())
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("stand-in-not-a-credential\n")
+            self.assertTrue(llm.have_api_key())
+
+    def test_the_transport_refuses_before_it_builds_a_client(self):
+        # The refusal names both places a key may live, so the operator log
+        # says the same thing the wizard's sentence does — and it is
+        # `NoApiKey`, which is the whole point: the worker classifies on the
+        # class, never on the text of somebody else's exception.
+        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
+                mock.patch.object(llm, "REPO_ROOT", tmp):
+            with self.assertRaises(llm.NoApiKey) as caught:
+                llm._anthropic_send("claude-haiku-4-5", "s", "p", 16)
+        message = str(caught.exception)
+        self.assertIn("ANTHROPIC_API_KEY", message)
+        self.assertIn("local/anthropic-key", message)
 
 
 class OutlineRolesTest(unittest.TestCase):

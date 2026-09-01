@@ -54,6 +54,18 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+class NoApiKey(RuntimeError):
+    """There is no credential this transport can call the model with.
+
+    Its own exception for the same reason `BudgetExceeded` is one: the
+    worker turns it into a failure reason the wizard has a sentence for, and
+    a stranger's first run of a fresh checkout is far more likely to end
+    here than anywhere else. Raised before the client is built where the
+    absence is visible, and out of the SDK's own authentication error where
+    it is not — either way carrying a fixed detail, never the credential.
+    """
+
+
 class FactoryConfigMissing(RuntimeError):
     """`models.yaml` or a role contract is not where the factory looked.
 
@@ -151,18 +163,46 @@ def _api_key() -> str | None:
     return None
 
 
+def have_api_key() -> bool:
+    """Whether a credential exists at all — never what it is.
+
+    The same two places `_api_key` looks, asked as a yes/no so that callers
+    who want to fail early can, without a key's value passing through them.
+    Env first, exactly as there: a key in the environment is one the SDK
+    finds for itself, which is why `_api_key` answers None to it.
+    """
+    return bool(os.environ.get("ANTHROPIC_API_KEY")) or _api_key() is not None
+
+
 def _anthropic_send(model: str, system: str, prompt: str,
                     max_tokens: int) -> tuple[str, dict]:
     """The real transport: streams (large max_tokens requires it) and
-    returns (text, usage-dict). Isolated so tests inject their own."""
+    returns (text, usage-dict). Isolated so tests inject their own.
+
+    The credential is checked before the client is built, because the SDK's
+    own complaint about an unresolvable one is a `TypeError` out of a
+    constructor — true, and unclassifiable by anything upstream. Asked here
+    rather than in `Runner` so that an injected transport is never held to
+    a key it does not use: a scripted `send` calls nothing.
+    """
     import anthropic
 
-    client = anthropic.Anthropic(api_key=_api_key())
-    with client.messages.stream(
-        model=model, max_tokens=max_tokens, system=system,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        message = stream.get_final_message()
+    if not have_api_key():
+        raise NoApiKey(
+            "no Anthropic API key: set ANTHROPIC_API_KEY, or put one in "
+            "local/anthropic-key beside the checkout")
+    try:
+        client = anthropic.Anthropic(api_key=_api_key())
+        with client.messages.stream(
+            model=model, max_tokens=max_tokens, system=system,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            message = stream.get_final_message()
+    except anthropic.AuthenticationError as exc:
+        # The fallback for a key that exists and is not accepted. Its own
+        # fixed detail: the SDK's message is an operator's to read in a log,
+        # and nothing here goes near the credential itself.
+        raise NoApiKey("the Anthropic API refused this credential") from exc
     text = "".join(b.text for b in message.content if b.type == "text")
     u = message.usage
     return text, {

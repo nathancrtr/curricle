@@ -104,8 +104,18 @@ NEVER_PROMISES = (
     "or delete any of it at any time.",
     "Nothing you type here is sent anywhere but your own database and, "
     "later, the model calls that build your course.",
-    "Every dollar of model spend is approved by you on a screen that shows "
-    "the number first.",
+    # The old sentence was "Every dollar of model spend is approved by you
+    # on a screen that shows the number first", and it was not true: the
+    # outline stage spends before any number has been shown, on the strength
+    # of the scope form's "it is the cheap one". What is true is the shape
+    # below — one stage approved against a number, the other running under a
+    # budget it stops at, and both of them itemised afterwards, which is the
+    # clause that makes the promise checkable rather than merely made. It is
+    # said here because the landing really does print that receipt.
+    "The expensive stage — building your materials — is approved by you on "
+    "a screen that shows the number first. Drafting the outline runs under "
+    "a budget of its own and never asks you for money. What each of them "
+    "actually cost is itemised for you when you land.",
 )
 
 # The profile stop's sub-screens, in order: the whole vocabulary `?screen=`
@@ -140,13 +150,24 @@ SCREEN_NAMES = {"welcome": "What this does",
 # The lede on each form screen. Screen 3's says plainly why those three
 # fields are the product (design §4): a profile that only says who you are
 # calibrates nothing.
+#
+# The ledes carry more than they did, because the field explanations carry
+# less: a field is one line now (F13 — four fields at three tiers of muted
+# text apiece made screen 1 two thousand pixels of reading before the first
+# box), and the rationale sentences that earned their place moved up here,
+# where they are said once for the screen instead of once per field.
 SCREEN_INTROS = {
     "1": "Where you are coming from — the work and study a course can build "
          "on instead of repeating. Short claims, in your own words.",
     "2": "How an explanation has to arrive for it to land, and how much of "
-         "your week a course is allowed to ask for.",
+         "your week a course is allowed to ask for. One habit per claim, "
+         "stated as an instruction a teacher could follow — and what you "
+         "say here about domains is a preference, never a requirement.",
     "3": "These three are the difference between a course that re-explains "
-         "your degree and one that builds only what you lack.",
+         "your degree and one that builds only what you lack: together they "
+         "are the procedure a tutor follows before it says anything new, "
+         "and every line of them is a week spent on something you do not "
+         "already know.",
     "4": "One course is being written now, but this profile outlives it. "
          "What here holds whatever the subject turns out to be?",
 }
@@ -179,7 +200,7 @@ FIELD_LABELS = {
 FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
     "meta": (
         "One sentence naming who this profile is for and when Claude should "
-        "reach for it. This is the only field that holds a single line.",
+        "reach for it.",
         ("Learning profile for a backend engineer with a CS degree studying "
          "distributed systems and formal methods through hands-on "
          "implementation.",
@@ -208,15 +229,14 @@ FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
          "Finished a lecture series on linear algebra two years ago: the "
          "notation stuck, the proofs did not.")),
     "style": (
-        "How understanding actually arrives for you. One habit per claim, "
-        "stated as an instruction a teacher could follow.",
+        "How understanding actually arrives for you.",
         ("Learns by implementing — pair every abstract idea with something "
          "runnable, and treat “show me the code” as always fair.",
          "Reaches understanding through failure modes: what breaks, and what "
          "the system does when it breaks, lands harder than the happy path.")),
     "domain_bias": (
         "Where examples and exercises should be drawn from when the choice "
-        "is free. A preference, never a requirement.",
+        "is free.",
         ("Prefers exercise domains drawn from storage engines, consensus, and "
          "stream processing.",
          "Examples from music, language, or games land; examples from finance "
@@ -228,23 +248,20 @@ FIELD_COPY: dict[str, tuple[str, tuple[str, str]]] = {
          "One long Sunday session rather than daily study — scope units to "
          "survive a week-long gap.")),
     "calibration": (
-        "The order an explanation has to arrive in for you. This is the "
-        "procedure a tutor follows before it says anything new.",
+        "The order an explanation has to arrive in for you.",
         ("When explaining a new concept: open with the failure it exists to "
          "prevent, show it concretely, then give the formal statement and "
          "name it properly.",
          "Give me the shape of the whole thing before any detail; a lesson "
          "built strictly bottom-up loses me by the third step.")),
     "skip": (
-        "What never needs explaining to you again. Every line here is time a "
-        "course spends on something you do not already know.",
+        "What never needs explaining to you again.",
         ("Don't explain what an index is, what a transaction is, how HTTP "
          "works, or any language-level feature of Go or Python.",
          "Don't explain big-O, common data structures, or basic algorithm "
          "analysis — the degree covered these and they held.")),
     "scaffold": (
-        "What to rebuild from the ground up, assuming nothing stuck. The "
-        "opposite list, and the one people under-report.",
+        "What to rebuild from the ground up, assuming nothing stuck.",
         ("Probability and statistics: rebuild from zero whenever a "
          "tail-latency or failure-rate argument needs them.",
          "Proof technique and formal notation — introduce each notation on "
@@ -348,14 +365,18 @@ GATE_LEDE = ("This is the course that was drafted for you. Read it, then "
              "built, or send it back with a note saying what to change.")
 GATE_ESTIMATE_WORD = "expected, at today's prices"
 GATE_HEADROOM_WORD = "left before it refuses"
+# Two sentences, one per figure. The four it used to be were the runner's
+# internals recited on the screen where a decision is taken — read a role's
+# spend, refuse at or past the budget, a call already under way finishes —
+# and that paragraph belongs in `docs/onboarding-design.md`, where it is.
+# What this has to say is what each number means and that the second one is
+# a stopping line rather than a cap.
 GATE_HEADROOM = ("The estimate is an expectation, not a cap: it prices the "
-                 "plan at today's rates and the real bill comes in over or "
-                 "under it. The second number is what these roles have left "
-                 "on their budgets right now — the runner reads a role's "
-                 "spend before every call and refuses once it is at or past "
-                 "that role's budget. It is where the build stops, not a "
-                 "hard cap: a call already under way finishes, so a role "
-                 "can end a little past its own line.")
+                 "plan at today's rates, and the real bill comes in over or "
+                 "under it. The second figure is what these roles have left "
+                 "on their budgets — the build refuses at that line, and a "
+                 "call already under way finishes, so it stops there rather "
+                 "than never crossing it.")
 # When the headroom will not cover the estimate, said before the button
 # rather than discovered as a stopped build. The approve form still
 # renders — this is the learner's money and their call — but nothing here
@@ -377,6 +398,10 @@ GATE_NONE = ("Nothing is left on these roles' budgets, so the build will "
 # rejected outline was drafted again and the ledger holds both, so a
 # sentence naming "this outline" would be pricing one draft at the cost of
 # all of them.
+# The one line between the figures and the list: without it the plan reads
+# as five more facts about money rather than as what the money is for.
+GATE_PLAN_LEAD = "What that buys:"
+
 GATE_SPENT = ("Drafting cost so far: {spent}{across}. That is already "
               "spent, and it is not part of the numbers above.")
 GATE_SPENT_ACROSS = ", across {n} drafts"
@@ -384,6 +409,18 @@ RECEIPT = ("Model spend for this course: {total} — {draft} to draft, "
            "{build} to build")
 RECEIPT_APPROVED = " (approved at about {estimate})"
 RECEIPT_NONE = "No model spend is recorded against this course."
+
+# The same number, said where a learner scanning for "how much?" looks:
+# under the lede, before three thousand pixels of outline (F19). Stop 0
+# promises a screen that shows the number first, and "first" had come to
+# mean "above the button" — which it is, and which is not what anybody was
+# told. The card itself stays where it is, after the evidence, because that
+# is where the decision is taken; this only says the number and points at
+# it. The figure and the word under it are the card's own — `estimate_cost`
+# draws both places — so the two can never come to say different things
+# about the same payload.
+GATE_COST_LEAD = ("Building the first phase of materials is the stage that "
+                  "costs money, and nothing is spent until you say so —")
 
 # What the reject box asks for, and why an empty one is refused: the note is
 # the whole content of a rejection, and a redraft briefed with nothing is the
@@ -437,6 +474,23 @@ MCP_DEST = ("Paste this into your assistant's MCP configuration — most "
 REVIEW_CAPTION = ("This exact document rides along on every model call that "
                   "builds your course.")
 
+# And the line that says which half of it is whose. The document is one
+# document — that is settled — but it opens with two paragraphs curricle
+# wrote and closes with a footer holding a terminal command, and the lede
+# used to claim it was generated "from your claims, and from nothing else",
+# which anybody who read the next four lines could see was false. The split
+# rendering shows the difference; this sentence says it, because a
+# distinction carried by type alone is a distinction some readers do not get.
+#
+# Structurally, and never by colour: "the grey paragraphs" is a sentence
+# that is wrong in the dark theme and wrong again for anyone reading this
+# through a screen reader. It names the parts instead — and it does not
+# hand curricle the whole frontmatter, because the description line in it
+# is the learner's own sentence when they wrote one.
+READBACK_LEGEND = ("Curricle wrote the opening paragraphs, the section "
+                   "headings and the footer; everything between them is a "
+                   "claim of yours, as is the description line at the top.")
+
 # The fallback for a browser with no JavaScript, and only for that browser.
 # A full-page refresh resets scroll, selection and focus and re-announces
 # the page to a screen reader; over an eleven-minute build at five seconds
@@ -486,7 +540,9 @@ POLL_JS = """
 })();
 """
 
-# What each stop is called on screen, and in the step strip.
+# What each stop is called on screen: the h1 on every stop past the
+# profile, and the stage name on the masthead's words line at the profile
+# stop, which is the one stop whose screens have h1s of their own.
 STOP_TITLES = {
     "profile": "Your learner profile",
     "scope": "What you want to learn",
@@ -494,10 +550,14 @@ STOP_TITLES = {
     "outline_gate": "Your outline, and what the build will cost",
     "build": "Building the first phase",
     "promote": "Publishing your course",
-    # Not a stop — the fold's terminal stage, and the only title the step
-    # strip is drawn for with every step behind it.
+    # Not a stop — the fold's terminal stage, and the only one the waypath
+    # is drawn for with every stone behind the learner and none under them.
     "done": "Your course is ready",
 }
+# And what each stop is called on its stone. Never printed: a stone carries
+# no words, so these are what its visually-hidden phrase says instead
+# ("Approval: to come"), which is the whole of what a reader who gets no
+# drawing is given.
 STEP_LABELS = {
     "profile": "Profile", "scope": "Scope", "outline": "Outline",
     "outline_gate": "Approval", "build": "Build", "promote": "Publish",
@@ -511,20 +571,24 @@ STEP_LABELS = {
 WIZARD_CSS = theme.style("""\
   .wizard { max-width:720px; margin:0 auto; padding:0 24px 90px; }
   .masthead { padding:40px 0 6px; }
+  .masthead .wordmark { margin:0; }
+  .masthead .eyebrow { margin:12px 0 0; }
   h1 { font-weight:700; font-size:clamp(26px,5vw,34px); letter-spacing:-.01em;
        margin:14px 0 0; }
   .lede { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:60ch; }
-  .steps { display:flex; flex-wrap:wrap; gap:8px; margin:26px 0 0; padding:0;
-           list-style:none; }
-  .steps li { display:inline-flex; align-items:center; gap:6px; font-size:12.5px;
-              font-weight:600; letter-spacing:.02em; border-radius:999px;
-              padding:4px 12px; background:var(--chip); color:var(--muted); }
-  .steps li.done { background:var(--good-soft); color:var(--good-text); }
-  .steps li.now { background:var(--accent-soft); color:var(--accent-text);
-                  box-shadow:inset 0 0 0 1.5px var(--accent); }
-  .steps svg { display:block; }
+  /* The waypath, at the size the hub draws it: the setup is six stones and
+     the same gesture the finished course will use. A list rather than a row
+     of bare spans, because each stop is an item with a position — the stone
+     is the drawing (aria-hidden) and the word inside it is what that
+     position is, for a reader who gets no drawing at all. `display:flex` on
+     the item is what blockifies the stone span so the component's width and
+     height still apply. */
+  ol.waypath { margin:22px 0 0; padding:0; list-style:none; }
+  ol.waypath li { display:flex; }
+  .vh { position:absolute; width:1px; height:1px; margin:-1px; padding:0;
+        overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
   .stepline { font-size:13.5px; font-weight:600; color:var(--muted);
-              margin:10px 0 0; }
+              margin:12px 0 0; }
   .gatebox { background:var(--panel); border:1px solid var(--line);
              border-radius:18px; box-shadow:var(--shadow); padding:20px 24px;
              margin:26px 0; }
@@ -541,27 +605,35 @@ WIZARD_CSS = theme.style("""\
   .stateline .note { font-size:13.5px; font-weight:600; color:var(--muted); }
   .elapsed { font-size:13.5px; font-weight:600; color:var(--muted); }
   .wording { color:var(--ink); }
-  .never { margin:22px 0 0; padding:0 0 0 22px; }
+  /* Three sibling sections, three panels (the operator's Fork D, over the
+     art director's recommendation that the promises be the only panel).
+     The list sits on the panel's own inset, so it takes no top margin. */
+  .never { margin:0; padding:0 0 0 22px; }
   .never li { font-size:14.5px; line-height:1.6; color:var(--muted);
               margin:9px 0; max-width:62ch; }
   .ask { display:flex; flex-wrap:wrap; align-items:center; gap:14px;
          margin:28px 0 0; }
   .ask .aside { font-size:13.5px; color:var(--muted); }
-  .screenline { font-size:13.5px; font-weight:600; color:var(--muted);
-                margin:22px 0 0; }
   .field { padding:20px 24px; margin:22px 0; }
   .field h3 { font-size:17px; font-weight:700; margin:0 0 5px; }
   .field .explain { font-size:14.5px; line-height:1.6; color:var(--muted);
                     margin:0 0 13px; max-width:62ch; }
+  /* The examples are a <details>, open only while the field is empty (the
+     operator's Fork C): they teach the register, and once a learner has
+     written in it they have done their job. No script — the `open`
+     attribute is written from the fold, like everything else here. */
   .eg { border-left:2px solid var(--line); padding:1px 0 1px 14px;
         margin:0 0 16px; }
+  .eg summary { cursor:pointer; }
+  .eg[open] summary { margin:0 0 5px; }
   /* Captions over a learner's own words, in the .stepline register:
      sentence case, no tracking, no small caps. The letterspaced uppercase
      eyebrow is the bookish vocabulary DIRECTION.md retired, and this was the
      one surface that had brought it back — over the learner's own sentences,
      which is the worst place in the product for it. */
-  .eg b, .claimkey { display:block; font-size:13.5px; font-weight:600;
-          color:var(--muted); margin:0 0 5px; }
+  .eg summary, .claimkey { font-size:13.5px; font-weight:600;
+          color:var(--muted); margin:0; }
+  .claimkey { display:block; margin:0 0 5px; }
   .eg p { font-size:13.5px; line-height:1.55; color:var(--muted);
           margin:0 0 7px; max-width:62ch; }
   .eg p:last-child { margin-bottom:0; }
@@ -641,35 +713,64 @@ WIZARD_CSS = theme.style("""\
      the compiled draft on every draw, like everything else above it. */
   .counts { font-size:13.5px; font-weight:600; color:var(--muted);
             margin:12px 0 0; }
-  /* Both selectors carry .gatebox: the panel's own `p` rule is one element
-     more specific than a bare class would be, and the number would quietly
-     come out at body size and body color. */
-  .gatebox p.cost { font-family:""" + theme.FONT_DISPLAY + """;
+  /* The gate says the estimate twice — once under the lede, where a
+     learner scanning for "how much?" looks (F19), and once inside the card,
+     where the decision is taken — so the rule reaches a number on the
+     ground as well as one in a panel. The second selector carries .gatebox
+     because the panel's own `p` rule is one element more specific than a
+     bare class would be, and the number would quietly come out at body size
+     and body color. */
+  p.cost, .gatebox p.cost { font-family:""" + theme.FONT_DISPLAY + """;
           font-weight:700; font-size:clamp(24px,4.5vw,30px);
           letter-spacing:-.01em; color:var(--ink); margin:0 0 8px; }
-  /* The two numbers side by side and the same size: the estimate is what
-     the build is expected to cost and the headroom is what is left before
-     it refuses, and setting one at display size over a caption that
-     withdraws it is how an estimate comes to read as a price. The word
-     under each carries the difference, because the word is the message. */
-  .costs { display:flex; flex-wrap:wrap; gap:6px 40px; margin:0 0 12px; }
+  /* The two numbers side by side, and not at the same size. They were, and
+     at equal weight the headroom landed first: the eye takes the largest
+     number on a card as the price, and the headroom is the one figure on
+     this screen that is not the cost. So the estimate keeps display size
+     and the headroom steps down one — still a figure, still beside it, no
+     longer the headline. The word under each carries which is which,
+     because the word is the message and the size is only the order to read
+     them in. (No example figure in this comment: a stylesheet is served,
+     and a number in a comment is a number on the page.) */
+  .costs { display:flex; flex-wrap:wrap; align-items:baseline;
+           gap:6px 40px; margin:0 0 12px; }
   .gatebox .costs p.cost { margin:0; }
+  .gatebox .costs p.cost.second { font-size:clamp(18px,3vw,21px); }
   .cost .costword { display:block; font:600 13.5px/1.5 """
              + theme.FONT_BODY + """; letter-spacing:0;
              color:var(--muted); margin:2px 0 0; }
   .gatebox p.spent { font-size:14.5px; line-height:1.6; color:var(--muted);
           margin:0 0 10px; max-width:62ch; }
   /* The plan as a list, because it is the thing the money is approved
-     against and a run-on sentence is not a thing anybody checks. */
-  ul.plan { margin:16px 0 0; padding:0; list-style:none; }
+     against and a run-on sentence is not a thing anybody checks. At body
+     weight, though: five bold lines in a row read as five headings over
+     nothing, and what these are is five things being bought. The lead line
+     is the hinge between the figures and the list — without it the plan
+     reads as more facts about money. */
+  .gatebox p.buys { font-size:14.5px; font-weight:600; color:var(--ink);
+          margin:16px 0 0; }
+  ul.plan { margin:8px 0 0; padding:0; list-style:none; }
   .plan li { margin:0 0 11px; max-width:62ch; }
   .plan li:last-child { margin-bottom:0; }
-  .plan b { display:block; font-size:14.5px; color:var(--ink); }
-  .plan span { display:block; font-size:13.5px; line-height:1.55;
+  .plan .what { display:block; font-size:14.5px; color:var(--ink); }
+  .plan span.detail { display:block; font-size:13.5px; line-height:1.55;
                color:var(--muted); margin:2px 0 0; }
   .receipt { font-size:14.5px; line-height:1.6; color:var(--muted);
              margin:14px 0 0; max-width:62ch; }
   .receipt b { color:var(--ink); }
+  /* The lede's copy of the number: the same drawing as the card's, with a
+     little more air over it because it sits on the ground, and one sentence
+     under it saying where the decision itself is. */
+  p.cost.upfront { margin:22px 0 4px; }
+  .costline { font-size:14.5px; line-height:1.6; color:var(--muted);
+              margin:8px 0 0; max-width:62ch; }
+  /* The course's own name, on the ground rather than in a card: it is the
+     one moment of arrival on the gate, and an h3 inside a panel identical to
+     the phase panels under it made it a list item (F23). The phases read as
+     its contents, and the count line sits under the title it counts. */
+  h2.coursetitle { font-family:""" + theme.FONT_DISPLAY + """;
+          font-weight:700; font-size:clamp(24px,4.5vw,26px);
+          letter-spacing:-.01em; color:var(--ink); margin:34px 0 0; }
   .nav { display:flex; flex-wrap:wrap; gap:12px; margin:30px 0 0; }
   /* The way back is not the action the screen is for, so it is a text link
      and not a pill: one forward action per screen, and it is Save. */
@@ -681,12 +782,19 @@ WIZARD_CSS = theme.style("""\
              margin:26px 0 0; max-width:62ch; }
   /* The projection, shown as what it is: a text file, in a text file's
      typeface, wrapping rather than scrolling sideways so every line of it
-     can be read without a horizontal gesture. */
+     can be read without a horizontal gesture.
+     Split, though (the operator's Fork B): curricle's own words — the
+     frontmatter, the headings, the two framing paragraphs, the footer — are
+     the mono the whole document used to be, and the learner's own sentences
+     are set in body type in --ink. One panel, one document, whole; what the
+     split does is show, rather than claim, which half of it is theirs. */
   pre.projection { font:13px/1.62 """ + theme.FONT_MONO + """;
                    white-space:pre-wrap; overflow-wrap:anywhere;
                    background:var(--panel); border:1px solid var(--line);
                    border-radius:18px; box-shadow:var(--shadow);
-                   color:var(--ink); padding:20px 24px; margin:14px 0 0; }
+                   color:var(--muted); padding:20px 24px; margin:14px 0 0; }
+  pre.projection .mine { font:15px/1.6 """ + theme.FONT_BODY + """;
+                   color:var(--ink); }
   /* The tutor's config, inside a panel rather than as one: it is a block
      within the closing card, so it takes the card's own inset rather than
      the projection's full-page shadow. Wrapping for the same reason — a
@@ -715,10 +823,10 @@ _ALERT = ('<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">'
           'stroke-width="1.6"/><path d="M6 3.2v3.3M6 8.4v.5" fill="none" '
           'stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>'
           '</svg>')
-_CHECK = ('<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true">'
-          '<path d="M1.6 5.7 4.3 8.4 9.4 2.7" fill="none" '
-          'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
-          'stroke-linejoin="round"/></svg>')
+# (There was a fourth, a check mark, drawn for the done chips of the step
+# strip the waypath replaced. A stone that is lit is what "done" looks like
+# in this product, and a second drawing for the same word is the kind of
+# vocabulary the direction spends its restraint on not having.)
 
 # (mark, word, chip tint) per status. The tint reinforces; the word carries.
 _STATUS_CHIPS = {
@@ -795,51 +903,103 @@ def _waitline(stop: str, status: str,
             f'data-status="{status}">{_chip(status)}{since}</p>')
 
 
-def _steps(stop: str) -> str:
-    """The step strip: where this stop sits in the six, in words.
+def _stone(stage: str, state: str) -> str:
+    """One stone: the drawing for everyone who can see it, the word for the rest.
 
-    Not the waypath. The waypath is the course's gesture and means "where
-    you are on a path you will walk"; six setup stops are not that path, and
-    borrowing the gesture here would spend it on the one part of the product
-    a learner sees exactly once. Done steps carry the check mark beside
-    their name and the line beneath says the position in words, so the strip
-    is legible with every color stripped out of it.
+    The stone itself carries no text, so it is `aria-hidden` and the item
+    around it holds the position in a phrase nobody sees — "Outline:
+    current". A ring a screen reader cannot read is a position only some
+    readers are given.
+    """
+    tint = {"done": " lit", "current": " here", "to come": ""}[state]
+    current = ' aria-current="step"' if state == "current" else ""
+    return (f'<li{current}><span class="wp-stone{tint}" aria-hidden="true">'
+            f'</span><span class="vh">{STEP_LABELS[stage]}: {state}</span></li>')
 
-    `done` is the fold's terminal stage rather than a seventh stop, so it
-    draws every step behind the learner and no step under them. A strip with
-    a "now" on it over a finished setup would be the one screen in the
-    wizard that says there is more to do when there is not.
+
+def _waypath(stop: str, sub: str | None = None) -> str:
+    """Where you are, drawn in the product's own gesture: six stones, one line.
+
+    This function used to draw a strip of chips, and its docstring used to
+    argue for it: that the waypath means "where you are on a path you will
+    walk", that six setup stops are not that path, and that spending the
+    gesture here would spend it on the one part of the product a learner
+    sees exactly once. The operator decided the other way (design review,
+    fork A), and the decision is the design now. The reasons it turns on:
+    onboarding is the most literally tracked thing in the product — a
+    ledger, a fold, a derived "you are here" — which is exactly where the
+    house rule says the waypath goes; the strip was a second progress idiom
+    standing beside the first, in a product whose personality is one move
+    plus discipline everywhere else; and the stones a learner watches fill
+    across six stops are the stones the hub lays out at full size on the far
+    side of the setup, so the hand-off *is* the gesture rather than one
+    product handing over to another.
+
+    Server-rendered, like the front door's mini paths: lit behind you, the
+    hollow ring on the stop you are at, unlit ahead. `theme.WAYPATH_JS` is
+    untouched and unused here — it exists to light a stone while you watch,
+    and nothing on these pages changes without a page load.
+
+    Under the stones, one line of words carrying what the strip and the
+    `.screenline` used to say between them, each thing said once (F9, F29):
+    "Step 3 of 6", the stage's name only where the h1 is not already it, and
+    the sub-screen only while the profile stop's four forms are being filled
+    in. `done` is the fold's terminal stage rather than a seventh stop, so it
+    lights every stone and rings none — a ring over a finished setup would be
+    the one screen in the wizard saying there is more to do when there is not.
     """
     total = len(onboarding.STAGE_SEQUENCE)
     if stop == "done":
-        items = [f'<li class="done">{_CHECK}{STEP_LABELS[stage]}</li>'
-                 for stage in onboarding.STAGE_SEQUENCE]
-        return (f'<ol class="steps">{"".join(items)}</ol>'
-                f'<p class="stepline">All {total} steps done · '
-                f'{STOP_TITLES["done"]}</p>')
+        stones = "".join(_stone(stage, "done")
+                         for stage in onboarding.STAGE_SEQUENCE)
+        return (f'<ol class="waypath" role="list">{stones}</ol>'
+                f'<p class="stepline">All {total} steps done</p>')
     at = onboarding.STAGE_SEQUENCE.index(stop)
-    items = []
-    for i, stage in enumerate(onboarding.STAGE_SEQUENCE):
-        label = STEP_LABELS[stage]
-        if i < at:
-            items.append(f'<li class="done">{_CHECK}{label}</li>')
-        elif i == at:
-            items.append(f'<li class="now" aria-current="step">{label}</li>')
-        else:
-            items.append(f"<li>{label}</li>")
-    return (f'<ol class="steps">{"".join(items)}</ol>'
-            f'<p class="stepline">Step {at + 1} of '
-            f'{total} · {STOP_TITLES[stop]}</p>')
+    stones = "".join(
+        _stone(stage, "done" if i < at else "current" if i == at else "to come")
+        for i, stage in enumerate(onboarding.STAGE_SEQUENCE))
+    words = f"Step {at + 1} of {total}"
+    if stop == "profile":
+        # The one stop with screens of its own, and the only one whose h1 is
+        # never the stage name — so this is where the stage name is said.
+        words += f" · {STOP_TITLES['profile']}"
+        if sub in _FORM_FIELDS:
+            words += f" — screen {sub} of {len(PROFILE_SCREENS)}"
+    # `role="list"` against `list-style:none`: VoiceOver stops announcing a
+    # list whose markers CSS has removed, and the list is how the six stops
+    # are counted for a reader who gets none of the drawing.
+    return (f'<ol class="waypath" role="list">{stones}</ol>'
+            f'<p class="stepline">{words}</p>')
 
 
-def _page(stop: str, screen: Screen, tenant_slug: str) -> str:
-    """The wizard's one page shell.
+def page_title(stop: str, sub: str | None = None) -> str:
+    """What this screen is called in a tab, in history, and in a bookmark.
 
-    The eyebrow leads to `/profile` rather than to the front door on
-    purpose: the gate sends an unstarted tenant straight back here, so a
-    link home would be a link to this page with extra steps. `/profile` is
-    reachable from every state of the account, which is the promise the gate
-    is written around.
+    Thirteen screens shared one title ("curricle — setting up"), which is a
+    history nobody can read back and two tabs nobody can tell apart (F11).
+    The screen's own name comes first because that is what a narrow tab shows.
+    """
+    if stop == "profile" and sub in SCREEN_NAMES:
+        return SCREEN_NAMES[sub]
+    return STOP_TITLES[stop]
+
+
+def _page(stop: str, screen: Screen, tenant_slug: str,
+          sub: str | None = None) -> str:
+    """The wizard's one page shell: the mark, the path, and the screen.
+
+    The masthead leads with the wordmark, and it is `theme.WORDMARK` itself
+    rather than a second drawing of it — the mark and the product's promise
+    are the same three stones, and the six under it are that gesture at full
+    size. Static, with no link on it: a tenant who has not finished setting
+    up has no front door to go home to (the gate sends them straight back
+    here), and a dead link is worse than no link.
+
+    The crumb reads forward from the mark rather than out of the page:
+    `/profile` is a destination this setup is producing, worded as one, and
+    it comes second. The tenant slug left the masthead entirely — "tenant
+    stranger" is infrastructure printed on the most hospitable screen in the
+    product — and says its one true thing in the footer instead.
     """
     e = html_mod.escape
     return f"""<!DOCTYPE html>
@@ -848,22 +1008,22 @@ def _page(stop: str, screen: Screen, tenant_slug: str) -> str:
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {NOSCRIPT_REFRESH if screen.refresh else ""}
-<title>curricle — setting up</title>
+<title>{e(page_title(stop, sub))} — setting up curricle</title>
 <style>
 {WIZARD_CSS}</style>
 </head>
 <body>
 <div class="wizard">
   <header class="masthead">
-    <p class="eyebrow"><a href="/profile">your profile</a>
-    <span class="sep">·</span> setting up curricle
-    <span class="sep">·</span> tenant {e(tenant_slug)}</p>
-    {_steps(stop)}
+    <p class="wordmark">{theme.WORDMARK} curricle</p>
+    <p class="eyebrow">setting up curricle
+    <span class="sep">·</span> <a href="/profile">your profile page</a></p>
+    {_waypath(stop, sub)}
   </header>
   {screen.body}
   <footer>
     Your saved screens are kept; you can close this tab and pick up where you
-    left off.
+    left off. Signed in as {e(tenant_slug)}.
   </footer>
 </div>
 {f"<script>{POLL_JS}</script>" if screen.refresh else ""}
@@ -888,11 +1048,20 @@ def default_screen(profile_state: profile.ProfileState) -> str:
     publish refusal already ask. And a profile whose gate is satisfied is one
     screen from being published, so it opens at the review.
 
-    Screen 4 is deliberately unreachable this way: it carries no gate field,
-    so nothing about it can be *missing*. It is reached by saving screen 3,
-    by the review's "edit your claims" link, or by naming it — `?screen=`
-    still opens any screen the fold has opened, and this is only the answer
-    to a URL that names none.
+    Screen 4 has to be named here rather than falling out of the gate,
+    because it carries no gate field: nothing on it can be *missing*, so a
+    learner who saved screens 1 to 3 and closed the tab was offered Publish
+    without ever being shown "Subjects" — the one screen whose question is
+    what the profile is worth once this course is over. So the rule ends
+    with it: a profile with no claim under `subject_adapters` opens there,
+    and only a profile that has answered every screen opens at the review.
+
+    Answering it is still optional; being *offered* it is not. Emptying the
+    box later leaves the claim retracted and this function pointing at
+    screen 4 again, which is the honest reading of a field with nothing in
+    it — and `?screen=review` still goes straight to the button, because
+    `?screen=` opens any screen the fold has opened and this is only the
+    answer to a URL that names none.
     """
     if not any(profile_state.field_claims(f) for f in profile.FIELDS):
         return "welcome"
@@ -900,6 +1069,8 @@ def default_screen(profile_state: profile.ProfileState) -> str:
     for number, _, fields in PROFILE_SCREENS:
         if any(f in missing for f in fields):
             return number
+    if not profile_state.field_claims("subject_adapters"):
+        return "4"
     return "review"
 
 
@@ -930,7 +1101,7 @@ def welcome_screen(*, worker_running: bool) -> Screen:
   </div>"""
     promises = "".join(f"<li>{p}</li>" for p in NEVER_PROMISES)
     return Screen(f"""
-  <h1>Let us build you a course.</h1>
+  <h1>Let us build you a course</h1>
   <p class="lede">Two things happen here, in order: you tell this system how
   you learn, and then it writes a course for you against that profile.</p>
 {banner}
@@ -952,8 +1123,10 @@ def welcome_screen(*, worker_running: bool) -> Screen:
     to cross, and the build does not start until you have approved an estimate
     on screen. The profile forms cost nothing.</p>
   </div>
-  <h2>What this never does</h2>
-  <ul class="never">{promises}</ul>
+  <div class="gatebox">
+    <h2>What this never does</h2>
+    <ul class="never">{promises}</ul>
+  </div>
   <p class="ask">
     <a class="pill primary" href="/onboarding/?screen=1">Begin →</a>
     <span class="aside">About ten minutes, and you can stop between any two
@@ -962,8 +1135,17 @@ def welcome_screen(*, worker_running: bool) -> Screen:
 """)
 
 
-def _examples(field: str) -> str:
-    """The two example claims, marked as examples rather than as copy.
+def _examples(field: str, *, unanswered: bool) -> str:
+    """The two example claims — open while the field is empty, folded after.
+
+    The examples teach a register: the length of a claim, its plainness, the
+    fact that it is a sentence rather than a form field. Once a learner has
+    written in that register they have done their job, and four fields
+    holding two examples each is the difference between a screen you read and
+    a screen you scroll (the operator's Fork C). So they are a `<details>`
+    whose `open` comes off the fold — the same place the boxes come from —
+    and never off a script or a cookie: this page has no state a reload could
+    lose, and that is as true of a disclosure triangle as of a claim.
 
     House copy, so unescaped, exactly like the never-promises and the wording
     sentences: the only text on a form screen that came from anywhere but
@@ -971,8 +1153,9 @@ def _examples(field: str) -> str:
     interpolated.
     """
     _, examples = FIELD_COPY[field]
-    return ('<div class="eg"><b>For example</b>'
-            + "".join(f"<p>{x}</p>" for x in examples) + "</div>")
+    return (f'<details class="eg"{" open" if unanswered else ""}>'
+            "<summary>For example</summary>"
+            + "".join(f"<p>{x}</p>" for x in examples) + "</details>")
 
 
 def box_rows(text: str) -> int:
@@ -1040,22 +1223,28 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
     and the parsing is not the thing to change, so each box says its own rule
     directly under or over itself — a learner who presses Enter in a saved
     box was otherwise told the opposite by the placeholder below it.
+
+    Two sentences, not four. The first pass at that rule printed one line
+    above the saved boxes, a second under them and a third under the Add
+    box, which is three instructions around two controls: the two about the
+    saved boxes are now one line sitting between them and the Add box, where
+    everything it describes is directly above it and the box it is *not*
+    about is directly below.
     """
     explanation, _ = FIELD_COPY[field]
     boxes = "".join(
         _claim_box(field, c.key, c.text, f"Claim {n}",
                    f"{FIELD_LABELS[field]}, claim {n}")
         for n, c in enumerate(claims, 1))
-    rule = ('<p class="hint">A box is one claim; line breaks stay inside '
-            "it.</p>" if claims else "")
-    hint = ('<p class="hint">Empty a box to delete that claim.</p>'
+    rule = ('<p class="hint">Each box is one claim: edit it to change it, '
+            "empty it to delete it, and line breaks stay inside it.</p>"
             if claims else "")
     return f"""
     <div class="panel field">
       <h3>{FIELD_LABELS[field]}</h3>
       <p class="explain">{explanation}</p>
-      {_examples(field)}
-      {rule}{boxes}{hint}
+      {_examples(field, unanswered=not claims)}
+      {boxes}{rule}
       <label class="claim"><span class="claimkey">Add a claim</span>
       <textarea name="new__{html_mod.escape(field)}"
       aria-label="{html_mod.escape(FIELD_LABELS[field])}, add a claim"
@@ -1069,14 +1258,16 @@ def _meta_block(state: profile.ProfileState) -> str:
     """Screen 1's description line: one box, one key, never a numbered one."""
     claim = state.claim("meta", META_KEY)
     explanation, _ = FIELD_COPY["meta"]
+    # One box, so "has this field been answered" is one claim's existence.
     return f"""
     <div class="panel field">
       <h3>{FIELD_LABELS["meta"]}</h3>
       <p class="explain">{explanation}</p>
-      {_examples("meta")}
+      {_examples("meta", unanswered=claim is None)}
       {_claim_box("meta", META_KEY, claim.text if claim else "",
                   "Description", FIELD_LABELS["meta"])}
-      <p class="hint">Empty this box to leave the description unset.</p>
+      <p class="hint">One line, and one line only — empty this box to leave
+      the description unset.</p>
     </div>"""
 
 
@@ -1129,8 +1320,9 @@ def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
     heading, fields = next((h, f) for n, h, f in PROFILE_SCREENS if n == number)
     blocks = [_meta_block(profile_state)] if number == "1" else []
     blocks += [_field_block(f, profile_state.field_claims(f)) for f in fields]
+    # No "Profile screen 2 of 4" line here any more: the masthead's words
+    # line under the stones says it, once, beside the step it belongs to.
     return Screen(f"""
-  <p class="screenline">Profile screen {e(number)} of 4</p>
   <h1>{heading}</h1>
   <p class="lede">{SCREEN_INTROS[number]}</p>
   <form method="post" action="/onboarding/profile/{e(number)}">
@@ -1145,32 +1337,65 @@ def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
 """)
 
 
+def _projection(profile_state: profile.ProfileState) -> str:
+    """The document, whole, with each part set in the voice that wrote it.
+
+    `profilerender.skill_parts` is `render_skill_md` before its own join, so
+    what is on the screen is still exactly the file that reaches a model —
+    the same bytes, in the same order, with a span around the ones the
+    learner typed. Not a second rendering of the same claims: a review of a
+    document that gets sent somewhere is the document that gets sent.
+
+    Escaped part by part, because every learner part is a sentence somebody
+    typed and the house parts are the only text here that came from this
+    repository.
+    """
+    e = html_mod.escape
+    return "\n".join(
+        f'<span class="mine">{e(text)}</span>'
+        if source == profilerender.LEARNER else e(text)
+        for source, text in profilerender.skill_parts(profile_state))
+
+
 def review_screen(profile_state: profile.ProfileState) -> Screen:
-    """Stop 5: the projection, whole, then publish.
+    """Stop 5: the projection, whole, in two voices, with publish at both ends.
 
     The document is rendered here and nowhere else in this module —
-    `profilerender.render_skill_md` is the only thing that knows how a
-    profile becomes that file, and a second renderer for the review screen
-    would be a second answer to what the model is about to read. Escaped,
-    because every substantive line of it is a claim the learner typed.
+    `profilerender` is the only thing that knows how a profile becomes that
+    file, and a second renderer for the review screen would be a second
+    answer to what the model is about to read.
+
+    Two changes the review found, both about a screen whose job is
+    *re-reading*. The document is set in two voices (the operator's Fork B):
+    curricle's frame stays the mono it always was, the learner's own
+    sentences are body type in ink, and a caption says which is which in
+    words. And the Publish button is drawn above the document as well as
+    below it, because below it meant nineteen hundred pixels down at desktop
+    and twice that at 400px, with nothing above the fold saying a decision
+    was waiting at all. Two buttons, one action: the POST is guarded by the
+    fold, so the second press of either is a 409 rather than a second row.
 
     Publishing is refused here as well as displayed: the confirm form is not
     drawn at all while the gate is unsatisfied, and `POST .../publish` asks
     `profile_gate_missing` again for itself, because a button that is absent
-    from a page is not a rule.
+    from a page is not a rule. The refusal panel is drawn once rather than
+    twice — it is not the decision this screen offers, it is the reason
+    there is none yet, and a page that says so at both ends is a page
+    nagging somebody who has already read it.
     """
     e = html_mod.escape
     missing = onboarding.profile_gate_missing(profile_state)
     if missing:
         names = ", ".join(FIELD_LABELS[f] for f in missing)
-        confirm = f"""
+        top = f"""
   <div class="gatebox attention">
     <p class="stateline">{_chip("waiting")}</p>
     <h2>Not ready to publish yet</h2>
     <p>{GATE_LEAD} <b>{e(names)}</b>.</p>
   </div>"""
+        bottom = ""
     else:
-        confirm = """
+        top = bottom = """
   <form method="post" action="/onboarding/profile/publish">
     <p class="ask">
       <button class="pill primary" type="submit">Publish my profile →</button>
@@ -1180,15 +1405,15 @@ def review_screen(profile_state: profile.ProfileState) -> Screen:
   </form>"""
     return Screen(f"""
   <h1>Read it back before you publish</h1>
-  <p class="lede">This is the whole of what a course gets told about you —
-  generated from your claims, and from nothing else.</p>
-  <p class="caption">{REVIEW_CAPTION}</p>
-  <pre class="projection">{e(profilerender.render_skill_md(profile_state))}</pre>
+  <p class="lede">This is the whole of what a course gets told about you.</p>
+  <p class="caption">{REVIEW_CAPTION} {READBACK_LEGEND}</p>
+{top}
+  <pre class="projection">{_projection(profile_state)}</pre>
   <div class="nav">
     <a class="pill" href="/onboarding/?screen=1">← Edit your claims</a>
     <a class="pill" href="/profile">See it as a page</a>
   </div>
-{confirm}
+{bottom}
 """)
 
 
@@ -1417,6 +1642,27 @@ def dollars(amount: Decimal) -> str:
     return f"${_cents(amount):.2f}"
 
 
+def estimate_cost(estimate: str, *, mark: str = "cost") -> str:
+    """The estimate as the gate draws it: "about $X" over the word for it.
+
+    Two places on that screen state this figure — the lede, so the number is
+    genuinely first, and the card, where the decision is taken — and they
+    are the same drawing of the same payload string by construction rather
+    than by two format strings agreeing. "About", because an estimate at
+    display size with cents on it otherwise reads as a price; the word
+    underneath says which of the card's two numbers this one is.
+
+    An empty figure draws nothing at all. A payload with no estimate in it
+    is a row from before the worker wrote one, and "about $" with nothing
+    after it is the invented number this module refuses in every other
+    place it prints one.
+    """
+    if not estimate:
+        return ""
+    return (f'<p class="{mark}">about ${html_mod.escape(estimate)}'
+            f'<span class="costword">{GATE_ESTIMATE_WORD}</span></p>')
+
+
 def course_spend(rows, ledger) -> Spend:
     """What `rows`' course spent, from ledger rows and the clock they share.
 
@@ -1441,12 +1687,20 @@ def course_spend(rows, ledger) -> Spend:
     times = [r.created_at for r in rows]
     if not times:
         return Spend(Decimal(0), Decimal(0))
-    drafts = sum(1 for r in rows if r.kind == "outline_requested")
     start = min(times)
     approved = max((r.created_at for r in rows
                     if r.kind == "outline_approved"), default=None)
     finished = max((r.created_at for r in rows if r.kind == "promoted"),
                    default=None)
+    # Where each drafting attempt begins, so a cost can be attributed to
+    # one. Asking for something is not paying for it: a stage that failed
+    # before its first call, or one whose run was superseded, is a request
+    # row with no metered row behind it, and counting requests printed
+    # "across 2 drafts" over a figure one draft had paid for. Only the
+    # windows that hold spend are counted.
+    asked = sorted(r.created_at for r in rows
+                   if r.kind == "outline_requested")
+    spent_in = set()
     draft = build = Decimal(0)
     for row in ledger:
         when = row.created_at
@@ -1454,9 +1708,12 @@ def course_spend(rows, ledger) -> Spend:
             continue
         if approved is None or when < approved:
             draft += Decimal(row.cost_usd)
+            begun = [t for t in asked if t <= when]
+            if begun:
+                spent_in.add(max(begun))
         else:
             build += Decimal(row.cost_usd)
-    return Spend(draft, build, drafts)
+    return Spend(draft, build, len(spent_in))
 
 
 # (plan key, what that key buys, what the build screen calls it) — the
@@ -1756,7 +2013,23 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
   </div>
 """)
     outline = flow.outline or {}
-    description = (f'<p class="explain">{e(manifest.course.description)}</p>'
+    estimate = str(outline.get("estimate_usd") or "")
+    estimate_cost_card = estimate_cost(estimate)
+    # The number, said under the lede as well as in the card (F19), in the
+    # card's own words and off the card's own string. No estimate on the row
+    # is no line here — the same way the card prints no headroom it was
+    # never given — because a sentence pointing at a number nobody can see
+    # is worse than the scroll it was meant to save.
+    lede_cost = (estimate_cost(estimate, mark="cost upfront")
+                 + f'<p class="costline">{GATE_COST_LEAD} '
+                   f'<a href="#cost">the plan and the approve button are '
+                   f"below the outline ↓</a></p>") if estimate else ""
+    # The course's own name, on the ground and at display size: this is the
+    # first time the learner sees what was drafted for them, and it was an
+    # h3 in a card identical to the five phase cards under it (F23). The
+    # description is the page's second lede rather than a card's small
+    # print, and the count line sits under the title it counts.
+    description = (f'<p class="lede">{e(manifest.course.description)}</p>'
                    if manifest.course.description else "")
     phases = "".join(_phase_block(manifest, p) for p in manifest.phases)
     # The headroom, and the warning that belongs with it. A payload written
@@ -1766,7 +2039,10 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     # because "the build will stop partway" is a thing to be told before the
     # button rather than to discover as a stopped stage.
     headroom = str(outline.get("headroom_usd") or "")
-    headroom_cost = (f'<p class="cost">${e(headroom)}'
+    # One size down (`second`): the estimate is the number this card is
+    # about, and two figures at display size put the one that is not the
+    # cost where the eye lands first.
+    headroom_cost = (f'<p class="cost second">${e(headroom)}'
                      f'<span class="costword">{GATE_HEADROOM_WORD}</span></p>'
                      if headroom else "")
     left, wanted = _money(headroom), _money(outline.get("estimate_usd"))
@@ -1783,32 +2059,32 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
         if spend is not None and spend.draft else "")
     spent = f'<p class="spent">{drafting}</p>' if drafting else ""
     plan = "".join(
-        f"<li><b>{e(item.label)}</b>"
-        + (f"<span>{e(item.detail)}</span>" if item.detail else "")
+        f'<li><span class="what">{e(item.label)}</span>'
+        + (f'<span class="detail">{e(item.detail)}</span>'
+           if item.detail else "")
         + "</li>"
         for item in plan_items(outline.get("plan") or {}, manifest))
     return Screen(f"""
   <h1>{STOP_TITLES["outline_gate"]}</h1>
   <p class="lede">{GATE_LEDE}</p>
-  <div class="panel field">
-    <h3>{e(manifest.course.title)}</h3>
-    {description}
-    <p class="counts">{count_line(manifest)}</p>
-  </div>
+  {lede_cost}
+  <h2 class="coursetitle">{e(manifest.course.title)}</h2>
+  {description}
+  <p class="counts">{count_line(manifest)}</p>
 {phases}{_ladder_block(manifest)}{_shelf_block(manifest)}
-  <div class="gatebox attention">
+  <div class="gatebox attention" id="cost">
     <p class="stateline">{_chip("waiting")}
       <span class="note">building the first phase is the stage that costs
       money</span></p>
     <h2>What building phase 1 will cost</h2>
     <div class="costs">
-      <p class="cost">about ${e(str(outline.get("estimate_usd", "")))}<span
-        class="costword">{GATE_ESTIMATE_WORD}</span></p>
+      {estimate_cost_card}
       {headroom_cost}
     </div>
     <p>{GATE_HEADROOM}</p>
     {warning}
     {spent}
+    <p class="buys">{GATE_PLAN_LEAD}</p>
     <ul class="plan">{plan}</ul>
     <form method="post" action="/onboarding/outline/approve">
       <p class="ask">
@@ -2371,8 +2647,8 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                 # card to land on, and the same stop is where a second
                 # course is started from (design §4, Stop 10). The card is
                 # drawn under the fold's terminal stage rather than under
-                # "scope", because the step strip over a finished setup must
-                # not say a step is still in progress.
+                # "scope", because the waypath over a finished setup must not
+                # ring a stone as though a step were still in progress.
                 landed = promoted_flow(state, course)
                 if landed is not None:
                     return HTMLResponse(_page(
@@ -2414,7 +2690,10 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             rendered = review_screen(profile_state)
         else:
             rendered = form_screen(screen, profile_state)
-        return HTMLResponse(_page(stop, rendered, tenant_slug))
+        # The sub-screen travels into the shell as well as into the body: it
+        # is what the words line under the stones and the page's own title
+        # are drawn from, and both of those live in the masthead.
+        return HTMLResponse(_page(stop, rendered, tenant_slug, screen))
 
     # Registered before `/onboarding/profile/{number}`: routes match in
     # registration order, and the other way round "publish" would arrive as a

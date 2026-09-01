@@ -254,10 +254,12 @@ is a ledger row too.
 be the wrong shape for this decision: a display-size figure with cents on it
 reads as a price, and the first live walk came in at $2.02 against "$1.70
 estimated" — an honest 19% over that nonetheless read as a wrong price. So
-the gate shows the estimate *and* the **headroom**, at the same size, each
-with the word that says which it is: the estimate is an expectation at
-today's rates, the headroom is what these roles have left to spend before
-one of them refuses.
+the gate shows the estimate *and* the **headroom**, each under the word that
+says which it is: the estimate is an expectation at today's rates, the
+headroom is what these roles have left to spend before one of them refuses.
+They are not the same size — the estimate keeps display size and the
+headroom steps down one — because two figures at equal weight put the one
+that is *not* the cost where the eye lands first.
 
 Headroom, not "the ceiling", and the distinction is the whole of why this
 number is trustworthy. `models.yaml` budgets are per tenant per *stage* for

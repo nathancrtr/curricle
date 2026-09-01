@@ -20,7 +20,8 @@ import unittest
 
 import sqlalchemy as sa
 
-from curricle import db, onboarding, profile, profilerender, webapp, wizard
+from curricle import (db, onboarding, profile, profilerender, theme,
+                      webapp, wizard)
 
 from pg import test_engine
 # The draft trees the gate screen compiles are planted with the courses
@@ -179,7 +180,7 @@ class ScreenDispatchTest(WizardFixture):
 
     def test_no_events_lands_on_the_welcome_screen(self):
         page = self.screen()
-        self.assertIn("Let us build you a course.", page)
+        self.assertIn("Let us build you a course", page)
         self.assertIn("Step 1 of 6", page)
 
     def test_the_profile_sub_screens_are_open_at_the_profile_stop(self):
@@ -192,7 +193,7 @@ class ScreenDispatchTest(WizardFixture):
                     200)
         self.assertIn("Read it back before you publish",
                       self.screen("?screen=review"))
-        self.assertIn("Profile screen 3 of 4", self.screen("?screen=3"))
+        self.assertIn("screen 3 of 4", self.screen("?screen=3"))
 
     def test_a_stop_beyond_the_fold_is_unreachable(self):
         # O1 in its strict half: with the fold at "profile", no navigation
@@ -220,22 +221,29 @@ class DefaultScreenTest(WizardFixture):
     sentence is true. It used to answer "welcome" always, which made the
     promise false on five of the profile stop's six screens.
 
-    One method rather than three, because the three cases are one profile
-    growing: an empty one, one with the first gate field answered, and one
-    with all four.
+    One method rather than four, because the cases are one profile growing:
+    an empty one, one with the first gate field answered, one with all four
+    gate fields but nothing under "Subjects", and one that has answered
+    every screen.
+
+    That third case is the one this rule was missing. `subject_adapters` is
+    on no gate, so nothing about screen 4 can ever be *missing*, and a
+    learner who saved 1 to 3 and closed the tab came back to Publish having
+    never been shown the screen that asks what their profile is worth after
+    this course.
     """
 
     def test_a_url_with_no_screen_resolves_from_the_fold(self):
         # Nothing said yet, so there is nowhere to be resumed to.
         self.assertEqual(wizard.default_screen(self.profile_state()),
                          "welcome")
-        self.assertIn("Let us build you a course.", self.screen())
+        self.assertIn("Let us build you a course", self.screen())
 
         # Screen 1's gate field is answered; screen 2 is now the first
         # screen still carrying one that is not.
         self.save("1", {"new__background": "Nine years of backend work."})
         self.assertEqual(wizard.default_screen(self.profile_state()), "2")
-        self.assertIn("Profile screen 2 of 4", self.screen())
+        self.assertIn("screen 2 of 4", self.screen())
 
         # Every gate field answered: what is left to come back to is the
         # read-back, which is the screen the publish button is on.
@@ -244,6 +252,16 @@ class DefaultScreenTest(WizardFixture):
         self.save("3", {"new__calibration": "The failure it prevents first."})
         self.assertEqual(
             onboarding.profile_gate_missing(self.profile_state()), ())
+        # Every gate field answered, and still a screen that has never been
+        # seen: "Subjects" is offered before the button, not after it.
+        self.assertEqual(wizard.default_screen(self.profile_state()), "4")
+        self.assertIn("screen 4 of 4", self.screen())
+
+        # Answered — with a claim, since answering is what makes it answered
+        # — and what is left to come back to is the read-back, which is the
+        # screen the publish button is on.
+        self.save("4", {"new__subject_adapters": "Subject-agnostic: lead "
+                                                 "with the failure."})
         self.assertEqual(wizard.default_screen(self.profile_state()), "review")
         self.assertIn("Read it back before you publish", self.screen())
 
@@ -258,9 +276,9 @@ class ExplicitScreenOutranksTheDefaultTest(WizardFixture):
     def test_a_named_screen_is_still_the_screen_that_is_drawn(self):
         self.save("1", {"new__background": "Nine years of backend work."})
         self.assertEqual(wizard.default_screen(self.profile_state()), "2")
-        self.assertIn("Let us build you a course.",
+        self.assertIn("Let us build you a course",
                       self.screen("?screen=welcome"))
-        self.assertIn("Profile screen 4 of 4", self.screen("?screen=4"))
+        self.assertIn("screen 4 of 4", self.screen("?screen=4"))
         self.assertIn("Read it back before you publish",
                       self.screen("?screen=review"))
 
@@ -284,8 +302,8 @@ class ScreenIsIgnoredPastTheProfileTest(WizardFixture):
                 self.assertIn(wizard.PENDING_WORD, page)
                 self.assertIn(wizard.STOP_TITLES["outline"], page)
                 self.assertNotIn("Read it back before you publish", page)
-                self.assertNotIn("Profile screen", page)
-                self.assertNotIn("Let us build you a course.", page)
+                self.assertNotIn("of 4", page)
+                self.assertNotIn("Let us build you a course", page)
 
 
 class WelcomeCopyTest(WizardFixture):
@@ -860,19 +878,40 @@ class OutlineGateScreenTest(GateFixture):
         self.assertEqual(payload["headroom_usd"], self.HEADROOM)
         self.assertIn(f"about ${payload['estimate_usd']}", page)
         self.assertIn(f"${payload['headroom_usd']}", page)
-        # And each is printed with the word that says which one it is: the
-        # expectation and the stopping line are not distinguishable by size
-        # here, because they are the same size on purpose.
+        # And each is printed with the word that says which one it is,
+        # because the word is the message. The size is the reading order:
+        # the estimate is what this card is about and keeps display size,
+        # the headroom steps down one, because two figures at equal weight
+        # put the one that is not the cost where the eye lands first.
         self.assertIn(wizard.GATE_ESTIMATE_WORD, page)
         self.assertIn(wizard.GATE_HEADROOM_WORD, page)
-        # The headroom is not a cap and the sentence under it says so, in
-        # the mechanism's own terms: a check made before every call.
+        self.assertIn(f'<p class="cost second">${payload["headroom_usd"]}',
+                      page)
+        self.assertIn(f'<p class="cost">about ${payload["estimate_usd"]}',
+                      page)
+        # The headroom is not a cap and the sentence beneath says so — two
+        # sentences, one per figure; the runner's own mechanism is written
+        # down in docs/onboarding-design.md rather than recited here.
         self.assertIn(wizard.GATE_HEADROOM, page)
-        self.assertIn("before every call", page)
+        self.assertIn("refuses at that line", page)
+        self.assertEqual(wizard.GATE_HEADROOM.count(". "), 1)
         # This one covers the estimate several times over, so nothing warns.
         for alarm in (wizard.GATE_SHORT, wizard.GATE_NONE):
             with self.subTest(alarm=alarm):
                 self.assertNotIn(alarm, page)
+
+    def test_the_plan_is_a_list_at_body_weight_under_a_line_that_hinges(self):
+        # Five bold lines in a row read as five headings over nothing; what
+        # they are is five things being bought, which is what the lead line
+        # says. Both together, because the lead is what makes the list stop
+        # reading as more facts about money.
+        page = self.screen()
+        self.assertIn(f'<p class="buys">{wizard.GATE_PLAN_LEAD}</p>', page)
+        self.assertLess(page.index('class="buys"'), page.index('<ul class="plan">'))
+        self.assertIn('<li><span class="what">Unit 1 · a Socratic lesson'
+                      "</span>", page)
+        plan = page.split('<ul class="plan">')[1].split("</ul>")[0]
+        self.assertNotIn("<b>", plan)
 
     def test_the_plan_is_a_list_derived_from_its_own_keys(self):
         page = self.screen()
@@ -929,10 +968,15 @@ class OutlineGateScreenTest(GateFixture):
         self.assertIn(wizard.GATE_HEADROOM, page)
         blind = self.gate_for({"plan": self.PLAN,
                                "estimate_usd": self.ESTIMATE})
-        self.assertIn(f"about ${self.ESTIMATE}", blind)
         self.assertIn(wizard.GATE_HEADROOM, blind)
         self.assertNotIn("None", blind)
-        self.assertEqual(blind.count("$"), 1)
+        # The estimate, twice — the lede's copy and the card's — and no
+        # other figure anywhere: no headroom, and no bare "$" standing in
+        # for one. Counting dollar signs stopped being able to say that
+        # when the lede started saying the number too (F19).
+        self.assertEqual(blind.count(f"about ${self.ESTIMATE}"), 2)
+        self.assertEqual(blind.count("$"), blind.count(f"${self.ESTIMATE}"))
+        self.assertNotIn(wizard.GATE_HEADROOM_WORD, blind)
         # Nothing to compare the estimate against is nothing to warn about.
         for alarm in (wizard.GATE_SHORT, wizard.GATE_NONE):
             with self.subTest(alarm=alarm):
@@ -978,6 +1022,48 @@ class OutlineGateScreenTest(GateFixture):
                               wizard.Spend(Decimal("2.14"), Decimal(0), 2))
         self.assertIn("Drafting cost so far: $2.14, across 2 drafts.", twice)
 
+    def test_the_number_is_under_the_lede_as_well_as_over_the_button(self):
+        # F19: Stop 0 promises a screen that shows the number first, and
+        # "first" had come to mean "above the button" — some three thousand
+        # pixels of outline below the lede. The card stays where the
+        # decision is taken; the lede carries the same figure in the same
+        # words, drawn by the same helper, and a link down to the card.
+        page = self.screen()
+        first = page.index(f"about ${self.ESTIMATE}")
+        self.assertLess(first, page.index(wizard.GATE_COST_LEAD))
+        self.assertLess(page.index(wizard.GATE_COST_LEAD),
+                        page.index("Phase 1 — The front end"))
+        self.assertIn('<a href="#cost">', page)
+        self.assertLess(page.index('<a href="#cost">'), page.index('id="cost"'))
+        # Same words under both copies of the number, because both come out
+        # of `estimate_cost`.
+        self.assertEqual(page.count(wizard.GATE_ESTIMATE_WORD), 2)
+        # And the decision itself is still one form, not two.
+        self.assertEqual(page.count('action="/onboarding/outline/approve"'), 1)
+
+    def test_a_row_with_no_estimate_says_no_number_at_all(self):
+        # The lede degrades the way the card's other figure does: a payload
+        # from before the worker wrote an estimate prints no line rather
+        # than "about $" with nothing after it.
+        blank = self.gate_for({"plan": self.PLAN})
+        self.assertNotIn("$", blank)
+        self.assertNotIn(wizard.GATE_COST_LEAD, blank)
+        self.assertIn('action="/onboarding/outline/approve"', blank)
+
+    def test_the_course_title_is_the_arrival_and_not_a_card(self):
+        # F23: the first time a learner sees their course's name it was an
+        # h3 inside a panel identical to the phase panels under it. The
+        # count line comes with it — it counts what the title names.
+        page = self.screen()
+        self.assertIn('<h2 class="coursetitle">Interpreters, end to end</h2>',
+                      page)
+        self.assertLess(page.index('class="coursetitle"'),
+                        page.index("Phase 0 — Orientation"))
+        self.assertLess(page.index('class="coursetitle"'),
+                        page.index('<p class="counts">'))
+        self.assertLess(page.index('<p class="counts">'),
+                        page.index("Phase 0 — Orientation"))
+
     def test_both_decisions_are_offered_and_the_note_is_required(self):
         page = self.screen()
         self.assertIn('action="/onboarding/outline/approve"', page)
@@ -1000,8 +1086,12 @@ class LegacyOutlineRowTest(GateFixture):
     def test_a_row_without_the_figure_still_gates_and_still_approves(self):
         page = self.screen()
         self.assertNotIn("headroom_usd", page)
-        self.assertIn(f"about ${self.ESTIMATE}", page)
-        self.assertEqual(page.count("$"), 1)
+        # One figure, in the two places the gate states the estimate — the
+        # lede and the card (F19) — and no other number anywhere: no
+        # headroom, and no bare "$" standing in for the one it never got.
+        self.assertEqual(page.count(f"about ${self.ESTIMATE}"), 2)
+        self.assertEqual(page.count("$"), page.count(f"${self.ESTIMATE}"))
+        self.assertNotIn(wizard.GATE_HEADROOM_WORD, page)
 
         approved = self.client.post("/onboarding/outline/approve",
                                     follow_redirects=False)
@@ -1889,14 +1979,311 @@ class ClaimLabelTest(WizardFixture):
         self.save("1", {"new__background": "Nine years of backend work."})
         page = self.screen("?screen=1")
         self.assertIn('<span class="claimkey">Add a claim</span>', page)
-        self.assertIn("<b>For example</b>", page)
+        self.assertIn("<summary>For example</summary>", page)
         # Placement is the whole finding: each rule has to sit by the box it
-        # is true of, or the two sentences have simply swapped the lie.
-        self.assertLess(page.index("A box is one claim; line breaks stay "
-                                   "inside it."),
-                        page.index('name="claim__background__'))
+        # is true of, or the two sentences have simply swapped the lie. Three
+        # hints around two controls became two — everything the first one
+        # describes is above it, and the box it is not about is below it.
+        saved_rule = page.index("Each box is one claim: edit it to change "
+                                "it, empty it to delete it, and line breaks "
+                                "stay inside it.")
+        self.assertLess(page.index('name="claim__background__'), saved_rule)
+        self.assertLess(saved_rule, page.index('name="new__background"'))
         self.assertLess(page.index('name="new__background"'),
                         page.index("Each line becomes its own claim."))
+        self.assertEqual(page.count('class="hint"'), 5)   # 4 fields + meta
+
+
+class MastheadTest(WizardFixture):
+    """F11 and fork A: the mark, the path, and the words under them.
+
+    The wizard was the one surface in the product with no wordmark on it —
+    the first screen a stranger ever sees, and the only one that did not say
+    what it was — and its position indicator was a chip strip the direction
+    had already retired in favour of the waypath.
+    """
+
+    def test_the_masthead_leads_with_the_mark_the_front_door_uses(self):
+        page = self.screen()
+        # The drawing itself, not a second drawing of it.
+        self.assertIn(theme.WORDMARK, page)
+        # Static: there is no home for a tenant who has not finished setting
+        # up, and the gate would send a link there straight back here.
+        self.assertIn(f'<p class="wordmark">{theme.WORDMARK} curricle</p>',
+                      page)
+        self.assertNotIn('<a class="wordmark"', page)
+
+    def test_the_crumb_reads_forward_and_the_slug_is_not_in_it(self):
+        page = self.screen()
+        masthead = page.split('<header class="masthead">')[1].split("</header>")[0]
+        self.assertIn("setting up curricle", masthead)
+        self.assertIn('<a href="/profile">your profile page</a>', masthead)
+        # "tenant stranger" was infrastructure on the most hospitable screen
+        # in the product. The footer is where an account says its name.
+        self.assertNotIn(self.slug, masthead)
+        self.assertIn(f"Signed in as {self.slug}.", page)
+
+    def test_six_stones_with_the_ring_on_the_stop_you_are_at(self):
+        page = self.screen()
+        self.assertEqual(page.count('class="wp-stone'), 6)
+        self.assertEqual(page.count('class="wp-stone here"'), 1)
+        self.assertEqual(page.count('class="wp-stone lit"'), 0)
+        # The ring is on the stop the fold says, which at this tenant is the
+        # first one — and the strip it replaced is gone entirely.
+        self.assertLess(page.index('class="wp-stone here"'),
+                        page.index('class="wp-stone"'))
+        self.assertNotIn('class="steps"', page)
+        self.assertNotIn("screenline", page)
+
+    def test_the_path_is_a_list_even_with_its_markers_removed(self):
+        # `list-style:none` stops VoiceOver announcing a list at all, and
+        # the list is how a reader who gets none of the drawing counts the
+        # six stops. The role puts it back.
+        page = self.screen()
+        self.assertIn('<ol class="waypath" role="list">', page)
+
+    def test_the_stones_carry_their_position_in_words_as_well(self):
+        # The stones are drawings and say nothing, so each one is aria-hidden
+        # and its item holds the position in a phrase nobody sees. A ring a
+        # screen reader cannot read is a position only some readers get.
+        page = self.screen()
+        self.assertIn('<span class="wp-stone here" aria-hidden="true">'
+                      '</span><span class="vh">Profile: current</span>', page)
+        self.assertIn('<span class="vh">Build: to come</span>', page)
+        self.assertEqual(page.count('<li aria-current="step">'), 1)
+
+    def test_the_path_is_server_rendered_and_no_script_lights_it(self):
+        # Same rule the front door keeps: `theme.WAYPATH_JS` exists to light
+        # a stone while you watch, and nothing on these pages changes without
+        # a page load.
+        page = self.screen()
+        self.assertNotIn("<script", page)
+        self.assertNotIn(theme.WAYPATH_JS, page)
+
+
+class StepWordsMixin:
+    def body(self, query: str = "") -> str:
+        # The <title> carries a stop's name too, so "said once" is a claim
+        # about the page, not about the document.
+        return self.screen(query).split("<body>")[1]
+
+
+class StepWordsTest(StepWordsMixin, WizardFixture):
+    """F9 and F29: everything the masthead says, it says once."""
+
+    def test_the_profile_stop_names_the_stage_and_the_sub_screen(self):
+        # The stop's four forms are the only screens with a sub-position, and
+        # their h1s are their own ("Who you are"), so the stage name earns
+        # its place here.
+        self.assertIn('<p class="stepline">Step 1 of 6 · Your learner '
+                      'profile — screen 2 of 4</p>', self.body("?screen=2"))
+        self.assertIn('<p class="stepline">Step 1 of 6 · Your learner '
+                      'profile</p>', self.body("?screen=welcome"))
+        self.assertIn('<p class="stepline">Step 1 of 6 · Your learner '
+                      'profile</p>', self.body("?screen=review"))
+
+
+class StepWordsPastTheProfileTest(StepWordsMixin, WizardFixture):
+    """The same line, on a stop with a stage name for an h1."""
+
+    def test_a_stop_whose_h1_is_the_stage_name_says_only_the_step(self):
+        # The duplication F29 names: "Step 3 of 6 · Drafting your course
+        # outline" sitting directly over the h1 "Drafting your course
+        # outline", on every stop past the profile.
+        self.append("profile_published")
+        self.append("scope_saved", "greek-201", {"topic": "koine"})
+        self.append("outline_requested", "greek-201")
+        body = self.body()
+        self.assertIn('<p class="stepline">Step 3 of 6</p>', body)
+        self.assertEqual(body.count(wizard.STOP_TITLES["outline"]), 1)
+        # Two stones behind, the ring on the third, three ahead.
+        self.assertEqual(body.count('class="wp-stone lit"'), 2)
+        self.assertIn('<span class="vh">Scope: done</span>', body)
+
+
+class StepWordsDoneTest(StepWordsMixin, WizardFixture):
+    """And on the far side of the whole setup."""
+
+    def test_a_finished_setup_has_every_stone_lit_and_no_ring(self):
+        # A ring over a finished setup would be the one screen in the wizard
+        # saying there is more to do when there is not.
+        self.append("profile_published")
+        self.append("scope_saved", "greek-202", {"topic": "koine"})
+        self.append("outline_requested", "greek-202")
+        self.append("outline_ready", "greek-202",
+                    {"plan": {}, "estimate_usd": "1.00"})
+        self.append("outline_approved", "greek-202", {"estimate_usd": "1.00"})
+        self.append("build_requested", "greek-202")
+        self.append("build_ready", "greek-202")
+        self.append("promote_requested", "greek-202")
+        self.append("promoted", "greek-202", {"course_id": "greek-202"})
+        body = self.body()
+        self.assertEqual(body.count('class="wp-stone lit"'), 6)
+        self.assertNotIn('class="wp-stone here"', body)
+        self.assertIn('<p class="stepline">All 6 steps done</p>', body)
+        self.assertEqual(body.count(wizard.STOP_TITLES["done"]), 1)
+
+
+class PageTitleTest(WizardFixture):
+    """F11: thirteen screens shared one title, so history said nothing."""
+
+    def test_each_profile_screen_names_itself(self):
+        for query, title in (("?screen=welcome", "What this does"),
+                             ("?screen=1", "Who you are"),
+                             ("?screen=3", "Calibration"),
+                             ("?screen=review", "Review and publish")):
+            with self.subTest(query=query):
+                self.assertIn(f"<title>{title} — setting up curricle</title>",
+                              self.screen(query))
+
+
+class PageTitleStopTest(WizardFixture):
+    """Its own tenant, because naming a stop means being at one."""
+
+    def test_a_stop_past_the_profile_is_titled_by_its_stop(self):
+        self.append("profile_published")
+        self.assertIn(f'<title>{wizard.STOP_TITLES["scope"]} — setting up '
+                      "curricle</title>", self.screen())
+
+
+class WelcomePanelsTest(WizardFixture):
+    """Fork D and F16: three sibling sections, three panels."""
+
+    def test_the_never_promises_are_the_third_panel(self):
+        # The operator's choice over the art director's recommendation (which
+        # was the promises alone in a panel, the explanations on the ground).
+        page = self.screen()
+        self.assertEqual(page.count('<div class="gatebox">'), 3)
+        panel = page.split("<h2>What this never does</h2>")[1].split("</div>")[0]
+        for promise in wizard.NEVER_PROMISES:
+            with self.subTest(promise=promise[:40]):
+                self.assertIn(promise, panel)
+
+    def test_the_h1_has_no_terminal_period(self):
+        # It was the only h1 in the wizard with one (F16).
+        self.assertIn("<h1>Let us build you a course</h1>", self.screen())
+
+    def test_the_money_promise_says_only_what_is_true(self):
+        # F20 part 4: "Every dollar of model spend is approved by you on a
+        # screen that shows the number first" was false — the outline stage
+        # spends before any number is shown to anybody. Three clauses now,
+        # and the third one is a promise about another screen: the landing
+        # really does print the receipt that itemises both stages, so the
+        # sentence is checkable rather than merely made.
+        promise = wizard.NEVER_PROMISES[2]
+        self.assertNotIn("Every dollar", promise)
+        self.assertIn("expensive stage", promise)
+        self.assertIn("budget of its own", promise)
+        self.assertIn("itemised", promise)
+        # That third clause is a promise about the landing screen, and the
+        # screen keeps it: `SpendTest` and the landing card's own case
+        # cover the receipt that itemises both stages.
+
+
+class CollapsingExamplesTest(WizardFixture):
+    """Fork C: the examples teach a register, then get out of the way."""
+
+    def test_they_are_open_while_a_field_is_empty(self):
+        page = self.screen("?screen=1")
+        # Screen 1 carries the description line plus three fields.
+        self.assertEqual(page.count('<details class="eg" open>'), 4)
+        self.assertEqual(page.count('<details class="eg">'), 0)
+
+
+class CollapsedExamplesTest(WizardFixture):
+    """Its own tenant: a saved claim is what folds them."""
+
+    def test_a_field_with_a_claim_folds_its_own_examples_and_no_others(self):
+        self.save("1", {"new__background": "Nine years of backend work."})
+        page = self.screen("?screen=1")
+        answered = page.split("<h3>Professional background</h3>")[1] \
+                       .split("</div>")[0]
+        self.assertIn('<details class="eg">', answered)
+        self.assertEqual(page.count('<details class="eg" open>'), 3)
+        # State off the fold, not off a script or a cookie.
+        self.assertNotIn("<script", page)
+
+
+class SplitReadBackTest(WizardFixture):
+    """Fork B and F6: one document, two voices, and the button at both ends."""
+
+    def test_the_learners_words_are_marked_and_curricles_are_not(self):
+        self.satisfy_the_gate()
+        page = self.screen("?screen=review")
+        pre = page.split('<pre class="projection">')[1].split("</pre>")[0]
+        mine = "\n".join(re.findall(r'<span class="mine">(.*?)</span>', pre,
+                                    re.S))
+        self.assertIn("Learns by implementing", mine)
+        self.assertIn("Four hours a week", mine)
+        # The frame is curricle's, and it is the part the old lede denied
+        # existed: two paragraphs, the headings, the footer.
+        for house in ("This skill provides Claude with context",
+                      "## Who the Learner Is",
+                      "Generated by curricle from the profile evidence"):
+            with self.subTest(house=house[:30]):
+                self.assertIn(html.escape(house), pre)
+                self.assertNotIn(house, mine)
+
+    def test_the_caption_says_in_words_what_the_type_shows(self):
+        # A distinction carried by type alone is a distinction some readers
+        # never get — and the lede's "and from nothing else" was simply
+        # false about a document with curricle's own paragraphs in it.
+        page = self.screen("?screen=review")
+        self.assertIn(wizard.READBACK_LEGEND, page)
+        self.assertNotIn("and from nothing else", page)
+
+
+class SplitReadBackPublishTest(WizardFixture):
+    """Its own tenant, because pressing the button moves the fold off it."""
+
+    def test_publish_is_offered_above_the_document_as_well_as_below(self):
+        self.satisfy_the_gate()
+        page = self.screen("?screen=review")
+        action = 'action="/onboarding/profile/publish"'
+        self.assertEqual(page.count(action), 2)
+        document = page.index('<pre class="projection">')
+        self.assertLess(page.index(action), document)
+        self.assertLess(document, page.rindex(action))
+        # Two buttons, one action: the fold refuses the second press.
+        first = self.client.post("/onboarding/profile/publish",
+                                 follow_redirects=False)
+        second = self.client.post("/onboarding/profile/publish",
+                                  follow_redirects=False)
+        self.assertEqual(first.status_code, 303)
+        self.assertEqual(second.status_code, 409)
+        self.assertEqual(len(self.onboarding_rows()), 1)
+
+
+class SplitReadBackGateTest(WizardFixture):
+    """Its own tenant, because an unmet gate is a profile short of a claim."""
+
+    def test_an_unmet_gate_is_said_once_rather_than_twice(self):
+        # The refusal is not the decision this screen offers; it is the
+        # reason there is none yet, and a page that says so at both ends is
+        # nagging somebody who has already read it.
+        self.save("2", {"new__style": "learns by implementing"})
+        page = self.screen("?screen=review")
+        self.assertEqual(page.count("Not ready to publish yet"), 1)
+        self.assertNotIn("/onboarding/profile/publish", page)
+
+
+class FieldExplanationTest(unittest.TestCase):
+    """F13: one line per field, and the rationale up in the screen lede."""
+
+    def test_every_explanation_is_a_single_sentence(self):
+        for field, (explanation, _) in wizard.FIELD_COPY.items():
+            with self.subTest(field=field):
+                self.assertTrue(explanation.endswith("."))
+                self.assertEqual(explanation.count(". "), 0)
+
+    def test_the_sentences_that_earned_their_place_moved_to_the_lede(self):
+        # Not deleted — a field's rationale is said once for the screen
+        # instead of once per field.
+        self.assertIn("One habit per claim", wizard.SCREEN_INTROS["2"])
+        self.assertIn("a preference, never a requirement",
+                      wizard.SCREEN_INTROS["2"])
+        self.assertIn("the procedure a tutor follows before it says anything "
+                      "new", wizard.SCREEN_INTROS["3"])
 
 
 class OneForwardActionTest(WizardFixture):
@@ -2148,7 +2535,10 @@ class ReviewScreenTest(WizardFixture):
         projection = profilerender.render_skill_md(self.profile_state())
         start = page.index('<pre class="projection">')
         pre = page[start:page.index("</pre>", start)]
-        self.assertIn(html.escape(projection), pre)
+        # Byte for byte, with the split's own markup stripped back out: the
+        # spans mark whose words a part is and change nothing else.
+        self.assertEqual(html.unescape(re.sub(r"<[^>]+>", "", pre)),
+                         projection)
         self.assertIn("Learns by implementing", pre)
         # Edit loops back to the forms; the styled view of the same claims is
         # a link away; and the gate is met, so the confirm form is drawn.
@@ -2489,6 +2879,21 @@ class SpendTest(unittest.TestCase):
         self.assertEqual(spend.draft, Decimal("2.14"))
         self.assertEqual(spend.build, Decimal(0))
         self.assertEqual(spend.drafts, 2)
+
+    def test_an_attempt_that_spent_nothing_is_not_a_draft_that_was_paid_for(self):
+        # Asking is not paying. A drafting run that failed before its first
+        # call, or one the queue superseded, is an `outline_requested` row
+        # with no metered row behind it — and counting requests printed
+        # "across 2 drafts" over a figure one draft had paid for.
+        from decimal import Decimal
+        spend = wizard.course_spend(
+            self.rows(("scope_saved", self.at(0)),
+                      ("outline_requested", self.at(1)),      # spent nothing
+                      ("outline_requested", self.at(4)),
+                      ("outline_ready", self.at(9))),
+            self.ledger(("1.03", self.at(6))))
+        self.assertEqual(spend.draft, Decimal("1.03"))
+        self.assertEqual(spend.drafts, 1)
 
     def test_a_course_with_no_rows_totals_nothing_rather_than_everything(self):
         from decimal import Decimal

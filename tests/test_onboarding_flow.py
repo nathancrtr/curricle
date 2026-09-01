@@ -32,7 +32,7 @@ from unittest import mock
 import sqlalchemy as sa
 
 from curricle import (coursehome, db, factory, llm, onboarding, webapp,
-                      worker)
+                      wizard, worker)
 from curricle.compiler import compile_course
 from curricle.sidecar import load_sidecar
 
@@ -269,31 +269,40 @@ class OnboardingFlowTest(unittest.TestCase):
         self.assertIn("Unit 1 — What a manifest is", self.gate_page)
         outline = self.payload("outline_ready")
         # Both numbers, both out of the payload the worker wrote: what the
-        # build is expected to cost, and what its stages refuse past.
+        # build is expected to cost, and what these roles have left before
+        # one of them refuses.
         self.assertIn(f"about ${outline['estimate_usd']}", self.gate_page)
-        self.assertIn(f"${outline['ceiling_usd']}", self.gate_page)
+        self.assertIn(f"${outline['headroom_usd']}", self.gate_page)
+        # This account had bought nothing on the build roles before the
+        # gate, so there is more left than the estimate needs and no
+        # warning belongs on the page.
+        self.assertNotIn(wizard.GATE_SHORT, self.gate_page)
+        self.assertNotIn(wizard.GATE_NONE, self.gate_page)
         # And what has already been spent getting here, off the token ledger
         # — the one figure on this page that is a bill rather than a guess.
         drafting = sum((Decimal(r.cost_usd) for r in self.spend()
                         if r.stage in OUTLINE_ROLES), Decimal(0))
-        self.assertIn(f"Drafting this outline cost ${drafting:.2f}",
+        self.assertIn(f"Drafting cost so far: ${drafting:.2f}.",
                       self.gate_page)
         self.assertEqual(self.approved.status_code, 303, self.approved.text)
 
-    def test_step_4_the_ceiling_is_the_configured_one_for_this_plan(self):
-        # Not a figure the wizard priced and not one this test transcribed:
-        # the roles this plan runs, each at the budget models.yaml gives it.
+    def test_step_4_the_headroom_covered_what_the_build_then_spent(self):
+        # The figure is what these roles had left when the outline became
+        # ready. This account was empty at that point, so it was the whole
+        # of their budgets — and the walk then proves the figure was not a
+        # decoration: what the build actually bought fits inside it, role by
+        # role and in total.
         config = llm.load_models_config()
         plan = self.payload("outline_ready")["plan"]
-        expected = sum((config.budget_for_stage(role)
-                        for key, role in factory.PLAN_ROLES if plan.get(key)),
-                       Decimal(0))
-        self.assertEqual(self.payload("outline_ready")["ceiling_usd"],
-                         f"{expected:.2f}")
-        # The roles it summed are the roles that were actually bought.
-        self.assertEqual(
-            {role for key, role in factory.PLAN_ROLES if plan.get(key)},
-            BUILD_ROLES)
+        planned = {role for key, role in factory.PLAN_ROLES if plan.get(key)}
+        self.assertEqual(planned, BUILD_ROLES)
+        headroom = Decimal(self.payload("outline_ready")["headroom_usd"])
+        self.assertEqual(headroom,
+                         sum((config.budget_for_stage(role)
+                              for role in planned), Decimal(0)))
+        built = sum((Decimal(r.cost_usd) for r in self.spend()
+                     if r.stage in BUILD_ROLES), Decimal(0))
+        self.assertLess(built, headroom)
 
     def test_step_6_the_landing_prints_the_receipt(self):
         # The promise Stop 0 makes about money, made checkable: the total,
@@ -419,10 +428,11 @@ class OnboardingFlowTest(unittest.TestCase):
         # And it carries the numbers that were on the screen, byte for byte
         # — the approval echoes `outline_ready`'s own payload rather than
         # reading figures off a form. Both of them: the learner was shown
-        # what the build is expected to cost and what it refuses past, and a
-        # row echoing half of that is half a record of the decision.
+        # what the build is expected to cost and what was left before it
+        # refuses, and a row echoing half of that is half a record of the
+        # decision.
         outline = next(r for r in rows if r.kind == "outline_ready")
-        for number in ("estimate_usd", "ceiling_usd"):
+        for number in ("estimate_usd", "headroom_usd"):
             with self.subTest(number=number):
                 self.assertEqual(approval.payload[number],
                                  outline.payload[number])

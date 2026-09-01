@@ -333,20 +333,38 @@ DRAFT_DIR = ".draft-onboarding"
 # The gate's lede, and the sentences around the two numbers. Both figures
 # come out of the `outline_ready` payload the worker wrote: this module
 # still never reads the model configuration, and the words under the
-# numbers say which one is the expectation and which one is the promise —
-# an estimate at display size with cents on it reads as a price, and the
-# thing that keeps that honest is the ceiling standing beside it.
+# numbers say which one is the expectation and which one is the stopping
+# line — an estimate at display size with cents on it reads as a price, and
+# what keeps that honest is the other number standing beside it.
+#
+# The second number is *headroom*, not a ceiling: budgets are per tenant
+# per role for the life of an account, so what bounds this build is what is
+# left of them, and it is smaller on a second course than on a first. The
+# word under it says "left" for that reason, and the sentence says what the
+# mechanism actually is — a pre-call check, which a call already under way
+# can carry its role a little past.
 GATE_LEDE = ("This is the course that was drafted for you. Read it, then "
              "decide: approve it and the first phase of materials gets "
              "built, or send it back with a note saying what to change.")
 GATE_ESTIMATE_WORD = "expected, at today's prices"
-GATE_CEILING_WORD = "the ceiling it stops at"
-GATE_CEILING = ("The estimate is an expectation, not a cap: it prices the "
-                "plan at today's rates and the real bill comes in over or "
-                "under it. The ceiling is the configured refusal — the "
-                "build runs one role per artifact, each with its own "
-                "spending ceiling, and a role that has reached its own "
-                "stops rather than making another call.")
+GATE_HEADROOM_WORD = "left before it refuses"
+GATE_HEADROOM = ("The estimate is an expectation, not a cap: it prices the "
+                 "plan at today's rates and the real bill comes in over or "
+                 "under it. The second number is what these roles have left "
+                 "on their budgets right now — the runner reads a role's "
+                 "spend before every call and refuses once it is at or past "
+                 "that role's budget. It is where the build stops, not a "
+                 "hard cap: a call already under way finishes, so a role "
+                 "can end a little past its own line.")
+# When the headroom will not cover the estimate, said before the button
+# rather than discovered as a stopped build. The approve form still
+# renders — this is the learner's money and their call — but nothing here
+# lets them press it thinking the build can finish.
+GATE_SHORT = ("Less is left than the estimate needs; the build will stop "
+              "partway. Raise the budgets in models.yaml first.")
+GATE_NONE = ("Nothing is left on these roles' budgets, so the build will "
+             "stop at its first call and buy nothing. Raise the budgets in "
+             "models.yaml first.")
 
 # The two sentences that print what was actually spent, from the ledger the
 # runner writes as it spends. Drafting is money that has already gone, and
@@ -355,8 +373,13 @@ GATE_CEILING = ("The estimate is an expectation, not a cap: it prices the "
 # costs too. The landing's receipt is the same fact after the fact, which is
 # what makes the promise checkable rather than merely made: two decimals
 # belong here, where they are the bill, and not on an estimate.
-GATE_SPENT = ("Drafting this outline cost {spent}. That is already spent, "
-              "and it is not part of the numbers above.")
+# "So far", and the number of drafts when there has been more than one: a
+# rejected outline was drafted again and the ledger holds both, so a
+# sentence naming "this outline" would be pricing one draft at the cost of
+# all of them.
+GATE_SPENT = ("Drafting cost so far: {spent}{across}. That is already "
+              "spent, and it is not part of the numbers above.")
+GATE_SPENT_ACROSS = ", across {n} drafts"
 RECEIPT = ("Model spend for this course: {total} — {draft} to draft, "
            "{build} to build")
 RECEIPT_APPROVED = " (approved at about {estimate})"
@@ -625,10 +648,10 @@ WIZARD_CSS = theme.style("""\
           font-weight:700; font-size:clamp(24px,4.5vw,30px);
           letter-spacing:-.01em; color:var(--ink); margin:0 0 8px; }
   /* The two numbers side by side and the same size: the estimate is what
-     the build is expected to cost and the ceiling is what it is allowed to,
-     and setting one at display size over a caption that withdraws it is how
-     an estimate comes to read as a price. The word under each carries the
-     difference, because the word is always the message. */
+     the build is expected to cost and the headroom is what is left before
+     it refuses, and setting one at display size over a caption that
+     withdraws it is how an estimate comes to read as a price. The word
+     under each carries the difference, because the word is the message. */
   .costs { display:flex; flex-wrap:wrap; gap:6px 40px; margin:0 0 12px; }
   .gatebox .costs p.cost { margin:0; }
   .cost .costword { display:block; font:600 13.5px/1.5 """
@@ -1360,6 +1383,7 @@ class Spend:
 
     draft: Decimal
     build: Decimal
+    drafts: int = 0     # how many drafting runs that first figure paid for
 
     @property
     def total(self) -> Decimal:
@@ -1372,6 +1396,20 @@ class Spend:
 
 def _cents(amount: Decimal) -> Decimal:
     return Decimal(amount).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _money(figure) -> Decimal | None:
+    """A payload figure as a number, or None when it is not one.
+
+    The two figures on the gate are strings written by the other process,
+    and the screen compares them to decide whether to warn. A row from
+    before those strings existed, or one an operator has edited by hand,
+    is a screen that says less rather than a screen that raises.
+    """
+    try:
+        return Decimal(str(figure))
+    except (ArithmeticError, ValueError, TypeError):
+        return None
 
 
 def dollars(amount: Decimal) -> str:
@@ -1403,6 +1441,7 @@ def course_spend(rows, ledger) -> Spend:
     times = [r.created_at for r in rows]
     if not times:
         return Spend(Decimal(0), Decimal(0))
+    drafts = sum(1 for r in rows if r.kind == "outline_requested")
     start = min(times)
     approved = max((r.created_at for r in rows
                     if r.kind == "outline_approved"), default=None)
@@ -1417,7 +1456,7 @@ def course_spend(rows, ledger) -> Spend:
             draft += Decimal(row.cost_usd)
         else:
             build += Decimal(row.cost_usd)
-    return Spend(draft, build)
+    return Spend(draft, build, drafts)
 
 
 # (plan key, what that key buys, what the build screen calls it) — the
@@ -1671,10 +1710,18 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     construction (O3).
 
     Three figures, three sources, and none of them a price this module
-    read. The estimate and the ceiling are the worker's, carried here in the
-    payload. What the outline has already cost is the token ledger's, summed
-    for this course — a database read on a request path, which is the same
+    read. The estimate and the headroom are the worker's, carried here in
+    the payload — the headroom being what was left of these roles' budgets
+    when the outline was drafted, which is smaller on a second course than
+    on a first and is why the sum of the budgets is not what gets printed.
+    What the outline has already cost is the token ledger's, summed for
+    this course — a database read on a request path, which is the same
     thing every other screen here does and not the thing L1 forbids.
+
+    A headroom under the estimate is said out loud, above the button. The
+    button still renders: it is the learner's account and their decision,
+    and a build that stops partway keeps everything it finished. What this
+    screen will not do is let them press it believing otherwise.
 
     The numbers sit above the button, which is the promise Stop 0 made in
     those words. And when the draft will not compile there is no button at
@@ -1712,15 +1759,28 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     description = (f'<p class="explain">{e(manifest.course.description)}</p>'
                    if manifest.course.description else "")
     phases = "".join(_phase_block(manifest, p) for p in manifest.phases)
-    ceiling = str(outline.get("ceiling_usd") or "")
-    ceiling_cost = (f'<p class="cost">${e(ceiling)}'
-                    f'<span class="costword">{GATE_CEILING_WORD}</span></p>'
-                    if ceiling else "")
-    # Drafted before the worker carried a ceiling, or drafted for free in a
-    # test: no figure is printed rather than a figure being invented, and
-    # the sentence under the pair names the ceiling either way.
-    drafting = (GATE_SPENT.format(spent=dollars(spend.draft))
-                if spend is not None and spend.draft else "")
+    # The headroom, and the warning that belongs with it. A payload written
+    # before the worker carried the figure prints no figure rather than an
+    # invented one, and the sentence under the pair describes the mechanism
+    # either way. When there is a figure it is compared with the estimate,
+    # because "the build will stop partway" is a thing to be told before the
+    # button rather than to discover as a stopped stage.
+    headroom = str(outline.get("headroom_usd") or "")
+    headroom_cost = (f'<p class="cost">${e(headroom)}'
+                     f'<span class="costword">{GATE_HEADROOM_WORD}</span></p>'
+                     if headroom else "")
+    left, wanted = _money(headroom), _money(outline.get("estimate_usd"))
+    warning = ""
+    if left is not None:
+        if not left:
+            warning = f"<p><b>{GATE_NONE}</b></p>"
+        elif wanted is not None and left < wanted:
+            warning = f"<p><b>{GATE_SHORT}</b></p>"
+    drafting = (GATE_SPENT.format(
+        spent=dollars(spend.draft),
+        across=(GATE_SPENT_ACROSS.format(n=spend.drafts)
+                if spend.drafts > 1 else ""))
+        if spend is not None and spend.draft else "")
     spent = f'<p class="spent">{drafting}</p>' if drafting else ""
     plan = "".join(
         f"<li><b>{e(item.label)}</b>"
@@ -1744,9 +1804,10 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     <div class="costs">
       <p class="cost">about ${e(str(outline.get("estimate_usd", "")))}<span
         class="costword">{GATE_ESTIMATE_WORD}</span></p>
-      {ceiling_cost}
+      {headroom_cost}
     </div>
-    <p>{GATE_CEILING}</p>
+    <p>{GATE_HEADROOM}</p>
+    {warning}
     {spent}
     <ul class="plan">{plan}</ul>
     <form method="post" action="/onboarding/outline/approve">
@@ -2594,13 +2655,16 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         from this row rather than recomputing one of its own.
 
         Both numbers, now that the screen shows both: the estimate is what
-        the learner expected to pay and the ceiling is what they were told
-        it could not quietly become, and an approval echoing only half of
-        what was on the screen is only half a record of the decision. The
-        ceiling is copied only when the payload has one — a draft made
-        before the worker carried it is a row this screen still renders, and
-        a `None` written into the ledger to fill a gap would be a number
-        nobody was shown.
+        the learner expected to pay and the headroom is what was left to
+        spend before the build starts refusing, and an approval echoing only
+        half of what was on the screen is only half a record of the
+        decision. The headroom is copied only when the payload has one — a
+        draft made before the worker carried it is a row this screen still
+        renders, and a `None` written into the ledger to fill a gap would be
+        a number nobody was shown. It is a reading taken when the outline
+        was drafted, so the row records what the learner was told, which is
+        what O3 asks of it; the runner still re-reads the ledger before
+        every call it makes.
 
         Three writes in one transaction, because there is no human turn
         between Stops 8 and 9: an approval with no build queued behind it is
@@ -2624,8 +2688,8 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             outline = flow.outline or {}
             approval = {"estimate_usd": outline.get("estimate_usd"),
                         "plan": outline.get("plan")}
-            if outline.get("ceiling_usd") is not None:
-                approval["ceiling_usd"] = outline["ceiling_usd"]
+            if outline.get("headroom_usd") is not None:
+                approval["headroom_usd"] = outline["headroom_usd"]
             onboarding.append_event(
                 conn, scope, "outline_approved", flow.course_id, approval)
             onboarding.append_event(conn, scope, "build_requested",

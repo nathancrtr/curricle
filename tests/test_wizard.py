@@ -715,10 +715,10 @@ class GateFixture(WizardFixture):
             "widget_concept": "precedence as a table of binding powers",
             "exercise_unit": "u2", "quiz": True, "bank": True}
     ESTIMATE = "1.37"
-    # The other half of what the learner is shown: what the build's stages
-    # are configured to refuse past, summed by the worker over the roles this
-    # plan runs and carried here in the same payload as the estimate.
-    CEILING = "20.00"
+    # The other half of what the learner is shown: what these roles have
+    # left on their budgets, read by the worker when the outline became
+    # ready and carried in the same payload as the estimate.
+    HEADROOM = "20.00"
     BROKEN = False        # a draft that will not compile
     MISSING = False       # a draft deleted by hand between two screens
 
@@ -737,13 +737,27 @@ class GateFixture(WizardFixture):
                     ("profile_published", None),
                     ("scope_saved", {"title": "Interpreters, end to end"}),
                     ("outline_requested", {}),
-                    ("outline_ready", {"plan": cls.PLAN,
-                                       "estimate_usd": cls.ESTIMATE,
-                                       "ceiling_usd": cls.CEILING})):
+                    ("outline_ready", dict(
+                        {"plan": cls.PLAN, "estimate_usd": cls.ESTIMATE},
+                        **({"headroom_usd": cls.HEADROOM}
+                           if cls.HEADROOM is not None else {})))):
                 onboarding.append_event(
                     conn, cls.scope, kind,
                     "" if kind == "profile_published" else cls.COURSE,
                     payload or {})
+
+    def gate_for(self, outline: dict, spend=None) -> str:
+        """The gate as it renders for one `outline_ready` payload.
+
+        Rendered rather than appended, because these are payload shapes the
+        fixture's own ledger cannot hold two of: one live outline per course
+        is what the wizard writes, and what is under test is the screen's
+        reading of a row rather than the ledger's ability to carry it.
+        """
+        return wizard.outline_gate_screen(
+            onboarding.CourseFlow(course_id=self.COURSE, stage="outline_gate",
+                                  status="waiting", outline=outline),
+            wizard.draft_manifest(self.tmp, self.COURSE), spend).body
 
     def outline_ready_payload(self) -> dict:
         row, = [r for r in self.onboarding_rows() if r.kind == "outline_ready"]
@@ -843,14 +857,22 @@ class OutlineGateScreenTest(GateFixture):
         page = self.screen()
         payload = self.outline_ready_payload()
         self.assertEqual(payload["estimate_usd"], self.ESTIMATE)
-        self.assertEqual(payload["ceiling_usd"], self.CEILING)
+        self.assertEqual(payload["headroom_usd"], self.HEADROOM)
         self.assertIn(f"about ${payload['estimate_usd']}", page)
-        self.assertIn(f"${payload['ceiling_usd']}", page)
+        self.assertIn(f"${payload['headroom_usd']}", page)
         # And each is printed with the word that says which one it is: the
-        # expectation and the promise are not distinguishable by size here,
-        # because they are the same size on purpose.
+        # expectation and the stopping line are not distinguishable by size
+        # here, because they are the same size on purpose.
         self.assertIn(wizard.GATE_ESTIMATE_WORD, page)
-        self.assertIn(wizard.GATE_CEILING_WORD, page)
+        self.assertIn(wizard.GATE_HEADROOM_WORD, page)
+        # The headroom is not a cap and the sentence under it says so, in
+        # the mechanism's own terms: a check made before every call.
+        self.assertIn(wizard.GATE_HEADROOM, page)
+        self.assertIn("before every call", page)
+        # This one covers the estimate several times over, so nothing warns.
+        for alarm in (wizard.GATE_SHORT, wizard.GATE_NONE):
+            with self.subTest(alarm=alarm):
+                self.assertNotIn(alarm, page)
 
     def test_the_plan_is_a_list_derived_from_its_own_keys(self):
         page = self.screen()
@@ -898,22 +920,63 @@ class OutlineGateScreenTest(GateFixture):
         self.assertLess(page.index(f"about ${self.ESTIMATE}"),
                         page.index('action="/onboarding/outline/approve"'))
 
-    def test_the_ceiling_is_a_figure_the_wizard_never_priced(self):
-        # The module still reads no model configuration: the ceiling on this
-        # page is the one the worker computed and wrote into the ledger row,
-        # and a draft made before the worker carried one prints no figure
-        # rather than inventing a number to fill the gap.
+    def test_the_headroom_is_a_figure_the_wizard_never_priced(self):
+        # The module still reads no model configuration: the figure on this
+        # page is the one the worker read off the ledger and wrote into the
+        # row, and a payload from before the worker carried one prints no
+        # figure rather than inventing a number to fill the gap.
         page = self.screen()
-        self.assertIn(wizard.GATE_CEILING, page)
-        blind = wizard.outline_gate_screen(
-            onboarding.CourseFlow(
-                course_id=self.COURSE, stage="outline_gate", status="waiting",
-                outline={"plan": self.PLAN, "estimate_usd": self.ESTIMATE}),
-            wizard.draft_manifest(self.tmp, self.COURSE)).body
+        self.assertIn(wizard.GATE_HEADROOM, page)
+        blind = self.gate_for({"plan": self.PLAN,
+                               "estimate_usd": self.ESTIMATE})
         self.assertIn(f"about ${self.ESTIMATE}", blind)
-        self.assertIn(wizard.GATE_CEILING, blind)
+        self.assertIn(wizard.GATE_HEADROOM, blind)
         self.assertNotIn("None", blind)
         self.assertEqual(blind.count("$"), 1)
+        # Nothing to compare the estimate against is nothing to warn about.
+        for alarm in (wizard.GATE_SHORT, wizard.GATE_NONE):
+            with self.subTest(alarm=alarm):
+                self.assertNotIn(alarm, blind)
+
+    def test_a_headroom_under_the_estimate_is_said_before_the_button(self):
+        # The defect this figure exists to prevent: budgets are per tenant
+        # for the life of an account, so a second course can arrive at this
+        # screen with less left than the build needs. That is a sentence
+        # above the button, not a stopped stage twenty minutes later.
+        short = self.gate_for({"plan": self.PLAN,
+                               "estimate_usd": self.ESTIMATE,
+                               "headroom_usd": "0.90"})
+        self.assertIn("$0.90", short)
+        self.assertIn(wizard.GATE_SHORT, short)
+        self.assertLess(short.index(wizard.GATE_SHORT),
+                        short.index('action="/onboarding/outline/approve"'))
+        # And the decision stays the learner's: the button is still there.
+        self.assertIn('action="/onboarding/outline/approve"', short)
+
+    def test_no_headroom_at_all_warns_and_still_offers_the_button(self):
+        none = self.gate_for({"plan": self.PLAN,
+                              "estimate_usd": self.ESTIMATE,
+                              "headroom_usd": "0.00"})
+        self.assertIn("$0.00", none)
+        self.assertIn(wizard.GATE_NONE, none)
+        self.assertNotIn(wizard.GATE_SHORT, none)
+        self.assertIn('action="/onboarding/outline/approve"', none)
+
+    def test_the_drafting_cost_says_so_far_and_counts_the_drafts(self):
+        # The figure is every draft this course has paid for, because a
+        # rejected outline was drafted again and the ledger holds both. A
+        # sentence naming "this outline" would price one draft at the cost
+        # of all of them.
+        from decimal import Decimal
+        once = self.gate_for({"plan": self.PLAN,
+                              "estimate_usd": self.ESTIMATE},
+                             wizard.Spend(Decimal("1.09"), Decimal(0), 1))
+        self.assertIn("Drafting cost so far: $1.09.", once)
+        self.assertNotIn("across", once)
+        twice = self.gate_for({"plan": self.PLAN,
+                               "estimate_usd": self.ESTIMATE},
+                              wizard.Spend(Decimal("2.14"), Decimal(0), 2))
+        self.assertIn("Drafting cost so far: $2.14, across 2 drafts.", twice)
 
     def test_both_decisions_are_offered_and_the_note_is_required(self):
         page = self.screen()
@@ -921,6 +984,35 @@ class OutlineGateScreenTest(GateFixture):
         self.assertIn('action="/onboarding/outline/reject"', page)
         self.assertIn('name="note"', page)
         self.assertIn("required", page)
+
+
+class LegacyOutlineRowTest(GateFixture):
+    """An `outline_ready` written before the worker carried the headroom.
+
+    The ledger is append-only and rows do not get rewritten, so the release
+    that adds a figure has to be able to read the rows that came before it.
+    Such a gate prints one number and still takes a decision; the approval
+    it writes carries what was on the screen and no key for what was not.
+    """
+
+    HEADROOM = None
+
+    def test_a_row_without_the_figure_still_gates_and_still_approves(self):
+        page = self.screen()
+        self.assertNotIn("headroom_usd", page)
+        self.assertIn(f"about ${self.ESTIMATE}", page)
+        self.assertEqual(page.count("$"), 1)
+
+        approved = self.client.post("/onboarding/outline/approve",
+                                    follow_redirects=False)
+        self.assertEqual(approved.status_code, 303, approved.text)
+        approval, = [r.payload for r in self.onboarding_rows()
+                     if r.kind == "outline_approved"]
+        self.assertEqual(approval["estimate_usd"], self.ESTIMATE)
+        self.assertEqual(approval["plan"], self.PLAN)
+        # Absent, not null: a `None` in the row would be a number nobody was
+        # shown, which is exactly what O3 exists to prevent.
+        self.assertNotIn("headroom_usd", approval)
 
 
 class OutlineGateEscapingTest(GateFixture):
@@ -971,8 +1063,8 @@ class OutlineApproveTest(GateFixture):
     number off the form, so the numbers on the screen and the numbers in
     the ledger are the same bytes by construction — which is what the
     byte-equality assertions below are pinning. Both of them: the screen now
-    shows an estimate *and* the ceiling it stops at, and a row echoing half
-    of what was shown is half a record of the decision.
+    shows an estimate *and* what is left before the build refuses, and a
+    row echoing half of what was shown is half a record of the decision.
 
     Its own tenant, because approving is a one-way move of this ledger.
     """
@@ -993,7 +1085,7 @@ class OutlineApproveTest(GateFixture):
         # and not ones posted by the form — the ones the ledger already held
         # and the screen had just printed.
         outline = self.outline_ready_payload()
-        for number in ("estimate_usd", "ceiling_usd"):
+        for number in ("estimate_usd", "headroom_usd"):
             with self.subTest(number=number):
                 self.assertEqual(approval[number], outline[number])
                 self.assertIsInstance(approval[number], str)
@@ -2367,6 +2459,7 @@ class SpendTest(unittest.TestCase):
         from decimal import Decimal
         spend = wizard.course_spend(
             self.rows(("scope_saved", self.at(0)),
+                      ("outline_requested", self.at(1)),
                       ("outline_ready", self.at(7)),
                       ("outline_approved", self.at(9)),
                       ("promoted", self.at(21))),
@@ -2375,6 +2468,7 @@ class SpendTest(unittest.TestCase):
                         ("0.18", self.at(6)),      # the curator
                         ("2.02", self.at(15)),     # the build
                         ("5.00", self.at(40))))    # another course, later
+        self.assertEqual(spend.drafts, 1)
         self.assertEqual(spend.draft, Decimal("1.09"))
         self.assertEqual(spend.build, Decimal("2.02"))
         self.assertEqual(spend.total, Decimal("3.11"))
@@ -2382,14 +2476,19 @@ class SpendTest(unittest.TestCase):
     def test_before_the_approval_everything_is_drafting(self):
         # Two drafts and a rejection between them: money spent answering a
         # note is money spent drafting, and the gate says so before the
-        # decision rather than after it.
+        # decision rather than after it. The figure is both drafts, so the
+        # sentence that prints it counts them rather than calling the sum
+        # the cost of "this outline".
         from decimal import Decimal
         spend = wizard.course_spend(
             self.rows(("scope_saved", self.at(0)),
-                      ("outline_rejected", self.at(8))),
+                      ("outline_requested", self.at(1)),
+                      ("outline_rejected", self.at(8)),
+                      ("outline_requested", self.at(9))),
             self.ledger(("1.09", self.at(4)), ("1.05", self.at(12))))
         self.assertEqual(spend.draft, Decimal("2.14"))
         self.assertEqual(spend.build, Decimal(0))
+        self.assertEqual(spend.drafts, 2)
 
     def test_a_course_with_no_rows_totals_nothing_rather_than_everything(self):
         from decimal import Decimal

@@ -85,6 +85,12 @@ CONTRAST_PAIRS = [
     # green fill, not on --panel, so it is its own pairing
     ("--accent-strong", "--good-soft", 3.0),
     ("--faint", "--bg", 3.0),
+    # The edge of a control a learner types into: WCAG 1.4.11 non-text
+    # contrast, against the panel a box sits inside and against the ground
+    # for the day a box sits directly on it. `--line` computed 1.30/1.31
+    # here, which is why the token exists at all.
+    ("--edge", "--panel", 3.0),
+    ("--edge", "--bg", 3.0),
 ]
 
 # --------------------------------------------------------------------------
@@ -223,7 +229,7 @@ class TestPalettes(unittest.TestCase):
         # only for whoever is running that theme — the failure a renderer
         # test would never see.
         self.assertEqual(sorted(LIGHT), sorted(DARK))
-        self.assertEqual(len(LIGHT), 21)   # grow deliberately; renderers know these
+        self.assertEqual(len(LIGHT), 22)   # grow deliberately; renderers know these
 
     def test_each_palette_declares_its_color_scheme(self):
         # Without color-scheme the browser paints native controls and
@@ -349,6 +355,13 @@ class TestBaseCss(unittest.TestCase):
         self.assertNotIn("{{", theme.BASE_CSS)
         self.assertNotIn("}}", theme.BASE_CSS)
         self.assertIn(theme.FONT_BODY, theme.BASE_CSS)
+
+    def test_a_pill_link_carries_no_underline(self):
+        # A pill is a button whether it is an <a> or a <button>. The rule
+        # lived in webapp.py, so the wizard's every nav pill came out with an
+        # underlined label; owning it here is what makes that unrepeatable.
+        self.assertEqual(_decls("a.pill", theme.BASE_CSS),
+                         {"text-decoration": "none"})
 
     def test_style_composes_tokens_then_base_then_extra(self):
         out = theme.style("  .own { color:var(--ink); }")

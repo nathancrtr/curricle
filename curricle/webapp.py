@@ -126,7 +126,6 @@ INDEX_STYLE = theme.style("""\
               color:var(--ink); text-decoration:none; letter-spacing:-.01em; }
   .wordmark svg { display:block; }
   .topbar .spacer { flex:1 1 auto; }
-  .pill { text-decoration:none; }
   h1 { font-size:clamp(26px,5vw,34px); font-weight:700; letter-spacing:-.01em;
        margin:0 0 6px; }
   .lede { color:var(--muted); font-size:16.5px; margin:0 0 28px; }

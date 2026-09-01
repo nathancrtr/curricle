@@ -48,11 +48,15 @@ WORKER_STAGES = frozenset({"outline", "build", "promote"})
 # `no_api_key` is the opposite kind of entry: the likeliest failure of
 # somebody's very first run, which arrived as a generic worker error until a
 # real walk-through proved that a stranger who retries without fixing the
-# key gets the same face forever. A reason is payload vocabulary, not a new
-# event kind — the kinds are `db.ONBOARDING_EVENT_KINDS` and none was added.
+# credential gets the same face forever. `bad_api_key` is its neighbour and
+# not its synonym — a credential that exists and is refused wants "replace
+# it", never "put one somewhere", and one sentence covering both would be
+# wrong for whichever reader it did not mean. A reason is payload
+# vocabulary, not a new event kind — the kinds are
+# `db.ONBOARDING_EVENT_KINDS` and none was added for either of these.
 REASONS = ("budget_exceeded", "validation_failed", "compile_failed",
            "unapproved", "unknown_stage", "worker_error", "interrupted",
-           "no_api_key")
+           "no_api_key", "bad_api_key")
 
 # O2: one human sentence per (worker stage, reason), the full cross product.
 # The completeness test cannot miss a pair because there is no pair it is
@@ -96,6 +100,11 @@ WORDING: dict[tuple[str, str], str] = {
         "before spending anything. Put a key in ANTHROPIC_API_KEY, or in a "
         "file called local/anthropic-key beside this checkout, restart the "
         "worker so it picks the key up, then try again.",
+    ("outline", "bad_api_key"):
+        "The API key the worker used was refused, so it stopped before "
+        "spending anything. Replace the key in ANTHROPIC_API_KEY, or in the "
+        "file called local/anthropic-key beside this checkout, restart the "
+        "worker so it picks the new one up, then try again.",
 
     ("build", "budget_exceeded"):
         "The phase-1 build hit its spending ceiling — raise the stage budget "
@@ -131,6 +140,12 @@ WORDING: dict[tuple[str, str], str] = {
         "ANTHROPIC_API_KEY, or in a file called local/anthropic-key beside "
         "this checkout, restart the worker so it picks the key up, then "
         "carry on.",
+    ("build", "bad_api_key"):
+        "The API key the worker used was refused, so the build stopped "
+        "without spending anything more. Replace the key in "
+        "ANTHROPIC_API_KEY, or in the file called local/anthropic-key beside "
+        "this checkout, restart the worker so it picks the new one up, then "
+        "carry on.",
 
     ("promote", "budget_exceeded"):
         "Promotion stopped against the stage budget before finishing — raise "
@@ -164,6 +179,12 @@ WORDING: dict[tuple[str, str], str] = {
         "untouched. A key in ANTHROPIC_API_KEY or in local/anthropic-key "
         "beside this checkout, and a restarted worker, will clear it; this "
         "one is also worth reporting.",
+    ("promote", "bad_api_key"):
+        "Publishing calls no model at all, so a refused API key should never "
+        "be able to stop it either — nothing was spent and your built "
+        "materials are untouched. Replacing the key in ANTHROPIC_API_KEY or "
+        "in local/anthropic-key beside this checkout, and restarting the "
+        "worker, will clear it; this one is also worth reporting.",
 }
 
 # The profile fields every factory prompt leans on (design §4, Stops 1–4).

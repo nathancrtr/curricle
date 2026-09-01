@@ -4,6 +4,8 @@ The fake transport returns canned artifacts; the smoke tests (an exercise's
 tests must fail against its stub, a widget must be offline) run for real.
 """
 
+import contextlib
+import importlib.util
 import json
 import os
 import tempfile
@@ -468,6 +470,64 @@ class HouseExemplarTest(unittest.TestCase):
         self.assertIn(factory.house_exemplar("bank"), bank)
 
 
+# The Anthropic SDK is not a declared dependency (pyproject names pyyaml,
+# sqlalchemy, alembic, psycopg, fastapi, uvicorn): the factory needs it, an
+# installed curricle serving courses does not. So everything that reaches
+# the real transport skips where it is absent rather than erroring.
+HAVE_ANTHROPIC = importlib.util.find_spec("anthropic") is not None
+if HAVE_ANTHROPIC:
+    import anthropic
+    import httpx
+
+
+def no_credential_error() -> TypeError:
+    """The SDK's own refusal when its whole credential chain came up empty.
+
+    Its wording, verbatim from anthropic 1.2.0, raised at request time — the
+    client itself constructs happily with no credential at all. Only the
+    opening clause is matched in `llm`, which is what a version bump is
+    least likely to break; the rest is here so the fixture is recognisably
+    the real thing rather than a string written to satisfy a prefix.
+    """
+    return TypeError(
+        "Could not resolve authentication method. Expected one of api_key, "
+        "auth_token, or credentials to be set. Or for one of the `X-Api-Key` "
+        "or `Authorization` headers to be explicitly omitted")
+
+
+def status_error(kind, status: int, message: str):
+    """One of the SDK's status errors, built the way the SDK builds it."""
+    request = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    return kind(message, response=httpx.Response(status, request=request),
+                body=None)
+
+
+def refused_credential_error():
+    """The SDK's 401: a credential was found, sent, and not accepted."""
+    return status_error(anthropic.AuthenticationError, 401, "invalid x-api-key")
+
+
+@contextlib.contextmanager
+def sdk_raising(exc):
+    """`anthropic.Anthropic` swapped for a client whose request raises `exc`.
+
+    The key lookup goes with it, answering None: these tests are about what
+    the transport makes of the SDK's report, and no real credential should
+    be read off anybody's disk on the way there.
+    """
+    class _Messages:
+        def stream(self, **kwargs):
+            raise exc
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            self.messages = _Messages()
+
+    with mock.patch.object(anthropic, "Anthropic", _Client), \
+            mock.patch.object(llm, "_api_key", lambda: None):
+        yield
+
+
 class ConfigLocationTest(unittest.TestCase):
     """Where the factory reads `models.yaml` and `roles/` from.
 
@@ -532,61 +592,65 @@ class ConfigLocationTest(unittest.TestCase):
         self.assertIn("quiz-author", str(caught.exception))
 
 
+@unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
 class CredentialTest(unittest.TestCase):
-    """Whether there is a key at all — asked before anything is called.
+    """The two credential failures, told apart on the SDK's own report.
 
-    A fresh checkout with no key is the likeliest way somebody's first run
-    ends, and the SDK's own answer to it is a `TypeError` from a constructor
-    ("could not resolve authentication method"), which nothing upstream can
-    classify. So the transport asks first, and the worker has a reason key
-    for the answer. Nothing here writes, reads or asserts a real credential:
-    the environment is emptied and `REPO_ROOT` is pointed at a temp
-    directory, so the machine's own key can neither pass nor fail these.
+    Nothing here decides in advance whether a credential exists: the chain
+    that resolves one belongs to the SDK (an API key, an auth token, a
+    profile, workload identity), and a pre-flight check over the two places
+    this repo knows about would fail people whose credential comes from one
+    of the others. So the transport calls, and translates what comes back —
+    which is what these tests drive, through `_anthropic_send`'s own except
+    clauses rather than around them.
+
+    No network and no credential: the client is replaced by one whose first
+    request raises, and the key lookup is neutered with it, so nothing on
+    anybody's machine is read.
     """
 
-    def keyless(self):
-        """No key in the environment. (The file is the caller's to place or
-        leave out — every test here points REPO_ROOT at an empty temp dir.)"""
-        return mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": ""})
-
-    def test_no_key_anywhere_is_visible_without_a_call(self):
-        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
-                mock.patch.object(llm, "REPO_ROOT", tmp):
-            self.assertFalse(llm.have_api_key())
-
-    def test_a_key_in_the_environment_is_the_sdks_to_find(self):
-        with tempfile.TemporaryDirectory() as tmp, \
-                mock.patch.dict(os.environ, {"ANTHROPIC_API_KEY": "x"}), \
-                mock.patch.object(llm, "REPO_ROOT", tmp):
-            self.assertTrue(llm.have_api_key())
-            # Which is why `_api_key` answers None to an environment key:
-            # the client is left to its own credential chain.
-            self.assertIsNone(llm._api_key())
-
-    def test_a_file_beside_the_checkout_counts_and_an_empty_one_does_not(self):
-        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
-                mock.patch.object(llm, "REPO_ROOT", tmp):
-            os.makedirs(os.path.join(tmp, "local"))
-            path = os.path.join(tmp, "local", "anthropic-key")
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("   \n")
-            self.assertFalse(llm.have_api_key())
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("stand-in-not-a-credential\n")
-            self.assertTrue(llm.have_api_key())
-
-    def test_the_transport_refuses_before_it_builds_a_client(self):
-        # The refusal names both places a key may live, so the operator log
-        # says the same thing the wizard's sentence does — and it is
-        # `NoApiKey`, which is the whole point: the worker classifies on the
-        # class, never on the text of somebody else's exception.
-        with tempfile.TemporaryDirectory() as tmp, self.keyless(), \
-                mock.patch.object(llm, "REPO_ROOT", tmp):
+    def test_no_credential_anywhere_becomes_no_api_key(self):
+        with sdk_raising(no_credential_error()):
             with self.assertRaises(llm.NoApiKey) as caught:
                 llm._anthropic_send("claude-haiku-4-5", "s", "p", 16)
+        # The operator's copy says what the learner's sentence says.
         message = str(caught.exception)
         self.assertIn("ANTHROPIC_API_KEY", message)
         self.assertIn("local/anthropic-key", message)
+
+    def test_a_refused_credential_becomes_bad_api_key(self):
+        # A different exception, because it is a different instruction: the
+        # credential exists and is not accepted, so it is replaced rather
+        # than provided.
+        with sdk_raising(refused_credential_error()):
+            with self.assertRaises(llm.BadApiKey) as caught:
+                llm._anthropic_send("claude-haiku-4-5", "s", "p", 16)
+        # The detail is this repo's own fixed literal. The SDK's message is
+        # the 401's body, and it stays in the chained exception for a log.
+        self.assertEqual(str(caught.exception),
+                         "the Anthropic API refused this credential")
+        self.assertNotIn("invalid x-api-key", str(caught.exception))
+
+    def test_another_status_error_is_not_a_credential_failure(self):
+        # Only the authentication class is translated. A rate limit or a
+        # 500 arriving in that clause would be worded to the learner as a
+        # key they have to replace, which it is not.
+        throttled = status_error(anthropic.RateLimitError, 429, "slow down")
+        with sdk_raising(throttled):
+            with self.assertRaises(anthropic.RateLimitError):
+                llm._anthropic_send("claude-haiku-4-5", "s", "p", 16)
+
+    def test_a_type_error_with_another_message_stays_the_bug_it_is(self):
+        # The SDK reports "no credential anywhere" as a bare TypeError, so
+        # the message's prefix has to match as well as the class: every
+        # ordinary bug in this call arrives as a TypeError too, and one of
+        # those classified as a missing key is a bug wearing a sentence.
+        with sdk_raising(TypeError("stream() got an unexpected keyword "
+                                   "argument 'systm'")):
+            with self.assertRaises(TypeError) as caught:
+                llm._anthropic_send("claude-haiku-4-5", "s", "p", 16)
+        self.assertNotIsInstance(caught.exception, llm.NoApiKey)
+        self.assertNotIsInstance(caught.exception, llm.BadApiKey)
 
 
 class OutlineRolesTest(unittest.TestCase):

@@ -1470,6 +1470,43 @@ class NoApiKeyOutlineFaceTest(WizardFixture):
         self.assertNotIn("no Anthropic API key", page)
 
 
+class BadApiKeyFaceTest(WizardFixture):
+    """A credential that exists and is refused — a face of its own.
+
+    The instruction is the thing that differs: this learner has a key and
+    has to replace it, and the sentence for having none would send them
+    looking for something they already have. Which is why the two are
+    separate reasons rather than one sentence hedged to cover both.
+    """
+
+    COURSE = "greek-112"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course, payload in (
+                    ("profile_published", "", {}),
+                    ("scope_saved", cls.COURSE, {"title": "Greek"}),
+                    ("outline_requested", cls.COURSE, {}),
+                    ("outline_failed", cls.COURSE,
+                     {"reason": "bad_api_key",
+                      "detail": "the Anthropic API refused this credential"})):
+                onboarding.append_event(conn, cls.scope, kind, course, payload)
+
+    def test_the_face_says_replace_rather_than_provide(self):
+        page = self.screen()
+        self.assertIn(onboarding.WORDING[("outline", "bad_api_key")], page)
+        self.assertIn("refused", page)
+        self.assertIn("Replace the key", page)
+        self.assertIn("spending anything", page)
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        # And it is not the other face: nobody is told to put a key
+        # somewhere they have already put one.
+        self.assertNotIn(onboarding.WORDING[("outline", "no_api_key")], page)
+        self.assertNotIn("bad_api_key", page)
+
+
 class NoApiKeyBuildFaceTest(WizardFixture):
     """The same reason on the expensive stage, in that stage's own verb."""
 

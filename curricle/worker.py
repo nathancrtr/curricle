@@ -164,6 +164,18 @@ def _outline(engine: sa.Engine, scope: db.TenantScope,
     try:
         factory.build_outline(runner, prof, run.course, flow.scope, draft_dir,
                               note=run.payload.get("note") or flow.note)
+    except llm.NoApiKey as exc:
+        # The first-run failure of a fresh checkout, and the one the generic
+        # worker error serves worst: a stranger who retries without putting
+        # a key somewhere gets this face forever. The call was refused
+        # before it was billed, so nothing was spent and the wizard's
+        # sentence can say so — see WORDING[("outline", "no_api_key")].
+        raise StageFailed("no_api_key", str(exc)) from exc
+    except llm.BadApiKey as exc:
+        # A different sentence because it is a different instruction: the
+        # credential exists and was refused, so it is replaced rather than
+        # provided. Told apart by the transport, on the SDK's own classes.
+        raise StageFailed("bad_api_key", str(exc)) from exc
     except llm.BudgetExceeded as exc:
         # The runner refuses in money's vocabulary; the ledger has a key for
         # it and the wizard has a sentence. Wrapped rather than re-raised
@@ -279,6 +291,14 @@ def _build(engine: sa.Engine, scope: db.TenantScope,
     try:
         report = factory.build_phase(RUNNER_FACTORY(engine, scope), manifest,
                                      prof, content_root, spec)
+    except llm.NoApiKey as exc:
+        # The same two classifications as the outline stage's: a credential
+        # that is missing, and one that is refused, are both things the
+        # learner can fix, and each is worth its own sentence rather than
+        # the generic stopped-worker one.
+        raise StageFailed("no_api_key", str(exc)) from exc
+    except llm.BadApiKey as exc:
+        raise StageFailed("bad_api_key", str(exc)) from exc
     except llm.BudgetExceeded as exc:
         raise StageFailed("budget_exceeded", str(exc)) from exc
     except factory.ValidationFailed as exc:

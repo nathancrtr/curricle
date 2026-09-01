@@ -656,6 +656,16 @@ class OutlineRetryTest(WizardFixture):
         self.assertNotIn("compile_failed", page)
         self.assertNotIn(wizard.META_REFRESH, page)
 
+    def test_the_aside_does_not_say_again_what_the_sentence_said(self):
+        # Every one of the outline's failure sentences that can promise it
+        # already promises that nothing partial was kept; the aside used to
+        # promise it a second time four inches lower. What it says instead
+        # is the part the sentence does not: which stage this is, and that
+        # it restarts rather than resumes.
+        page = self.screen()
+        self.assertIn(wizard.OUTLINE_RETRY_ASIDE, page)
+        self.assertEqual(page.count("Nothing partial was kept"), 1)
+
     def test_the_button_is_the_scheduler(self):
         # Nothing retries a failed stage on its own: the run row exists
         # because a person asked for it, and the ledger says they did.
@@ -1040,6 +1050,13 @@ class OutlineGateScreenTest(GateFixture):
         self.assertEqual(page.count(wizard.GATE_ESTIMATE_WORD), 2)
         # And the decision itself is still one form, not two.
         self.assertEqual(page.count('action="/onboarding/outline/approve"'), 1)
+        # The sentence is said once, by the lede. The cost card's chip used
+        # to repeat it in a note a screen-height further down; the chip
+        # stays, because whose turn it is still has to be said, and the
+        # duplicate does not.
+        self.assertEqual(page.count("is the stage that costs money"), 1)
+        self.assertNotIn("building the first phase is the stage", page)
+        self.assertIn(wizard.WAITING_WORD, page)
 
     def test_a_row_with_no_estimate_says_no_number_at_all(self):
         # The lede degrades the way the card's other figure does: a payload
@@ -1307,6 +1324,35 @@ class BuildFailedTest(WizardFixture):
         # And no second approval is asked for: the row upstream still stands.
         self.assertNotIn('action="/onboarding/outline/approve"', page)
 
+    # Named, like every other screen test in this class, to sort before the
+    # retry: the failed face exists only until that button is pressed.
+    def test_a_sentence_that_names_no_cause_it_cannot_know(self):
+        # It used to hedge between two causes ("a test that should have
+        # failed passed, or a quiz arrived without its explanations"), one of
+        # which was false for whoever read it — the row knows which validator
+        # refused, but only in `detail`, which is an operator's (O2). And it
+        # said "Retry" over a button that says "Carry on".
+        page = self.screen()
+        worded = onboarding.WORDING[("build", "validation_failed")]
+        self.assertIn(worded, page)
+        self.assertIn("Carry on", worded)
+        self.assertNotIn("Retry", worded)
+        for hedge in ("a test that should have", "without its explanations"):
+            with self.subTest(hedge=hedge):
+                self.assertNotIn(hedge, page)
+
+    def test_the_aside_says_that_carrying_on_spends_again(self):
+        # The half the old aside left out. It promised no second approval,
+        # which is true, and said nothing about the second purchase the same
+        # button makes — on the screen where money moves, that is the fact.
+        page = self.screen()
+        self.assertIn(wizard.BUILD_RETRY_ASIDE, page)
+        self.assertIn("spends against that same approval",
+                      wizard.BUILD_RETRY_ASIDE)
+        # And no figure is invented: this tenant has bought nothing, so the
+        # sentence that would price it is absent rather than printed at zero.
+        self.assertNotIn("This build has spent", page)
+
     def test_the_button_is_the_scheduler_and_asks_for_no_new_approval(self):
         self.assertEqual(self.runs(), [])
         retried = self.client.post("/onboarding/build/retry",
@@ -1335,6 +1381,173 @@ class BuildFailedTest(WizardFixture):
         again = self.client.post("/onboarding/build/retry",
                                  follow_redirects=False)
         self.assertEqual(again.status_code, 409)
+
+
+class BuildFailedSpendTest(WizardFixture):
+    """The stopped build, priced from the ledger the receipt is priced from.
+
+    Deliberately not "what the refused attempt cost": the token ledger
+    meters a call under its role, not under the run that made it, so what it
+    can honestly answer is what this course has spent since its approval —
+    the refused work and the kept work together. That is the same figure the
+    landing card later adds to the drafting half, so the two screens cannot
+    disagree about it.
+    """
+
+    COURSE = "greek-109"
+
+    @classmethod
+    def setUpClass(cls):
+        from decimal import Decimal
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_requested", {}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_requested", {}),
+                    ("build_failed", {"reason": "validation_failed",
+                                      "detail": "ValidationFailed: tests PASS "
+                                                "against the stub"})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+        # The metered call goes in a transaction of its own, so its clock
+        # reading falls after the approval's and the windowing puts it on
+        # the build side of the split.
+        with cls.engine.begin() as conn:
+            conn.execute(cls.scope.ledger_insert(
+                stage="quiz-author", model="claude-opus-4-5",
+                input_tokens=1000, output_tokens=500, cache_write_tokens=0,
+                cache_read_tokens=0, cost_usd=Decimal("0.83")))
+
+    def test_the_aside_prices_what_the_build_has_spent_so_far(self):
+        page = self.screen()
+        self.assertIn(wizard.BUILD_RETRY_ASIDE, page)
+        self.assertIn(wizard.BUILD_RETRY_SPENT.format(spent="$0.83"), page)
+        # A claim about the build, not about the attempt inside it: the
+        # ledger cannot separate the two and the screen does not pretend it.
+        self.assertNotIn("refused attempt cost", page)
+
+
+class NoApiKeyOutlineFaceTest(WizardFixture):
+    """The first-run failure a stranger actually hits, worded.
+
+    A checkout with no key drafts nothing, and until this reason existed the
+    screen said the worker had stopped — true, unactionable, and identical
+    on every retry. The sentence has three jobs: name both places a key can
+    live, say the worker has to be restarted after, and say nothing was spent.
+    """
+
+    COURSE = "greek-110"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course, payload in (
+                    ("profile_published", "", {}),
+                    ("scope_saved", cls.COURSE, {"title": "Greek"}),
+                    ("outline_requested", cls.COURSE, {}),
+                    ("outline_failed", cls.COURSE,
+                     {"reason": "no_api_key",
+                      "detail": "no Anthropic API key: set ANTHROPIC_API_KEY, "
+                                "or put one in local/anthropic-key beside the "
+                                "checkout"})):
+                onboarding.append_event(conn, cls.scope, kind, course, payload)
+
+    def test_the_face_tells_a_stranger_what_to_do_and_keeps_the_button(self):
+        page = self.screen()
+        self.assertIn(onboarding.WORDING[("outline", "no_api_key")], page)
+        for actionable in ("ANTHROPIC_API_KEY", "local/anthropic-key",
+                           "restart"):
+            with self.subTest(actionable=actionable):
+                self.assertIn(actionable, page)
+        self.assertIn("spending anything", page)
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        self.assertIn(wizard.FAILED_WORD, page)
+        # O2 holds for the new reason exactly as for the old ones: the key
+        # is never the sentence, and the detail is the operator's copy.
+        self.assertNotIn("no_api_key", page)
+        self.assertNotIn("no Anthropic API key", page)
+
+
+class BadApiKeyFaceTest(WizardFixture):
+    """A credential that exists and is refused — a face of its own.
+
+    The instruction is the thing that differs: this learner has a key and
+    has to replace it, and the sentence for having none would send them
+    looking for something they already have. Which is why the two are
+    separate reasons rather than one sentence hedged to cover both.
+    """
+
+    COURSE = "greek-112"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, course, payload in (
+                    ("profile_published", "", {}),
+                    ("scope_saved", cls.COURSE, {"title": "Greek"}),
+                    ("outline_requested", cls.COURSE, {}),
+                    ("outline_failed", cls.COURSE,
+                     {"reason": "bad_api_key",
+                      "detail": "the Anthropic API refused this credential"})):
+                onboarding.append_event(conn, cls.scope, kind, course, payload)
+
+    def test_the_face_says_replace_rather_than_provide(self):
+        page = self.screen()
+        self.assertIn(onboarding.WORDING[("outline", "bad_api_key")], page)
+        self.assertIn("refused", page)
+        self.assertIn("Replace the key", page)
+        self.assertIn("spending anything", page)
+        self.assertIn('action="/onboarding/outline/retry"', page)
+        # And it is not the other face: nobody is told to put a key
+        # somewhere they have already put one.
+        self.assertNotIn(onboarding.WORDING[("outline", "no_api_key")], page)
+        self.assertNotIn("bad_api_key", page)
+
+
+class NoApiKeyBuildFaceTest(WizardFixture):
+    """The same reason on the expensive stage, in that stage's own verb."""
+
+    COURSE = "greek-111"
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        with cls.engine.begin() as conn:
+            for kind, payload in (
+                    ("profile_published", None),
+                    ("scope_saved", {"title": "Greek"}),
+                    ("outline_ready", {"plan": {"phase_id": "p1"},
+                                       "estimate_usd": "1.37"}),
+                    ("outline_approved", {"plan": {"phase_id": "p1"},
+                                          "estimate_usd": "1.37"}),
+                    ("build_requested", {}),
+                    ("build_failed", {"reason": "no_api_key",
+                                      "detail": "no Anthropic API key"})):
+                onboarding.append_event(
+                    conn, cls.scope, kind,
+                    "" if kind == "profile_published" else cls.COURSE,
+                    payload or {})
+
+    def test_the_build_face_says_the_same_fix_and_carries_on_after_it(self):
+        page = self.screen()
+        worded = onboarding.WORDING[("build", "no_api_key")]
+        self.assertIn(worded, page)
+        self.assertIn("ANTHROPIC_API_KEY", page)
+        self.assertIn("local/anthropic-key", page)
+        # The button's verb, in the sentence as well as on the button.
+        self.assertIn("carry on", worded)
+        self.assertIn("Carry on →", page)
+        self.assertNotIn("no_api_key", page)
 
 
 class BuildRetryBeforeTheBuildTest(GateFixture):

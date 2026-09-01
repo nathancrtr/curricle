@@ -128,7 +128,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 ## The design system (Phase 4)
 
 - `curricle/theme.py` is the single source of design tokens, base CSS,
-  `WAYPATH_JS` and the milestone glyph. Renderers compose
+  `WAYPATH_JS`, the wordmark and the milestone glyph. Renderers compose
   `theme.style(own_css)` and define no palette of their own — `hubrender.py`
   carried its own `:root` into Phase 4, and composing it without deleting
   that block would have overridden the whole system with pre-sprint values.

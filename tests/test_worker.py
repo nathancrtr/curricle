@@ -37,8 +37,9 @@ from pg import test_engine
 # re-canned, so a change to what a clean outline or a valid lesson looks
 # like arrives here too.
 from test_factory import (
-    BROKEN_SIDECAR, GOOD_CURRICULUM, GOOD_SHELF, GOOD_SIDECAR, SCOPE,
-    FakeBuildSend, FakeOutlineSend, compile_draft, designer_json,
+    BROKEN_SIDECAR, GOOD_CURRICULUM, GOOD_SHELF, GOOD_SIDECAR, HAVE_ANTHROPIC,
+    SCOPE, FakeBuildSend, FakeOutlineSend, compile_draft, designer_json,
+    no_credential_error, refused_credential_error, sdk_raising,
 )
 
 OUTLINE = {"plan": {"phases": [{"id": "p1", "title": "Phase 1"}]},
@@ -59,6 +60,21 @@ NO_PHASE_ONE = (GOOD_CURRICULUM
 # briefed with, so "the profile reached the model" is an assertion here.
 PROFILE_CLAIM = ("Learns by implementing — pair every abstract idea with "
                  "something runnable.")
+
+
+def real_transport():
+    """`worker.RUNNER_FACTORY` with the transport production actually uses.
+
+    Every other test here scripts a `send` and never reaches `_anthropic_send`
+    at all. The credential failures have to: what is under test is the whole
+    path from the SDK's own report through the transport's translation to the
+    reason key in the ledger, and a fake raising the translated exception
+    would only be a test of the assertion making it. The SDK's client is
+    replaced by `sdk_raising`, so there is still no network and no credential.
+    """
+    return mock.patch.object(worker, "RUNNER_FACTORY",
+                             lambda engine, scope: llm.Runner(engine, scope))
+
 
 # A reviewer's note, the kind Stop 8's rejection leaves behind.
 FOLD_NOTE = "Too many weeks — I have four, not eight."
@@ -629,6 +645,84 @@ class OutlineStageTest(WorkerFixture):
         # O2: the screen has a sentence for it.
         self.assertIn(("outline", "compile_failed"), onboarding.WORDING)
 
+    @unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
+    def test_a_worker_with_no_credential_says_so_in_its_own_word(self):
+        # The generic `worker_error` was what this looked like until a real
+        # first run proved the cost of it: a stranger who presses "Try again"
+        # without putting a credential anywhere gets the same face forever.
+        # Driven from the SDK's own refusal, through the transport, to the
+        # reason in the ledger — the whole path, because the translation in
+        # the middle is the part that was worth writing.
+        tenant = self.fresh_tenant()
+        self.scoped(tenant, self.COURSE)
+        self.enqueue(tenant, self.COURSE, "outline")
+        with real_transport(), sdk_raising(no_credential_error()):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(tenant) if r.course == self.COURSE]
+        self.assertEqual((row.status, row.reason), ("failed", "no_api_key"))
+        (kind, payload), = [e for e in self.ledger(tenant, self.COURSE)
+                            if e[0] != "scope_saved"]
+        self.assertEqual((kind, payload["reason"]),
+                         ("outline_failed", "no_api_key"))
+        # The call was refused before it was billed, so nothing was metered
+        # — which is exactly what the sentence on the screen promises.
+        self.assertEqual(self.ledger_stages(tenant), [])
+        # A reason is payload vocabulary, not a kind: no event kind was added
+        # for this and none is in the ledger.
+        self.assertIn("no_api_key", onboarding.REASONS)
+        self.assertNotIn("no_api_key", db.ONBOARDING_EVENT_KINDS)
+        # O2, and the sentence has to be actionable: both places a key can
+        # live, and the restart the running worker needs.
+        worded = onboarding.WORDING[("outline", "no_api_key")]
+        self.assertIn("ANTHROPIC_API_KEY", worded)
+        self.assertIn("local/anthropic-key", worded)
+        self.assertIn("restart", worded)
+
+    @unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
+    def test_a_refused_credential_is_a_reason_of_its_own(self):
+        # Not the same face as having none: this learner has a key and has
+        # to *replace* it, and one sentence covering both cases would give
+        # one of the two readers the wrong instruction.
+        tenant = self.fresh_tenant()
+        self.scoped(tenant, self.COURSE)
+        self.enqueue(tenant, self.COURSE, "outline")
+        with real_transport(), sdk_raising(refused_credential_error()):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(tenant) if r.course == self.COURSE]
+        self.assertEqual((row.status, row.reason), ("failed", "bad_api_key"))
+        (kind, payload), = [e for e in self.ledger(tenant, self.COURSE)
+                            if e[0] != "scope_saved"]
+        self.assertEqual((kind, payload["reason"]),
+                         ("outline_failed", "bad_api_key"))
+        self.assertEqual(self.ledger_stages(tenant), [])
+        # The operator's copy carries no part of the credential and no part
+        # of the API's own answer about it.
+        self.assertNotIn("invalid x-api-key", payload["detail"])
+        worded = onboarding.WORDING[("outline", "bad_api_key")]
+        self.assertIn("refused", worded)
+        self.assertIn("Replace", worded)
+
+    @unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
+    def test_another_type_error_is_still_a_worker_error(self):
+        # The SDK reports a missing credential as a bare TypeError, so the
+        # classification matches its message's prefix as well as its class.
+        # An ordinary bug in the call arrives as a TypeError too, and
+        # telling that learner to go and find a key sends them after the
+        # wrong thing entirely.
+        tenant = self.fresh_tenant()
+        self.scoped(tenant, self.COURSE)
+        self.enqueue(tenant, self.COURSE, "outline")
+        with real_transport(), sdk_raising(TypeError("systm is not a kwarg")):
+            self.assertTrue(worker.run_once(self.engine))
+
+        row, = [r for r in self.runs(tenant) if r.course == self.COURSE]
+        self.assertEqual((row.status, row.reason), ("failed", "worker_error"))
+        (_, payload), = [e for e in self.ledger(tenant, self.COURSE)
+                         if e[0] != "scope_saved"]
+        self.assertEqual(payload["reason"], "worker_error")
+
     def test_a_run_for_a_course_nobody_scoped_never_reaches_a_model(self):
         self.enqueue(self.a, "unscoped", "outline")
         def never(model, system, prompt, max_tokens):
@@ -980,6 +1074,40 @@ class BuildStageTest(WorkerFixture):
         # build that bought nothing.
         self.assertEqual([r.stage for r in self.runs(self.tenant)], ["build"])
         self.assertEqual(self.stage_and_status(), ("build", "failed"))
+
+    @unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
+    def test_a_missing_credential_stops_the_build_in_its_own_word_too(self):
+        # The same classification on the expensive stage, where the sentence
+        # has one more thing to say: nothing *more* was spent, and the
+        # button under it still carries on rather than starting over.
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with real_transport(), sdk_raising(no_credential_error()):
+            self.assertTrue(worker.run_once(self.engine))
+        self.assert_build_failed_with("no_api_key")
+
+    @unittest.skipUnless(HAVE_ANTHROPIC, "anthropic SDK not installed")
+    def test_a_refused_credential_stops_the_build_under_its_own_reason(self):
+        self.at_the_gate(approved=True)
+        self.enqueue(self.tenant, self.COURSE, "build")
+        with real_transport(), sdk_raising(refused_credential_error()):
+            self.assertTrue(worker.run_once(self.engine))
+        self.assert_build_failed_with("bad_api_key")
+
+    def assert_build_failed_with(self, reason: str) -> None:
+        """The whole shape of a build stopped by a credential: the run row,
+        the ledger row, nothing metered, nothing chained, a sentence."""
+        row, = [r for r in self.runs(self.tenant) if r.stage == "build"]
+        self.assertEqual((row.status, row.reason), ("failed", reason))
+        kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
+        self.assertEqual((kind, payload["reason"]), ("build_failed", reason))
+        self.assertEqual(self.token_rows(), [])
+        # Nothing chains off a failure, here as everywhere else.
+        self.assertEqual([r.stage for r in self.runs(self.tenant)], ["build"])
+        self.assertEqual(self.stage_and_status(), ("build", "failed"))
+        worded = onboarding.WORDING[("build", reason)]
+        self.assertIn("ANTHROPIC_API_KEY", worded)
+        self.assertIn("local/anthropic-key", worded)
 
     def test_a_dirty_draft_is_refused_rather_than_built_against(self):
         # The draft compiled when it was drafted and again when the gate drew

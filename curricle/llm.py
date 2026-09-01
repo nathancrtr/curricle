@@ -54,6 +54,32 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+class NoApiKey(RuntimeError):
+    """The SDK found no credential at all, anywhere it looks.
+
+    Its own exception for the same reason `BudgetExceeded` is one: the
+    worker turns it into a failure reason the wizard has a sentence for, and
+    a stranger's first run of a fresh checkout is far more likely to end
+    here than anywhere else.
+
+    Raised only by translating the SDK's own refusal, never by a check of
+    our own beforehand — the chain that resolves a credential is the SDK's
+    (an API key, an auth token, a profile, workload identity), and a
+    pre-flight gate over the two places *this* repo knows about would fail
+    people whose credential comes from one of the others.
+    """
+
+
+class BadApiKey(RuntimeError):
+    """A credential was found, sent, and refused by the API.
+
+    Distinct from `NoApiKey` because the instruction to the learner is
+    different: not "put a key somewhere" but "the one you have is not
+    accepted — replace it". Told apart on the SDK's own error class, so
+    nothing here reads a 401 body or the credential inside it.
+    """
+
+
 class FactoryConfigMissing(RuntimeError):
     """`models.yaml` or a role contract is not where the factory looked.
 
@@ -141,7 +167,9 @@ class RunResult:
 
 def _api_key() -> str | None:
     """Env first; else the gitignored local/anthropic-key file. Returning
-    None lets the SDK try its own credential chain."""
+    None lets the SDK try its own credential chain — which is wider than
+    these two places (an auth token, a profile, workload identity), and is
+    why nothing here decides in advance that there is no credential."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         return None
     key_path = os.path.join(REPO_ROOT, "local", "anthropic-key")
@@ -151,18 +179,53 @@ def _api_key() -> str | None:
     return None
 
 
+# How the SDK opens its complaint when its whole credential chain came up
+# empty ("Could not resolve authentication method. Expected one of api_key,
+# auth_token, or credentials to be set…"). The rest of the sentence names
+# the arguments it wanted and has changed between SDK versions; the opening
+# has not, and a prefix is what a version bump is least likely to break.
+# If it ever does, the failure is a `worker_error` again — honest, and the
+# thing to fix here.
+NO_CREDENTIAL_PREFIX = "Could not resolve authentication method"
+
+
 def _anthropic_send(model: str, system: str, prompt: str,
                     max_tokens: int) -> tuple[str, dict]:
     """The real transport: streams (large max_tokens requires it) and
-    returns (text, usage-dict). Isolated so tests inject their own."""
+    returns (text, usage-dict). Isolated so tests inject their own.
+
+    The two credential failures are translated here, and only here, into
+    exceptions the worker can word for a learner (`no_api_key`,
+    `bad_api_key`). Both are told apart the way the SDK reports them —
+    nothing pre-empts the SDK's credential chain, and nothing reads the
+    credential or the 401's body. The client constructs happily with no
+    credential at all; the complaint comes at request time.
+    """
     import anthropic
 
-    client = anthropic.Anthropic(api_key=_api_key())
-    with client.messages.stream(
-        model=model, max_tokens=max_tokens, system=system,
-        messages=[{"role": "user", "content": prompt}],
-    ) as stream:
-        message = stream.get_final_message()
+    try:
+        client = anthropic.Anthropic(api_key=_api_key())
+        with client.messages.stream(
+            model=model, max_tokens=max_tokens, system=system,
+            messages=[{"role": "user", "content": prompt}],
+        ) as stream:
+            message = stream.get_final_message()
+    except anthropic.AuthenticationError as exc:
+        # A credential was sent and refused: a typo, a revoked key, the
+        # wrong organisation. Its own fixed detail — the SDK's message is
+        # the 401's body, which is an operator's to read in a log.
+        raise BadApiKey("the Anthropic API refused this credential") from exc
+    except TypeError as exc:
+        # The SDK's "no credential anywhere" refusal, which it raises as a
+        # bare TypeError at request time. The class alone is far too broad
+        # to classify on — every ordinary bug in this call would arrive as
+        # one — so the message's fixed prefix has to match too, and anything
+        # else is re-raised as the bug it is.
+        if not str(exc).startswith(NO_CREDENTIAL_PREFIX):
+            raise
+        raise NoApiKey(
+            "the Anthropic SDK found no credential: set ANTHROPIC_API_KEY, "
+            "or put a key in local/anthropic-key beside the checkout") from exc
     text = "".join(b.text for b in message.content if b.type == "text")
     u = message.usage
     return text, {

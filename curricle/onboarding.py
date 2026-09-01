@@ -45,8 +45,18 @@ WORKER_STAGES = frozenset({"outline", "build", "promote"})
 # worker to start, over a run whose worker died mid-stage. A crash is not a
 # reason to re-spend a learner's money unasked, so the wreckage becomes an
 # honest failure with a retry button rather than an automatic re-run.
+# `no_api_key` is the opposite kind of entry: the likeliest failure of
+# somebody's very first run, which arrived as a generic worker error until a
+# real walk-through proved that a stranger who retries without fixing the
+# credential gets the same face forever. `bad_api_key` is its neighbour and
+# not its synonym — a credential that exists and is refused wants "replace
+# it", never "put one somewhere", and one sentence covering both would be
+# wrong for whichever reader it did not mean. A reason is payload
+# vocabulary, not a new event kind — the kinds are
+# `db.ONBOARDING_EVENT_KINDS` and none was added for either of these.
 REASONS = ("budget_exceeded", "validation_failed", "compile_failed",
-           "unapproved", "unknown_stage", "worker_error", "interrupted")
+           "unapproved", "unknown_stage", "worker_error", "interrupted",
+           "no_api_key", "bad_api_key")
 
 # O2: one human sentence per (worker stage, reason), the full cross product.
 # The completeness test cannot miss a pair because there is no pair it is
@@ -81,14 +91,33 @@ WORDING: dict[tuple[str, str], str] = {
     ("outline", "interrupted"):
         "The worker was shut down partway through the outline build and "
         "nothing partial was kept. Retry when you're ready.",
+    # The one sentence in this table that has to teach as well as explain:
+    # it is the first thing a stranger with a fresh checkout will see go
+    # wrong, and it names both places a key may live, the restart the
+    # running worker needs, and the fact that nothing was spent.
+    ("outline", "no_api_key"):
+        "The worker has no API key it can call a model with, so it stopped "
+        "before spending anything. Put a key in ANTHROPIC_API_KEY, or in a "
+        "file called local/anthropic-key beside this checkout, restart the "
+        "worker so it picks the key up, then try again.",
+    ("outline", "bad_api_key"):
+        "The API key the worker used was refused, so it stopped before "
+        "spending anything. Replace the key in ANTHROPIC_API_KEY, or in the "
+        "file called local/anthropic-key beside this checkout, restart the "
+        "worker so it picks the new one up, then try again.",
 
     ("build", "budget_exceeded"):
         "The phase-1 build hit its spending ceiling — raise the stage budget "
         "in models.yaml, then retry to pick up where it stopped.",
+    # No list of causes. The old sentence named two ("a test that should
+    # have failed passed, or a quiz arrived without its explanations") and
+    # one of them was false for whoever read it — the ledger row knows which
+    # validator refused, but only in `detail`, which is an operator's to read
+    # and never a screen's (O2). Saying less is the honest half of that, and
+    # the verb is the button's own.
     ("build", "validation_failed"):
-        "Generated material failed its checks — a test that should have "
-        "failed passed, or a quiz arrived without its explanations. Retry to "
-        "have it built again.",
+        "One of the generated materials failed its checks, so it was refused "
+        "rather than half-kept. Carry on to have that one written again.",
     ("build", "compile_failed"):
         "The built materials wouldn't compile into the course, so they were "
         "refused rather than promoted. Retrying is safe.",
@@ -105,6 +134,18 @@ WORDING: dict[tuple[str, str], str] = {
         "The worker was shut down partway through the build. What it had "
         "already finished was kept — retry when you're ready and it carries "
         "on from there.",
+    ("build", "no_api_key"):
+        "The worker has no API key it can call a model with, so the build "
+        "stopped without spending anything more. Put a key in "
+        "ANTHROPIC_API_KEY, or in a file called local/anthropic-key beside "
+        "this checkout, restart the worker so it picks the key up, then "
+        "carry on.",
+    ("build", "bad_api_key"):
+        "The API key the worker used was refused, so the build stopped "
+        "without spending anything more. Replace the key in "
+        "ANTHROPIC_API_KEY, or in the file called local/anthropic-key beside "
+        "this checkout, restart the worker so it picks the new one up, then "
+        "carry on.",
 
     ("promote", "budget_exceeded"):
         "Promotion stopped against the stage budget before finishing — raise "
@@ -128,6 +169,22 @@ WORDING: dict[tuple[str, str], str] = {
         "The worker was shut down while publishing your course, so the "
         "course was left unpublished and nothing partial was put in place. "
         "Retry when you're ready.",
+    # Publishing moves files and compiles them; it calls no model, so this
+    # pair is one of the cross product's "can't happen today" rows — worded
+    # anyway, because those are exactly the ones that arrive unworded the
+    # day they can, and worded to say both what to do and that it is odd.
+    ("promote", "no_api_key"):
+        "Publishing calls no model at all, so a missing API key should never "
+        "be able to stop it — nothing was spent and your built materials are "
+        "untouched. A key in ANTHROPIC_API_KEY or in local/anthropic-key "
+        "beside this checkout, and a restarted worker, will clear it; this "
+        "one is also worth reporting.",
+    ("promote", "bad_api_key"):
+        "Publishing calls no model at all, so a refused API key should never "
+        "be able to stop it either — nothing was spent and your built "
+        "materials are untouched. Replacing the key in ANTHROPIC_API_KEY or "
+        "in local/anthropic-key beside this checkout, and restarting the "
+        "worker, will clear it; this one is also worth reporting.",
 }
 
 # The profile fields every factory prompt leans on (design §4, Stops 1–4).

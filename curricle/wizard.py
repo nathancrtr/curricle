@@ -419,6 +419,11 @@ RECEIPT_NONE = "No model spend is recorded against this course."
 # it. The figure and the word under it are the card's own — `estimate_cost`
 # draws both places — so the two can never come to say different things
 # about the same payload.
+# It is also the only place that sentence is said: the cost card's chip used
+# to carry a note repeating it ("building the first phase is the stage that
+# costs money") a screen-height below, which was one fact printed twice on
+# one page. The chip stays — it says whose turn this is — and the lede says
+# what the turn is about.
 GATE_COST_LEAD = ("Building the first phase of materials is the stage that "
                   "costs money, and nothing is spent until you say so —")
 
@@ -431,14 +436,33 @@ REJECT_HINT = ("The outline is drafted again with this note in the brief, so "
 REJECT_EMPTY = ("Sending an outline back needs a note saying what to change — "
                 "a redraft briefed with nothing is the same outline again")
 
+# What the outline's retry button says under it. Every sentence the outline
+# stage's wording table has for a failure already says that nothing partial
+# was kept, so this one does not say it a second time four inches lower —
+# what it adds is the other half a learner wants before pressing: which of
+# the two stages this is, and that it restarts rather than resumes.
+OUTLINE_RETRY_ASIDE = ("This is the cheap stage, and it starts over rather "
+                       "than resuming.")
+
 # What the build's retry button says under it, and the one thing about this
 # stop that differs from every other retry in the wizard: a stopped build
 # kept what it had finished, and the approval it ran under is a row upstream
 # in the ledger that a stopped run did not spend. So this button asks for
-# neither the money already spent nor the decision already taken.
+# neither the money already spent nor the decision already taken — but it is
+# not free either, and now it says so: the refused piece is written a second
+# time, at its own cost, under that same approval. On the screens about
+# money, a button that spends carries the fact that it spends.
 BUILD_RETRY_ASIDE = ("What was already finished was kept, so this carries on "
-                     "from where it stopped rather than starting over — and "
-                     "it does not ask you to approve anything again.")
+                     "from where it stopped rather than starting over, and it "
+                     "does not ask you to approve anything again — but the "
+                     "refused piece is written a second time, which spends "
+                     "against that same approval.")
+
+# And what the build has cost so far, when the ledger has anything to say.
+# Deliberately not "the refused attempt cost": the token ledger meters calls
+# by role, not by run, so what it can honestly answer is what this course
+# has spent since its approval — refused work and kept work together.
+BUILD_RETRY_SPENT = " This build has spent {spent} so far."
 
 # And what the publication's retry says under it. Publishing calls no model
 # at all — it moves finished files and compiles them — so the one thing this
@@ -487,9 +511,16 @@ REVIEW_CAPTION = ("This exact document rides along on every model call that "
 # through a screen reader. It names the parts instead — and it does not
 # hand curricle the whole frontmatter, because the description line in it
 # is the learner's own sentence when they wrote one.
-READBACK_LEGEND = ("Curricle wrote the opening paragraphs, the section "
-                   "headings and the footer; everything between them is a "
-                   "claim of yours, as is the description line at the top.")
+#
+# "The frame" and then its parts, because the bold lead-ins ("What to skip:"
+# and its neighbours) are house text too: a legend that listed paragraphs,
+# headings and footer was read as a promise that everything else on the page
+# is the learner's, and those lead-ins sit inside the learner's own sections
+# where that promise is least true.
+READBACK_LEGEND = ("Curricle wrote the frame — the opening paragraphs, the "
+                   "headings and the bold lead-ins, and the footer; "
+                   "everything between them is a claim of yours, as is the "
+                   "description line at the top.")
 
 # The fallback for a browser with no JavaScript, and only for that browser.
 # A full-page refresh resets scroll, selection and focus and re-announces
@@ -1522,7 +1553,9 @@ def outline_screen(flow: onboarding.CourseFlow | None) -> Screen:
     itself never reaches the page (O2) and neither does the exception; both
     are in the ledger row for an operator. Retrying is offered without a
     caveat because a failed outline kept nothing — the draft's three files
-    are deleted on every way out but success.
+    are deleted on every way out but success. Which the sentence above the
+    button already says, in whichever of its wordings applies, so the aside
+    under the button says the rest and not that again.
 
     (`waiting` is a state this wizard cannot write: the scope save appends
     the request row in the same transaction as the scope. A ledger that
@@ -1543,8 +1576,7 @@ def outline_screen(flow: onboarding.CourseFlow | None) -> Screen:
     <form method="post" action="/onboarding/outline/retry">
       <p class="ask">
         <button class="pill primary" type="submit">Try again →</button>
-        <span class="aside">Nothing partial was kept, so this starts the
-        stage over rather than resuming it.</span>
+        <span class="aside">{OUTLINE_RETRY_ASIDE}</span>
       </p>
     </form>
   </div>
@@ -2073,9 +2105,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
   <p class="counts">{count_line(manifest)}</p>
 {phases}{_ladder_block(manifest)}{_shelf_block(manifest)}
   <div class="gatebox attention" id="cost">
-    <p class="stateline">{_chip("waiting")}
-      <span class="note">building the first phase is the stage that costs
-      money</span></p>
+    <p class="stateline">{_chip("waiting")}</p>
     <h2>What building phase 1 will cost</h2>
     <div class="costs">
       {estimate_cost_card}
@@ -2114,7 +2144,8 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
 """)
 
 
-def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
+def build_screen(flow: onboarding.CourseFlow | None,
+                 spend: Spend | None = None) -> Screen:
     """Stop 9, in the outline stop's own words and shape.
 
     Pending makes the same two sentences the drafting screen does: what is
@@ -2128,6 +2159,15 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
     that anything has to be approved again: the approval is a row upstream
     in the ledger and a stopped run did not spend it.
 
+    It does say what carrying on costs, which is the other half of that:
+    pressing the button buys the refused piece a second time, and a screen
+    that promised no second approval while staying quiet about the second
+    purchase was reassuring in one direction only. `spend` is this course's
+    ledger reading, or None where nobody has one to hand — the sentence with
+    a figure in it is printed only when the ledger can supply the figure.
+    Not "what the refused attempt cost": the token ledger meters by role,
+    not by run, and it cannot separate the refused work from the kept.
+
     `waiting` is a state this stop should never be seen in — the approval
     and the request for the build are one transaction — but a ledger that
     somehow held only the approval reads as this screen without the refresh,
@@ -2138,6 +2178,9 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
         worded = onboarding.WORDING.get(
             ("build", flow.reason or ""),
             "That stage stopped and what it had already finished was kept.")
+        aside = BUILD_RETRY_ASIDE + (
+            BUILD_RETRY_SPENT.format(spent=dollars(spend.build))
+            if spend is not None and spend.build else "")
         return Screen(f"""
   <h1>{STOP_TITLES["build"]}</h1>
   <div class="gatebox attention">
@@ -2147,7 +2190,7 @@ def build_screen(flow: onboarding.CourseFlow | None) -> Screen:
     <form method="post" action="/onboarding/build/retry">
       <p class="ask">
         <button class="pill primary" type="submit">Carry on →</button>
-        <span class="aside">{BUILD_RETRY_ASIDE}</span>
+        <span class="aside">{aside}</span>
       </p>
     </form>
   </div>
@@ -2668,7 +2711,12 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
                     flow, draft_manifest(courses_dir, flow.course_id),
                     read_spend(flow.course_id))
             elif stop == "build":
-                rendered = build_screen(flow)
+                # The spend read is the same one the gate and the landing
+                # card make, at the third moment money is worth a number:
+                # the button under a stopped build spends again.
+                rendered = build_screen(
+                    flow, read_spend(flow.course_id) if flow is not None
+                    else None)
             elif stop == "promote":
                 rendered = promote_screen(flow)
             else:

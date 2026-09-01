@@ -55,6 +55,7 @@ import json
 import os
 import sys
 import time
+from decimal import Decimal
 from typing import Callable
 
 import sqlalchemy as sa
@@ -193,7 +194,38 @@ def _outline(engine: sa.Engine, scope: db.TenantScope,
         # worker breaking, so it is worded as such and the retry is offered.
         raise StageFailed("validation_failed", str(exc)) from exc
     estimate = factory.estimate_build_cost(runner.config, plan)
-    return "outline_ready", {"plan": plan, "estimate_usd": f"{estimate:.2f}"}
+    headroom = _build_headroom(runner, plan)
+    return "outline_ready", {"plan": plan,
+                             "estimate_usd": f"{estimate:.2f}",
+                             "headroom_usd": f"{headroom:.2f}"}
+
+
+def _build_headroom(runner: llm.Runner, plan: dict) -> Decimal:
+    """What this build has left to spend before a role starts refusing.
+
+    Not the configured budgets added up. A budget is *per tenant per stage*
+    for the life of the account (models.yaml), and `run_role` compares a
+    role's whole ledger history against it — so a tenant on their second
+    course has already eaten into every one of these, and the sum of the
+    budgets would be a number nobody can still spend. Printing that at the
+    gate would put a cap on the screen that the very next call could refuse
+    to honour, and O3 would record it forever.
+
+    So: budget minus what this tenant has already spent on that role,
+    floored at zero, summed over the roles this plan actually runs.
+    `runner.spent` is the same read `run_role` performs before every call,
+    taken here at the moment the outline becomes ready — which is what
+    makes the figure true of the decision the learner is about to make
+    rather than of the account in general.
+
+    It is a stopping line and not a hard cap, and the gate says so: the
+    check is made *before* a call, so a call already under way can carry
+    its role a little past the budget it was checked against.
+    """
+    return sum((max(runner.config.budget_for_stage(role) - runner.spent(role),
+                    Decimal(0))
+                for key, role in factory.PLAN_ROLES if plan.get(key)),
+               Decimal(0))
 
 
 def _build(engine: sa.Engine, scope: db.TenantScope,

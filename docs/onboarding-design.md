@@ -250,6 +250,44 @@ ledger; nothing that costs tokens runs without such a row upstream.
 Rejecting with a note re-runs Stop 7 with the note in the prompt; the note
 is a ledger row too.
 
+**Two numbers, and a receipt for both.** The estimate alone turned out to
+be the wrong shape for this decision: a display-size figure with cents on it
+reads as a price, and the first live walk came in at $2.02 against "$1.70
+estimated" — an honest 19% over that nonetheless read as a wrong price. So
+the gate shows the estimate *and* the **headroom**, at the same size, each
+with the word that says which it is: the estimate is an expectation at
+today's rates, the headroom is what these roles have left to spend before
+one of them refuses.
+
+Headroom, not "the ceiling", and the distinction is the whole of why this
+number is trustworthy. `models.yaml` budgets are per tenant per *stage* for
+the life of an account, and `Runner.run_role` compares a role's entire
+ledger history against its budget before every call. The sum of the budgets
+is therefore not a cap on *this* build — a learner on their second course
+has already eaten into every one of them, and a gate printing the sum would
+put a number on screen that the next call could refuse to honour, with the
+approval row recording it forever. What the worker writes into the
+`outline_ready` payload is `sum(max(0, budget − spent(role)))` over the
+roles the plan will actually run, read at the moment the outline becomes
+ready; the wizard still reads no prices of its own. It is a stopping line
+rather than a hard cap and the copy says so: the check happens before a
+call, so a call already under way can carry its role a little past its
+budget. When the headroom will not cover the estimate the gate says that
+above the button, in a sentence, and still offers the button — it is the
+learner's account and their decision, and a build that stops partway keeps
+what it finished.
+
+The approval row echoes *both* figures, so O3's "the number the learner was
+shown" is the whole of what they were shown. The gate also prints what
+drafting has cost so far — across every draft, when a rejection bought more
+than one — from `token_ledger` (a database read; L1 is about model calls,
+not queries), because that money was spent on the strength of an aside
+calling it the cheap stage and no screen had ever named it. The landing
+closes the loop with the receipt: total, split into draft and build, beside
+the estimate the build was approved at. Two-decimal precision belongs there,
+where it is a bill, rather than on an estimate, where it is a claim the
+system cannot keep.
+
 (Rejected: a second human gate on the generated materials themselves. The
 outline is where a human's five minutes change the outcome; the materials
 are guarded by the existing refusal-grade validators — exercise tests

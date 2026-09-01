@@ -431,9 +431,29 @@ class OutlineStageTest(WorkerFixture):
                 phase_id="p1", lesson_unit="u1", widget_unit="u2",
                 widget_concept="The compiler refuses rather than guesses.",
                 exercise_unit="u2", quiz=True, bank=False))
-        # A number the gate can print and the approval row can carry.
-        self.assertGreater(Decimal(payload["estimate_usd"]), 0)
-        self.assertRegex(payload["estimate_usd"], r"^\d+\.\d\d$")
+        # Two numbers the gate can print and the approval row can carry:
+        # what building this plan is expected to cost, and what these roles
+        # have left to spend before one of them refuses. Both travel in the
+        # payload because the wizard may never read the model configuration
+        # itself, and this stage already holds it.
+        for number in ("estimate_usd", "headroom_usd"):
+            with self.subTest(number=number):
+                self.assertGreater(Decimal(payload[number]), 0)
+                self.assertRegex(payload[number], r"^\d+\.\d\d$")
+        # This tenant has bought nothing on the build roles yet, so what is
+        # left of their budgets is the whole of them — and only theirs: the
+        # bank is off, so the bank author's budget is not in the figure.
+        # (What the number does when a tenant *has* spent is the next test;
+        # that is the whole point of it being headroom.)
+        config = llm.load_models_config()
+        planned = [role for key, role in factory.PLAN_ROLES if plan.get(key)]
+        self.assertEqual(
+            Decimal(payload["headroom_usd"]),
+            sum((config.budget_for_stage(role) for role in planned),
+                Decimal(0)))
+        self.assertLess(Decimal(payload["headroom_usd"]),
+                        sum((config.budget_for_stage(role)
+                             for _, role in factory.PLAN_ROLES), Decimal(0)))
 
         # T1 where it matters: the stage was briefed with *this* tenant's two
         # folds, not with empty state that would have produced a generic
@@ -448,6 +468,67 @@ class OutlineStageTest(WorkerFixture):
         # L2: every call the stage made is metered, under its role's name.
         self.assertEqual(self.ledger_stages(self.a),
                          ["curriculum-designer", "resource-curator"])
+
+    def test_the_headroom_is_what_is_left_not_what_was_configured(self):
+        """The figure the learner approves against, on a used account.
+
+        Budgets are per tenant per *stage* for the life of the account
+        (models.yaml), and `run_role` compares a role's whole ledger history
+        against its budget before every call. So the sum of the budgets is a
+        number a tenant on their second course can no longer spend — and
+        printing it at the gate would put a cap on screen that the very next
+        call refuses to honour, with O3 recording it forever.
+
+        The prior spend here is planted directly rather than bought, so the
+        arithmetic under test is `budget − spent`, not this test's ability
+        to predict what a scripted transport costs: one role three-quarters
+        used, one role spent past its budget (which happens — the check is
+        made before a call, so the call that crosses the line completes),
+        and the rest untouched.
+        """
+        used, over = "lesson-writer", "widget-builder"
+        config = llm.load_models_config()
+        spent = {used: Decimal("3.75"),
+                 over: config.budget_for_stage(over) + Decimal("0.40")}
+        # A tenant of this test's own: the prior spend under test is the
+        # spend planted below and nothing another test happened to buy.
+        tenant = self.fresh_tenant()
+        scope = db.for_tenant(tenant)
+        with self.engine.begin() as conn:
+            for role, cost in spent.items():
+                conn.execute(scope.ledger_insert(
+                    stage=role, model="claude-haiku-4-5", input_tokens=1,
+                    output_tokens=1, cache_write_tokens=0,
+                    cache_read_tokens=0, cost_usd=cost))
+
+        self.scoped(tenant, self.COURSE)
+        self.enqueue(tenant, self.COURSE, "outline")
+        with self.with_send(FakeOutlineSend(designer_json(), GOOD_SHELF)):
+            self.assertTrue(worker.run_once(self.engine))
+        (_, payload), = [e for e in self.ledger(tenant, self.COURSE)
+                         if e[0] == "outline_ready"]
+
+        plan = payload["plan"]
+        planned = [role for key, role in factory.PLAN_ROLES if plan.get(key)]
+        self.assertIn(used, planned)
+        self.assertIn(over, planned)
+        # Role by role: what is left, and never less than nothing. A role
+        # already past its budget contributes zero rather than a negative
+        # that would quietly fund the others.
+        left = {role: max(config.budget_for_stage(role) - spent.get(role, 0),
+                          Decimal(0))
+                for role in planned}
+        self.assertEqual(left[used],
+                         config.budget_for_stage(used) - Decimal("3.75"))
+        self.assertEqual(left[over], Decimal(0))
+        self.assertEqual(Decimal(payload["headroom_usd"]),
+                         sum(left.values(), Decimal(0)))
+        # And the whole point: it is strictly less than the configured
+        # budgets this account started with.
+        self.assertLess(
+            Decimal(payload["headroom_usd"]),
+            sum((config.budget_for_stage(role) for role in planned),
+                Decimal(0)))
 
     def test_a_reviewers_note_from_the_fold_reaches_the_roles(self):
         # The note is the whole content of a rejection (Stop 8), and the

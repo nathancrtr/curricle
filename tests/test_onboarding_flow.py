@@ -26,12 +26,13 @@ import os
 import shutil
 import tempfile
 import unittest
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from unittest import mock
 
 import sqlalchemy as sa
 
-from curricle import coursehome, db, llm, onboarding, webapp, worker
+from curricle import (coursehome, db, factory, llm, onboarding, webapp,
+                      wizard, worker)
 from curricle.compiler import compile_course
 from curricle.sidecar import load_sidecar
 
@@ -261,14 +262,71 @@ class OnboardingFlowTest(unittest.TestCase):
         self.assertEqual(sorted(set(self.send.roles()) & OUTLINE_ROLES),
                          sorted(OUTLINE_ROLES))
 
-    def test_step_4_the_gate_shows_the_outline_and_the_number(self):
+    def test_step_4_the_gate_shows_the_outline_and_the_numbers(self):
         # Compiled off the draft on disk, not read back out of a row: the
         # course's own title and unit headings are on the page.
         self.assertIn("Tiny demo", self.gate_page)
         self.assertIn("Unit 1 — What a manifest is", self.gate_page)
-        estimate = self.payload("outline_ready")["estimate_usd"]
-        self.assertIn(f"${estimate} estimated", self.gate_page)
+        outline = self.payload("outline_ready")
+        # Both numbers, both out of the payload the worker wrote: what the
+        # build is expected to cost, and what these roles have left before
+        # one of them refuses.
+        self.assertIn(f"about ${outline['estimate_usd']}", self.gate_page)
+        self.assertIn(f"${outline['headroom_usd']}", self.gate_page)
+        # This account had bought nothing on the build roles before the
+        # gate, so there is more left than the estimate needs and no
+        # warning belongs on the page.
+        self.assertNotIn(wizard.GATE_SHORT, self.gate_page)
+        self.assertNotIn(wizard.GATE_NONE, self.gate_page)
+        # And what has already been spent getting here, off the token ledger
+        # — the one figure on this page that is a bill rather than a guess.
+        drafting = sum((Decimal(r.cost_usd) for r in self.spend()
+                        if r.stage in OUTLINE_ROLES), Decimal(0))
+        self.assertIn(f"Drafting cost so far: ${drafting:.2f}.",
+                      self.gate_page)
         self.assertEqual(self.approved.status_code, 303, self.approved.text)
+
+    def test_step_4_the_headroom_covered_what_the_build_then_spent(self):
+        # The figure is what these roles had left when the outline became
+        # ready. This account was empty at that point, so it was the whole
+        # of their budgets — and the walk then proves the figure was not a
+        # decoration: what the build actually bought fits inside it, role by
+        # role and in total.
+        config = llm.load_models_config()
+        plan = self.payload("outline_ready")["plan"]
+        planned = {role for key, role in factory.PLAN_ROLES if plan.get(key)}
+        self.assertEqual(planned, BUILD_ROLES)
+        headroom = Decimal(self.payload("outline_ready")["headroom_usd"])
+        self.assertEqual(headroom,
+                         sum((config.budget_for_stage(role)
+                              for role in planned), Decimal(0)))
+        built = sum((Decimal(r.cost_usd) for r in self.spend()
+                     if r.stage in BUILD_ROLES), Decimal(0))
+        self.assertLess(built, headroom)
+
+    def test_step_6_the_landing_prints_the_receipt(self):
+        # The promise Stop 0 makes about money, made checkable: the total,
+        # split at the approval, beside the estimate it was approved at. The
+        # split is asserted against the roles rather than against the clock
+        # the wizard windows by — two independent answers to "what did the
+        # drafting cost", and they have to agree.
+        spend = self.spend()
+        drafting = sum((Decimal(r.cost_usd) for r in spend
+                        if r.stage in OUTLINE_ROLES), Decimal(0))
+        building = sum((Decimal(r.cost_usd) for r in spend
+                        if r.stage in BUILD_ROLES), Decimal(0))
+        def cents(amount: Decimal) -> Decimal:
+            return amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        self.assertIn(f"${cents(drafting):.2f} to draft", self.landing)
+        self.assertIn(f"${cents(building):.2f} to build", self.landing)
+        # The total is the two printed figures added, not the raw sum
+        # rounded: a receipt whose own arithmetic does not check is worse
+        # than no receipt.
+        self.assertIn(f"<b>${cents(drafting) + cents(building):.2f}</b>",
+                      self.landing)
+        approved = self.payload("outline_approved")["estimate_usd"]
+        self.assertIn(f"approved at about ${approved}", self.landing)
 
     def test_step_5_the_build_and_the_promotion_reach_promoted(self):
         self.assertEqual(self.kinds()[-1], "promoted")
@@ -367,14 +425,20 @@ class OnboardingFlowTest(unittest.TestCase):
                                 if r.stage in BUILD_ROLES)
         self.assertLess(approval.created_at, first_build_spend)
 
-        # And it carries the number that was on the screen, byte for byte —
-        # the approval echoes `outline_ready`'s own payload rather than
-        # reading a figure off a form.
+        # And it carries the numbers that were on the screen, byte for byte
+        # — the approval echoes `outline_ready`'s own payload rather than
+        # reading figures off a form. Both of them: the learner was shown
+        # what the build is expected to cost and what was left before it
+        # refuses, and a row echoing half of that is half a record of the
+        # decision.
         outline = next(r for r in rows if r.kind == "outline_ready")
-        self.assertEqual(approval.payload["estimate_usd"],
-                         outline.payload["estimate_usd"])
+        for number in ("estimate_usd", "headroom_usd"):
+            with self.subTest(number=number):
+                self.assertEqual(approval.payload[number],
+                                 outline.payload[number])
+                self.assertIn(f"${outline.payload[number]}", self.gate_page)
         self.assertEqual(approval.payload["plan"], outline.payload["plan"])
-        self.assertIn(f"${outline.payload['estimate_usd']} estimated",
+        self.assertIn(f"about ${outline.payload['estimate_usd']}",
                       self.gate_page)
 
         # Per-stage budget compliance: each stage's summed cost is inside the

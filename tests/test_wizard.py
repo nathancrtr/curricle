@@ -1050,6 +1050,13 @@ class OutlineGateScreenTest(GateFixture):
         self.assertEqual(page.count(wizard.GATE_ESTIMATE_WORD), 2)
         # And the decision itself is still one form, not two.
         self.assertEqual(page.count('action="/onboarding/outline/approve"'), 1)
+        # The sentence is said once, by the lede. The cost card's chip used
+        # to repeat it in a note a screen-height further down; the chip
+        # stays, because whose turn it is still has to be said, and the
+        # duplicate does not.
+        self.assertEqual(page.count("is the stage that costs money"), 1)
+        self.assertNotIn("building the first phase is the stage", page)
+        self.assertIn(wizard.WAITING_WORD, page)
 
     def test_a_row_with_no_estimate_says_no_number_at_all(self):
         # The lede degrades the way the card's other figure does: a payload

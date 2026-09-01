@@ -419,6 +419,11 @@ RECEIPT_NONE = "No model spend is recorded against this course."
 # it. The figure and the word under it are the card's own — `estimate_cost`
 # draws both places — so the two can never come to say different things
 # about the same payload.
+# It is also the only place that sentence is said: the cost card's chip used
+# to carry a note repeating it ("building the first phase is the stage that
+# costs money") a screen-height below, which was one fact printed twice on
+# one page. The chip stays — it says whose turn this is — and the lede says
+# what the turn is about.
 GATE_COST_LEAD = ("Building the first phase of materials is the stage that "
                   "costs money, and nothing is spent until you say so —")
 
@@ -506,9 +511,16 @@ REVIEW_CAPTION = ("This exact document rides along on every model call that "
 # through a screen reader. It names the parts instead — and it does not
 # hand curricle the whole frontmatter, because the description line in it
 # is the learner's own sentence when they wrote one.
-READBACK_LEGEND = ("Curricle wrote the opening paragraphs, the section "
-                   "headings and the footer; everything between them is a "
-                   "claim of yours, as is the description line at the top.")
+#
+# "The frame" and then its parts, because the bold lead-ins ("What to skip:"
+# and its neighbours) are house text too: a legend that listed paragraphs,
+# headings and footer was read as a promise that everything else on the page
+# is the learner's, and those lead-ins sit inside the learner's own sections
+# where that promise is least true.
+READBACK_LEGEND = ("Curricle wrote the frame — the opening paragraphs, the "
+                   "headings and the bold lead-ins, and the footer; "
+                   "everything between them is a claim of yours, as is the "
+                   "description line at the top.")
 
 # The fallback for a browser with no JavaScript, and only for that browser.
 # A full-page refresh resets scroll, selection and focus and re-announces
@@ -2093,9 +2105,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
   <p class="counts">{count_line(manifest)}</p>
 {phases}{_ladder_block(manifest)}{_shelf_block(manifest)}
   <div class="gatebox attention" id="cost">
-    <p class="stateline">{_chip("waiting")}
-      <span class="note">building the first phase is the stage that costs
-      money</span></p>
+    <p class="stateline">{_chip("waiting")}</p>
     <h2>What building phase 1 will cost</h2>
     <div class="costs">
       {estimate_cost_card}

@@ -121,10 +121,6 @@ REFUSALS = (RuntimeError, SchemaError)
 INDEX_STYLE = theme.style("""\
   .wrap { max-width:760px; margin:0 auto; padding:48px 24px 80px; }
   .topbar { display:flex; align-items:center; gap:12px; margin:0 0 44px; }
-  .wordmark { display:inline-flex; align-items:center; gap:10px;
-              font:700 22px """ + theme.FONT_DISPLAY + """;
-              color:var(--ink); text-decoration:none; letter-spacing:-.01em; }
-  .wordmark svg { display:block; }
   .topbar .spacer { flex:1 1 auto; }
   h1 { font-size:clamp(26px,5vw,34px); font-weight:700; letter-spacing:-.01em;
        margin:0 0 6px; }
@@ -147,24 +143,10 @@ INDEX_STYLE = theme.style("""\
            color:var(--muted); }
 """)
 
-# The wordmark is the waypath itself, in miniature: three stones — lit, ring,
-# unlit — because the mark and the product's promise are the same drawing.
-# Which is why both of its v1 departures from the path are gone. The lit
-# stone fills --accent-strong, the token the path's lit stones moved to when
-# the contrast exception was retired; drawing the mark in --accent left the
-# one place the gesture is stated on its own out of the decision that reached
-# every other waypath. And the stones are the 2:1 lozenge, not circles: the
-# lozenge is the chosen stone shape, and a mark whose stones are a different
-# shape from the path's stones is a different drawing, whatever it is
-# miniaturizing. Scaling is the honest miniaturization — the front door's
-# course cards already shrink the stone to 15x8 — so these are 16x8 with a
-# 4px gap, and the ring is a hollow lit stone inset 1 with a 2 stroke,
-# exactly as `.wp-stone.here` draws it.
-WORDMARK = ('<svg width="56" height="8" viewBox="0 0 56 8" aria-hidden="true">'
-            '<rect x="0" y="0" width="16" height="8" rx="4" fill="var(--accent-strong)"/>'
-            '<rect x="21" y="1" width="14" height="6" rx="3" fill="none" '
-            'stroke="var(--accent-strong)" stroke-width="2"/>'
-            '<rect x="40" y="0" width="16" height="8" rx="4" fill="var(--stone)"/></svg>')
+# The wordmark is `theme.WORDMARK`, drawn by the design system and used here
+# and by the wizard's masthead. It moved out of this module when the wizard
+# grew a masthead of its own: `webapp` imports `wizard`, so a mark the wizard
+# could reach had to live below them both.
 
 
 def _program_ids(manifest: Manifest) -> tuple[str, ...]:
@@ -470,7 +452,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
 <body>
 <div class="wrap">
   <div class="topbar">
-    <a class="wordmark" href="/">{WORDMARK} curricle</a>
+    <a class="wordmark" href="/">{theme.WORDMARK} curricle</a>
     <span class="spacer"></span>
     <a class="pill" href="/profile">Your profile</a>
   </div>

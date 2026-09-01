@@ -158,6 +158,17 @@ BASE_CSS = f"""\
           color:var(--on-accent); text-decoration:none; }}
   .pill.primary:hover {{ filter:brightness(1.06); }}
 
+  /* ---- the mark ---- */
+  /* Shared, because two surfaces draw it now: the front door leads with it
+     as a link home, and the wizard leads with it as a static mark (there is
+     no home for a tenant who has not finished setting up, and a dead link
+     is worse than none). A second copy of these four declarations beside a
+     second copy of the drawing is how a mark drifts. */
+  .wordmark {{ display:inline-flex; align-items:center; gap:10px;
+              font:700 22px {FONT_DISPLAY}; color:var(--ink);
+              text-decoration:none; letter-spacing:-.01em; }}
+  .wordmark svg {{ display:block; }}
+
   /* ---- the waypath (the signature gesture) ---- */
   .waypath {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }}
   .wp-stone {{ width:20px; height:10px; border-radius:5px; background:var(--stone);
@@ -192,6 +203,35 @@ BASE_CSS = f"""\
 def style(extra: str = "") -> str:
     """Tokens + base + a surface's own styles, ready for a <style> block."""
     return TOKENS_CSS + BASE_CSS + extra
+
+
+# --------------------------------------------------------------------------
+# The mark
+# --------------------------------------------------------------------------
+
+# The wordmark is the waypath itself, in miniature: three stones — lit, ring,
+# unlit — because the mark and the product's promise are the same drawing.
+# Which is why both of its v1 departures from the path are gone. The lit
+# stone fills --accent-strong, the token the path's lit stones moved to when
+# the contrast exception was retired; drawing the mark in --accent left the
+# one place the gesture is stated on its own out of the decision that reached
+# every other waypath. And the stones are the 2:1 lozenge, not circles: the
+# lozenge is the chosen stone shape, and a mark whose stones are a different
+# shape from the path's stones is a different drawing, whatever it is
+# miniaturizing. Scaling is the honest miniaturization — the front door's
+# course cards already shrink the stone to 15x8 — so these are 16x8 with a
+# 4px gap, and the ring is a hollow lit stone inset 1 with a 2 stroke,
+# exactly as `.wp-stone.here` draws it.
+#
+# It lives here rather than in `webapp.py` because the wizard leads with it
+# too, and `webapp` imports the wizard: one drawing, in the module that owns
+# the drawing, is the only arrangement in which "reuse, never redraw" is
+# something the code enforces rather than something a reviewer remembers.
+WORDMARK = ('<svg width="56" height="8" viewBox="0 0 56 8" aria-hidden="true">'
+            '<rect x="0" y="0" width="16" height="8" rx="4" fill="var(--accent-strong)"/>'
+            '<rect x="21" y="1" width="14" height="6" rx="3" fill="none" '
+            'stroke="var(--accent-strong)" stroke-width="2"/>'
+            '<rect x="40" y="0" width="16" height="8" rx="4" fill="var(--stone)"/></svg>')
 
 
 # --------------------------------------------------------------------------

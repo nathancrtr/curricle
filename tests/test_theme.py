@@ -130,7 +130,9 @@ SHEETS = [
     # Not a renderer: the web app draws the front door itself, and that page
     # spends tokens like any other surface, so its sheet is guarded like any
     # other sheet.
-    Sheet("curricle.webapp", "INDEX_STYLE", ".wordmark", themed=True),
+    # `.topbar`, not `.wordmark`: the mark is drawn on two surfaces now, so
+    # its rule moved into the shared sheet and cannot witness this one.
+    Sheet("curricle.webapp", "INDEX_STYLE", ".topbar", themed=True),
     # SPIKE (one-stop-shop): the unit page and the markdown reader.
     Sheet("curricle.unitrender", "STYLE", ".doc blockquote", themed=True),
     # The onboarding wizard, which is a page the same way the front door is:

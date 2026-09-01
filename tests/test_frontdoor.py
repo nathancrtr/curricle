@@ -266,7 +266,7 @@ class WordmarkTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.lit, self.ring, self.unlit = _rects(webapp.WORDMARK)
+        self.lit, self.ring, self.unlit = _rects(theme.WORDMARK)
         self.stone = dict(re.findall(
             r"([a-z-]+):([^;]+);",
             re.search(r"\.wp-stone \{([^}]*)\}", theme.BASE_CSS).group(1)))
@@ -300,7 +300,7 @@ class WordmarkTest(unittest.TestCase):
         self.assertEqual(float(self.ring["height"]) + stroke, float(self.lit["height"]))
 
     def test_the_mark_fits_its_viewbox(self):
-        w, h = re.search(r'viewBox="0 0 (\d+) (\d+)"', webapp.WORDMARK).groups()
+        w, h = re.search(r'viewBox="0 0 (\d+) (\d+)"', theme.WORDMARK).groups()
         right = float(self.unlit["x"]) + float(self.unlit["width"])
         self.assertEqual(right, float(w))
         self.assertEqual(float(self.lit["height"]), float(h))

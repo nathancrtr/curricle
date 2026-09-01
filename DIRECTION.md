@@ -47,10 +47,16 @@ core-path meter. Three rules give it its meaning:
 The wordmark is the gesture in miniature: three stones — lit, ring, unlit —
 before the word "curricle". The mark and the product promise are the same
 drawing, which is why there is no second illustration idea anywhere (the one
-exception: a small drawn flag for milestones, see below).
+exception: a small drawn flag for milestones, see below). It is drawn once,
+as `theme.WORDMARK` beside the tokens; the front door and the onboarding
+wizard both spend that one string, because two surfaces drawing the same mark
+from two copies is how a mark drifts.
 
 Where the gesture does **not** go: the profile page tracks nothing, so it gets
-no waypath. A gesture applied where it isn't true is decoration.
+no waypath. A gesture applied where it isn't true is decoration. Where it
+*does* go, and did not until the design review: the onboarding wizard (see
+"Onboarding" below) — a ledger, a fold and a derived "you are here" is the
+most literally tracked thing in the product.
 
 ## Where the line is drawn (the infantilization test)
 
@@ -74,8 +80,8 @@ chosen to read as *hospitality to that person*:
 
 The four independent `STYLE` blobs are gone. `theme.py` is the single source:
 `TOKENS_CSS` (light + dark variables), `BASE_CSS` (shell, panel, chip, pill,
-waypath, toast), `WAYPATH_JS`, the milestone `FLAG_SVG`, and
-`strip_leading_pictograph`. Every renderer composes `theme.style(own_css)`;
+wordmark, waypath, toast), `WAYPATH_JS`, the `WORDMARK` drawing, the
+milestone `FLAG_SVG`, and `strip_leading_pictograph`. Every renderer composes `theme.style(own_css)`;
 `webapp.py`'s front door draws from the same module. A palette change is now
 one edit.
 
@@ -414,6 +420,79 @@ dumps. Decisions taken:
   only paths the compiler blessed. The course repo holds more than the
   course (gitignored seeds, keys, `.git`), so "whatever is on disk" was
   never on the table.
+
+## Onboarding (the design review's second batch)
+
+The wizard is the first ten minutes anybody spends with curricle, and it was
+built before this direction had been applied to a form. A live art-direction
+review of all fifteen stops produced four taste forks; the operator decided
+all four, and they are the design now rather than a recommendation.
+
+- **The masthead is the mark and the waypath** (fork A, over "keep the chip
+  strip" and "words only"). Wordmark → six `.wp-stone`s, server-rendered, lit
+  behind you, the hollow ring on the stop you are at → one line of words
+  ("Step 1 of 6 · Your learner profile — screen 2 of 4"). The chip strip and
+  its second position line are gone: two progress idioms in a product whose
+  personality is one move plus discipline is one idiom too many, and the
+  strip was inert for the first six screens while the line under it did all
+  the moving. The counter-argument the code used to carry — that the waypath
+  means "a path you will walk" and the setup is walked once — lost to the
+  house rule it was arguing against: *the waypath goes wherever something is
+  genuinely tracked*, and the stones a learner watches fill across six stops
+  are the stones the hub lays out on the far side. The hand-off is the
+  gesture. No script: `WAYPATH_JS` lights a stone while you watch, and
+  nothing here changes without a page load. The stones are `aria-hidden` and
+  each carries its position in a visually-hidden word, because a ring a
+  screen reader cannot read is a position only some readers get.
+- **The read-back is split, not rendered** (fork B, over "raw mono" and
+  "rendered markdown with the source behind a disclosure"). The projection is
+  still shown whole and is still the exact file a model reads — one renderer,
+  `profilerender.skill_parts`, which is `render_skill_md` before its own join
+  — with curricle's frame in the mono it always was and the learner's own
+  sentences in body type. A caption says which is which in words, because a
+  distinction carried by type alone is one some readers never get. The lede
+  used to claim the document was generated "from your claims, and from
+  nothing else", four lines above two paragraphs curricle wrote; that clause
+  is gone. Publish is drawn above the document as well as below it.
+- **Examples collapse once a field is answered** (fork C). The two example
+  claims per field teach a register; once a learner has written in it they
+  have done their job, and four fields' worth of them is the difference
+  between a screen you read and a screen you scroll. A `<details>` whose
+  `open` comes off the fold — no script, no cookie, same rule as everything
+  else on these pages.
+- **Three panels on the welcome screen** (fork D — **the operator's choice
+  over the art director's recommendation**, which was to make the
+  never-promises the *only* panel and let the two explanations sit on the
+  ground, on the grounds that the promises are what a stranger is there to
+  check). Three sibling sections now read as three siblings.
+
+Two hierarchy fixes ride along on the same batch. The outline gate says the
+estimate under the lede as well as inside the card — Stop 0 promises "a
+screen that shows the number first", and first had come to mean "after three
+thousand pixels of outline" — and the course's own title is a display `h2` on
+the ground above the phase panels rather than an `h3` in a card identical to
+them, with the count line under the title it counts. Both copies of the
+number are drawn by `estimate_cost`, so the lede and the card cannot come to
+say different things about one payload, and a row carrying no estimate draws
+neither rather than "about $" with nothing after it. The welcome screen's
+money promise was reworded to what is true: the expensive stage is approved
+against a number, the outline runs under a budget of its own, and both are
+itemised on the landing, which is the clause that makes the promise
+checkable.
+
+The cost card itself came out of the same review with three corrections.
+The two figures are not the same size — the estimate keeps display size and
+the headroom steps down one, because at equal weight the eye takes the
+largest number on a card as the price and the headroom is the one figure
+there that is not the cost. The paragraph under them is two sentences, one
+per figure; the runner's mechanism (a check before every call, a call under
+way finishing) is written down in `docs/onboarding-design.md` and not
+recited on the screen where the decision is taken. And the plan is a list of
+things being bought rather than five bold lines that read as five headings:
+body weight, the detail muted, under one short line — "What that buys:" —
+that hinges the money to what it is for. (A stylesheet is served, so the
+comment explaining any of this may not carry an example figure: a number in
+a CSS comment is a number on the page.)
 
 ## Left undone / notes
 

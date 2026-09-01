@@ -34,76 +34,124 @@ _CALIBRATE_SECTIONS = (
 )
 
 
-def _emit(state: ProfileState, sections) -> list[str]:
-    out: list[str] = []
+# Whose words a part of the projection is. The document is one document and
+# `render_skill_md` is its one renderer; this is the seam between the frame
+# curricle writes — frontmatter keys, headings, the two paragraphs that tell
+# a model what it is reading, the footer — and the sentences the learner
+# wrote. The onboarding review screen sets the two differently so that "this
+# is yours, that is ours" is shown rather than claimed; nothing else needs
+# to know, which is why the split lives in the parts and not in a second
+# renderer that could disagree with this one.
+HOUSE = "house"
+LEARNER = "learner"
+
+
+def _emit(state: ProfileState, sections) -> list[tuple[str, str]]:
+    """One group of sections as tagged parts, blank lines and all.
+
+    Sections are separated by an empty part rather than by a join, so that
+    joining every part in order with a newline reproduces the document
+    exactly — which is what lets the review screen mark the parts up without
+    the file that reaches a model changing by a byte.
+    """
+    out: list[tuple[str, str]] = []
     for field, lead, style in sections:
         claims = state.field_claims(field)
         if not claims:
             continue
+        if out:
+            out.append((HOUSE, ""))
         if style == "bullets":
-            block = ([lead] if lead else []) + [f"- {c.text}" for c in claims]
-            out.append("\n".join(block))
+            if lead:
+                out.append((HOUSE, lead))
+            out.append((LEARNER, "\n".join(f"- {c.text}" for c in claims)))
         else:
-            out.extend(c.text for c in claims)
+            out.append((LEARNER, "\n\n".join(c.text for c in claims)))
     return out
 
 
-def render_skill_md(state: ProfileState) -> str:
+def skill_parts(state: ProfileState) -> list[tuple[str, str]]:
+    """The projection, in order, each part tagged HOUSE or LEARNER.
+
+    `render_skill_md` is this, joined with newlines; there is no second
+    renderer and no marker string threaded through the text.
+
+    A section with no claims prints nothing at all — not even its heading.
+    A learner who skips "Subjects" used to get "## Adapting to Different
+    Subjects" over a blank, which reads to a model as a section that was
+    considered and came back empty, and to the learner reviewing their own
+    document as a promise the form failed to keep.
+
+    The frontmatter's `description:` line is tagged by where its text came
+    from: it is the learner's own sentence when they wrote one, and the
+    house fallback when they did not.
+    """
     description = state.claim("meta", "description")
     desc_text = description.text if description else "Personal learning profile."
     today = datetime.date.today().isoformat()
 
-    parts: list[str] = []
-    parts.append("---")
-    parts.append("name: learner-profile")
-    parts.append(f"description: {desc_text}")
-    parts.append("---")
-    parts.append("")
-    parts.append("# Learner Profile")
-    parts.append("")
-    parts.append(
+    parts: list[tuple[str, str]] = []
+
+    def house(text: str = "") -> None:
+        parts.append((HOUSE, text))
+
+    house("---")
+    house("name: learner-profile")
+    parts.append((LEARNER if description else HOUSE,
+                  f"description: {desc_text}"))
+    house("---")
+    house("")
+    house("# Learner Profile")
+    house("")
+    house(
         "This skill provides Claude with context about who the learner is, so "
         "that explanations, exercises, and curriculum materials are calibrated "
         "correctly across any project or subject.")
-    parts.append("")
-    parts.append(
+    house("")
+    house(
         "Read this skill before responding to any learning-oriented request. "
         "Use it to set your baseline assumptions about what to explain, what "
         "to skip, and how to frame new ideas.")
-    parts.append("")
-    parts.append("## Who the Learner Is")
-    parts.append("")
-    parts.append("\n\n".join(_emit(state, _WHO_SECTIONS)))
-    parts.append("")
-    parts.append("## How to Calibrate Responses")
-    parts.append("")
-    parts.append("\n\n".join(_emit(state, _CALIBRATE_SECTIONS)))
-    parts.append("")
-    parts.append("## Adapting to Different Subjects")
-    parts.append("")
-    parts.append("\n\n".join(_emit(state, (("subject_adapters", None, "para"),))))
+
+    for heading, sections in (
+            ("## Who the Learner Is", _WHO_SECTIONS),
+            ("## How to Calibrate Responses", _CALIBRATE_SECTIONS),
+            ("## Adapting to Different Subjects",
+             (("subject_adapters", None, "para"),))):
+        body = _emit(state, sections)
+        if not body:
+            continue
+        house("")
+        house(heading)
+        house("")
+        parts.extend(body)
 
     demonstrated = state.field_claims("demonstrated")
     if demonstrated:
-        parts.append("")
-        parts.append("## Demonstrated in Course Work")
-        parts.append("")
-        parts.append(
+        house("")
+        house("## Demonstrated in Course Work")
+        house("")
+        house(
             "Evidence accumulated from actual course activity — checkpoints "
             "and reviewed work, learner-ratified. Recent entries first tell "
             "you what has been *proven*, not merely claimed.")
-        parts.append("")
-        parts.append("\n".join(f"- {c.text}" for c in reversed(demonstrated)))
+        house("")
+        parts.append((LEARNER,
+                      "\n".join(f"- {c.text}" for c in reversed(demonstrated))))
 
-    parts.append("")
-    parts.append("---")
-    parts.append("")
-    parts.append(
+    house("")
+    house("---")
+    house("")
+    house(
         f"*Generated by curricle from the profile evidence ledger — {today}. "
         "Do not edit by hand: propose or assert evidence instead "
         "(`python -m curricle profile --help`), then re-render.*")
-    parts.append("")
-    return "\n".join(parts)
+    house("")
+    return parts
+
+
+def render_skill_md(state: ProfileState) -> str:
+    return "\n".join(text for _, text in skill_parts(state))
 
 
 def write_skill_md(state: ProfileState, out_path: str) -> None:

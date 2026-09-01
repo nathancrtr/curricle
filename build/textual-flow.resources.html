@@ -105,6 +105,17 @@
           color:var(--on-accent); text-decoration:none; }
   .pill.primary:hover { filter:brightness(1.06); }
 
+  /* ---- the mark ---- */
+  /* Shared, because two surfaces draw it now: the front door leads with it
+     as a link home, and the wizard leads with it as a static mark (there is
+     no home for a tenant who has not finished setting up, and a dead link
+     is worse than none). A second copy of these four declarations beside a
+     second copy of the drawing is how a mark drifts. */
+  .wordmark { display:inline-flex; align-items:center; gap:10px;
+              font:700 22px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+              text-decoration:none; letter-spacing:-.01em; }
+  .wordmark svg { display:block; }
+
   /* ---- the waypath (the signature gesture) ---- */
   .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);

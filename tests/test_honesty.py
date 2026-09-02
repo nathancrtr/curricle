@@ -274,5 +274,49 @@ class TestTheMilestoneGutter(unittest.TestCase):
                       js_function_body(self.page, "openEntry"))
 
 
+class TestTheNotInHandFilterOnlyHidesWhatItShould(unittest.TestCase):
+    """`classList.toggle(name, undefined)` toggles rather than sets — DOM spec.
+
+    An entry never marked in hand leaves `state.inhand[e.id]` undefined, so
+    the old `hide` expression could itself be `undefined`; handed straight to
+    `toggle`, that flips "hidden" against whatever the class already was
+    instead of setting it to the computed value. "Not in hand" read as "hide
+    everything" on the very first click, because the entries not yet in hand
+    are exactly the ones the filter is meant to keep showing. The fix coerces
+    the argument at the call site, so `toggle` never sees anything but a real
+    boolean.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.page = render_resources(
+            make_manifest(resources=SHELF, resource_tiers=TIERS),
+            api="api/events")
+
+    def test_toggles_second_argument_is_coerced_to_boolean(self):
+        body = js_function_body(self.page, "applyFilter")
+        self.assertIn('toggle("hidden", Boolean(hide))', body)
+        self.assertNotIn('toggle("hidden", hide)', body)
+
+
+class TestTheInHandTitleFadeReachesLinkedTitles(unittest.TestCase):
+    """`.title a { color: var(--ink) }` outranked the fade on linked titles.
+
+    Almost every entry on the shelf has a link, so `.title` sets the color of
+    an element whose visible text sits inside an anchor that pins its own
+    color to `--ink` — the in-hand fade never showed on the common case, only
+    on the rare linkless entry. The selector now names the anchor directly,
+    still spending only the one token.
+    """
+
+    def test_the_inhand_rule_covers_the_anchor(self):
+        page = render_resources(
+            make_manifest(resources=SHELF, resource_tiers=TIERS),
+            api="api/events")
+        self.assertIn(
+            ".entry.inhand .title, .entry.inhand .title a { color:var(--muted); }",
+            page)
+
+
 if __name__ == "__main__":
     unittest.main()

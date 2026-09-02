@@ -59,7 +59,7 @@ STYLE = theme.style("""\
   .title a { color:var(--ink); text-decoration:none; }
   .title a:hover { color:var(--accent-text); text-decoration:underline;
                    text-underline-offset:3px; }
-  .entry.inhand .title { color:var(--muted); }
+  .entry.inhand .title, .entry.inhand .title a { color:var(--muted); }
   .chips { display:inline-flex; flex-wrap:wrap; gap:5px; vertical-align:2px; margin-left:9px; }
   .cite { font-size:12.5px; font-weight:500; color:var(--muted); margin:5px 0 0;
           line-height:1.5; }
@@ -224,7 +224,7 @@ function applyFilter() {
   document.querySelectorAll(".entry").forEach(entry => {
     const e = ALL.find(x => x.id === entry.dataset.id);
     const hide = (freeOnly && !e.free) || (needOnly && state.inhand[e.id]);
-    entry.classList.toggle("hidden", hide);
+    entry.classList.toggle("hidden", Boolean(hide));
     if (!hide) shown++;
   });
   document.querySelectorAll(".tier").forEach(t => {

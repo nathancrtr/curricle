@@ -1,5 +1,5 @@
 # An example profile seed — a fictional learner, used to demonstrate the
-# Phase 2 pipeline end to end without anybody's real profile in the repo.
+# profile pipeline end to end without anybody's real profile in the repo.
 #
 #   python -m curricle tenant create example
 #   python -m curricle profile import-seed examples/example-profile-seed.yaml \

@@ -1,8 +1,9 @@
-"""curricle — the manifest layer of a personalized-learning platform.
+"""curricle — a personalized-learning platform.
 
-Phase 0 scope (see docs/platform-design.md §9): the course
-manifest schema, a compiler over the corpus's curriculum.md conventions,
-and validation that turns house rules into refusals.
+At the foundation, the manifest layer: the course manifest schema, a compiler
+over the corpus's curriculum.md conventions, and validation that turns house
+rules into refusals. Everything else — renderers, progress, profile, factory,
+web app, tutor export — reads the manifest that layer emits.
 """
 
 from .schema import Manifest, SchemaError  # noqa: F401

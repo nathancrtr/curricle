@@ -125,42 +125,50 @@ this like this?" about any element and get a real answer.
 ## In this repo
 
 `CLAUDE.md` is already in your context — it carries the architecture, the
-strict-decoding contract, and the phase map. Read it and do not re-derive it.
+strict-decoding contract, and the conventions. Read it and do not re-derive it.
 What follows is only what an art director additionally needs.
 
 ### Where the visual surface actually is
 
-Every pixel this product shows is emitted by a Python renderer. There is no
-CSS file, no build step, no framework:
+Every pixel this product shows is emitted by a Python renderer. There is no CSS
+file to hand-edit, no build step, no framework:
 
-| Surface | Renderer | Style blob |
-|---|---|---|
-| Course hub | `curricle/hubrender.py` | `STYLE` at line 21 |
-| Curriculum | `curricle/currender.py` | `STYLE` at line 23 |
-| Learning resources | `curricle/resrender.py` | `STYLE` at line 21 |
-| Learner profile | `curricle/profilerender.py` | `_STYLE` at line 119 |
-| Course picker, routes | `curricle/webapp.py` | (none — inherits) |
+| Surface | Renderer |
+|---|---|
+| Course hub | `curricle/hubrender.py` |
+| Curriculum | `curricle/currender.py` |
+| Unit page | `curricle/unitrender.py` |
+| Learning resources | `curricle/resrender.py` |
+| Learner profile | `curricle/profilerender.py` |
+| Front door, reader, onboarding wizard | `curricle/webapp.py`, `curricle/wizard.py` |
 
-**Those four style blobs are independent copies.** Nothing is shared: no token
-layer, no common scale, no single definition of the accent. That duplication is
-the mechanical cause of the quality ceiling you are here to lift, and it is why
-"build the system before the pixels" is not optional advice here — extracting a
-real token module is part of the work, not a refactor someone else will do.
+**The design system is `curricle/theme.py`** — one source for the tokens (light
+and dark), the base CSS, the waypath script, the wordmark, and the milestone
+glyph. Every renderer composes `theme.style(own_css)` and defines no palette of
+its own; a module that keeps its own `:root` while composing the theme
+overrides the whole system with its old palette. The guards are in
+`tests/test_theme.py`: a stylesheet spending tokens joins `SHEETS` or the suite
+fails, `--faint` is allowlisted per (stylesheet, selector, property) because it
+is decorative only, and the contrast table in `DIRECTION.md` is recomputed from
+the hex values in `theme.py` and asserted against its floor. Changing a token
+means recomputing that table in the same change.
+
+`DIRECTION.md` at the repo root is the record: the signature gesture, the
+judgment calls, the contrast provenance, and what was rejected and why. Read it
+before proposing anything it has already settled.
 
 ### Rendering baselines
 
-`build/*.html` are self-contained files with real course content in them —
-open them directly, no server and no database. That is the cheap loop: edit a
-renderer, recompile, look at the file.
+`build/*.html` are self-contained files with real course content in them — open
+them directly, no server and no database. That is the cheap loop: edit a
+renderer, rebuild, look at the file. `CONTRIBUTING.md` carries the exact
+compile-and-render commands; `examples/tinylang` is the shipped course and the
+baseline everybody has.
 
-```
-source .venv/bin/activate
-python -m curricle compile ../textual-flow --sidecar courses/textual-flow.course.yaml --out build/textual-flow.manifest.yaml
-```
-
-Use the **real** courses (`textual-flow`, `rhyme-schemer`) — they are the ugliest
-honest content this product has, with long unit titles, dense tag chips, and
-uneven phase lengths. Never design against a shortened fixture.
+Where the private courses (`../textual-flow`, `../rhyme-schemer`) are checked
+out beside this repo, design against those too — they are the ugliest honest
+content this product has, with long unit titles, dense tag chips, and uneven
+phase lengths. Never design against a shortened fixture.
 
 ### Binding constraints
 

@@ -6,6 +6,14 @@ art named in [platform-design.md](platform-design.md) §4.1) and an audit of
 curricle's own cold-start path. Like the platform document, decisions recorded
 here are settled unless reopened in interview.*
 
+> **On reading this in the open-source repository.** This is the design
+> document the onboarding wizard was built from, and it is vendored here so
+> the repository is self-contained: the decisions it records are settled, and
+> code that contradicts one is a bug in the code. It cites `job-radar` — a
+> private project whose onboarding pipeline was the prior art — and §2
+> describes the state of curricle *before* the wizard existed. That section is
+> history explaining the design, not a description of the product you have.
+
 ---
 
 ## 1. What this document is
@@ -54,7 +62,8 @@ auth, and invites stay in Phase 5+ per the roadmap.
 
 ## 2. The gap, audited
 
-What "create a profile and a course" actually takes today, in order:
+This is the state of the checkout on 2026-08-30, before any of the below was
+built. What "create a profile and a course" actually took then, in order:
 
 1. Hand-author a ~200-line seed YAML against a twelve-word field vocabulary
    nothing documents outside `profile.FIELDS`, then `profile import-seed`.

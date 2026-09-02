@@ -1,8 +1,8 @@
 """Render the profile: the SKILL.md projection and the web review page.
 
-The skill-file projection is the Phase 2 exit criterion made concrete: the
-document every Claude session reads for calibration is generated from the
-evidence fold, never edited by hand. Structural boilerplate (headings,
+The skill-file projection is the profile pipeline's founding requirement made
+concrete: the document every Claude session reads for calibration is generated
+from the evidence fold, never edited by hand. Structural boilerplate (headings,
 framing paragraphs) lives here; every substantive sentence is a claim.
 """
 

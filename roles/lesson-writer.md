@@ -12,10 +12,10 @@ existing intuition to the formal idea.
 You will receive: the learner's profile (calibrate everything to it — skip
 what it says to skip, scaffold what it says to scaffold, use its preferred
 example domains), the unit's curriculum entry (goal, resources, exercises,
-milestone), an exemplar lesson guide from the same course (match its voice,
-register, and structure exactly), and the house lesson-guide template.
+milestone), and an exemplar lesson guide (match its voice, register, and
+structure exactly).
 
-The non-negotiable spine, from the template:
+The non-negotiable spine:
 
 1. **Objective + prerequisites to check** at the top, and a "Pairs with"
    line naming the unit's widget/exercise files if any are planned.

@@ -470,6 +470,23 @@ class HouseExemplarTest(unittest.TestCase):
         self.assertIn(factory.house_exemplar("bank"), bank)
 
 
+class NoPrivateSkillTest(unittest.TestCase):
+    """The build reads its reference material from the package, not from `~`.
+
+    The lesson stage used to read a lesson-guide template out of one author's
+    `~/.claude/skills/`, and on every other machine substituted an apology for
+    it — a prompt that silently differed by whose disk it ran on. The shipped
+    exemplar is the reference now, so the module has no business under a home
+    directory at all. Guard-test style, same as the tutor export's L1.
+    """
+
+    def test_the_factory_never_reaches_into_a_home_directory(self):
+        with open(factory.__file__, encoding="utf-8") as f:
+            source = f.read()
+        for reach in ("expanduser", "~/", ".claude", '"HOME"', "'HOME'"):
+            self.assertNotIn(reach, source, reach)
+
+
 # The Anthropic SDK is not a declared dependency (pyproject names pyyaml,
 # sqlalchemy, alembic, psycopg, fastapi, uvicorn): the factory needs it, an
 # installed curricle serving courses does not. So everything that reaches
@@ -1446,6 +1463,19 @@ class HouseFallbackBuildTest(unittest.TestCase):
         # nothing under it came from `curricle/exemplars/`.
         self.assertEqual(os.listdir(os.path.join(content_root, "interactive")),
                          [".draft-p1"])
+
+    def test_the_lesson_prompt_is_the_exemplar_and_nothing_else(self):
+        manifest, _ = self.course(GOOD_SIDECAR)
+        send, _ = self.build(manifest, os.path.join(self.tmp.name, "empty"))
+        prompt = send.prompt("lesson-writer")
+        self.assertEqual(
+            [t for t in ("<course>", "<unit>", "<exemplar_lesson>")
+             if t in prompt],
+            ["<course>", "<unit>", "<exemplar_lesson>"])
+        # No slot for the template that used to come off the author's disk,
+        # and no apology standing in for it where it was absent.
+        self.assertNotIn("lesson_guide_template", prompt)
+        self.assertNotIn("no template on this machine", prompt)
 
     def test_a_course_with_its_own_materials_keeps_using_them(self):
         manifest, content_root = self.course(GOOD_SIDECAR + NATIVE_MATERIALS,

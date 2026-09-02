@@ -396,7 +396,7 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         parts.append("</div>")
 
     if c.trigger_phrases:
-        parts.append("<h2>Worked with Claude "
+        parts.append("<h2>Working with your assistant "
                      '<span class="sub">(open a fresh chat '
                      "in this repo and say the words)</span></h2>")
         parts.append('<div class="panel phrases">')

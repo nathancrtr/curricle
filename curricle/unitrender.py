@@ -386,7 +386,7 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
                    None)
         if say and unit:
             say = re.sub(r"[Uu]nit \d+", f"Unit {unit.num}", say)
-        phrase = (f' — open a fresh Claude chat in the course repo and say '
+        phrase = (f' — open a fresh chat with your assistant in the course repo and say '
                   f'<span class="say">{e(say)}</span>' if say else "")
         banner = ('<div class="banner"><b>This is a dialogue script.</b> '
                   "It is written for a tutor to run with you, one question "

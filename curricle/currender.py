@@ -446,7 +446,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
         for tp in c.trigger_phrases:
             note = f" — {e(tp.note)}" if tp.note else ""
             items.append(f'<li><span class="say">{e(tp.say)}</span>{note}</li>')
-        says = ('<section class="section"><h2>Working with Claude</h2>'
+        says = ('<section class="section"><h2>Working with your assistant</h2>'
                 f'<ul class="saylist">{"".join(items)}</ul></section>')
 
     n_units = sum(1 for u in mf.units)

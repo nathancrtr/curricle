@@ -15,7 +15,7 @@ learning/
   learning-resources.md   every source, tiered, each with a "why this one"
   course.yaml             the sidecar — ids, glosses, materials, tracks
   interactive/
-    lessons/              Socratic guides, written for Claude
+    lessons/              Socratic guides, written for your tutor
     widgets/              things to poke at
     exercises/            stubs with failing tests
     quizzes/              checkpoint quizzes that explain themselves

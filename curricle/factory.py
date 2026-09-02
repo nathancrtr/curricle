@@ -880,12 +880,10 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         unit = units[spec.lesson_unit]
         exemplar = (read_exemplar(content_root, manifest, "lesson")
                     or house_exemplar("lesson"))
-        template = _lesson_template()
         text = validate_lesson(run("lesson-writer", [
             ("course", course_line),
             ("unit", unit_md(unit)),
             ("exemplar_lesson", exemplar),
-            ("lesson_guide_template", template),
         ]))
         rel = f"lessons/unit-{unit.num:02d}-lesson.md"
         save(rel, text)
@@ -995,15 +993,6 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         checkpoint()
 
     return report
-
-
-def _lesson_template() -> str:
-    path = os.path.expanduser(
-        "~/.claude/skills/course-builder/assets/lesson-guide-template.md")
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as f:
-            return f.read()
-    return "(no template on this machine — follow the exemplar's structure)"
 
 
 def _quiz_exemplar(shell: str) -> str:

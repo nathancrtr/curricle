@@ -133,7 +133,7 @@ SHEETS = [
     # `.topbar`, not `.wordmark`: the mark is drawn on two surfaces now, so
     # its rule moved into the shared sheet and cannot witness this one.
     Sheet("curricle.webapp", "INDEX_STYLE", ".topbar", themed=True),
-    # SPIKE (one-stop-shop): the unit page and the markdown reader.
+    # DIRECTION.md, unit-page section: the unit page and the markdown reader.
     Sheet("curricle.unitrender", "STYLE", ".doc blockquote", themed=True),
     # The onboarding wizard, which is a page the same way the front door is:
     # drawn by the module that serves it, spending the same tokens.

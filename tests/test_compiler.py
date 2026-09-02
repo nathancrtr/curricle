@@ -1,8 +1,12 @@
+import contextlib
+import io
 import os
 import tempfile
 import textwrap
 import unittest
 
+from curricle import theme
+from curricle.__main__ import main
 from curricle.compiler import compile_course
 from curricle.sidecar import (
     Sidecar, SidecarCourse, SidecarMaterial, SidecarMilestone, SidecarUnit,
@@ -145,6 +149,86 @@ class TestCompile(unittest.TestCase):
     def test_grader_types_are_enforced(self):
         with self.assertRaises(Exception):
             Grader(type="vibes")
+
+
+# The same course as `base_sidecar()`, on disk: the CLI loads its sidecar from
+# a file, so the in-memory constructors can't stand in for it.
+SIDECAR_YAML = textwrap.dedent("""\
+    sidecar_version: 1
+    course:
+      id: test
+      title: Test
+      mode: subject
+      hours_per_week: [1, 2]
+    tracks:
+    - id: side
+      name: Side
+      stages:
+      - {id: s1, label: one}
+      checkpoint_labels: ["Side by now"]
+    units:
+    - id: u0
+      num: 0
+      phase_body: true
+      steps:
+      - {id: u0-a, label: a}
+      - {id: u0-b, label: b}
+    - {id: u1, num: 1, gloss: The first.}
+    - {id: u2, num: 2, gloss: The second.}
+    milestones:
+    - {id: m1, phase_num: 1, kind: contact, label: Say hi, after_unit: u1}
+    materials:
+    - {id: l-u01, kind: lesson, title: L1,
+       path: interactive/lessons/unit-01.md, unit: u1}
+    """)
+
+
+class TestCliWriters(unittest.TestCase):
+    """`--out` paths whose directory does not exist yet.
+
+    The README's quickstart renders the pages beside the course, and someone
+    following it points `--out` at `build/` in a fresh clone. Opening the path
+    without making its parent turned both into a FileNotFoundError from inside
+    the CLI, which is the CLI's job to prevent, not the reader's.
+    """
+
+    def setUp(self):
+        self.root = make_course_dir()
+        with open(os.path.join(self.root, "learning", "course.yaml"), "w") as f:
+            f.write(SIDECAR_YAML)
+        self.out_root = tempfile.mkdtemp()
+
+    def run_cli(self, argv):
+        # "wrote …" on stdout, issues on stderr: neither belongs in a run.
+        noise = io.StringIO()
+        with contextlib.redirect_stdout(noise), contextlib.redirect_stderr(noise):
+            return main(argv), noise.getvalue()
+
+    def test_compile_makes_the_parent_directory_of_out(self):
+        out = os.path.join(self.out_root, "nested", "deeper", "manifest.yaml")
+        code, log = self.run_cli(["compile", self.root, "--out", out])
+        self.assertEqual(code, 0, log)
+        self.assertTrue(os.path.exists(out), log)
+
+    def test_the_renderers_make_the_parent_directory_of_out(self):
+        for command, name in (("hub", "index.html"),
+                              ("curriculum", "curriculum.html"),
+                              ("resources", "learning-resources.html")):
+            with self.subTest(command=command):
+                out = os.path.join(self.out_root, command, "pages", name)
+                code, log = self.run_cli([command, self.root, "--out", out])
+                self.assertEqual(code, 0, log)
+                self.assertTrue(os.path.exists(out), log)
+
+    def test_theme_writes_what_the_served_route_serves(self):
+        # The materials link `../../theme.css`; the app serves theme.style("")
+        # there, and a static render has to be able to put the same bytes on
+        # disk or a widget opened from a rendered hub comes up unstyled.
+        out = os.path.join(self.out_root, "nested", "theme.css")
+        code, log = self.run_cli(["theme", "--out", out])
+        self.assertEqual(code, 0, log)
+        with open(out, encoding="utf-8") as f:
+            self.assertEqual(f.read(), theme.style(""))
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 Learn how interpreters work **by building tinylang** — a small dynamically-typed language with functions, closures, and a REPL — from raw characters through to a running program. For an experienced engineer at ~4 hrs/week; roughly 8 weeks, in phases that each stand alone.
 
-This is the example course that ships with curricle. It is deliberately small — four units and two phases — but it is a real course, not a fixture: it exercises every part of the manifest schema (tracks, milestones, materials, graders, all four reference schemes) and it compiles clean. Copy this directory and start editing when you want a course of your own.
+This is the example course that ships with curricle. It is deliberately small — an orientation phase and two working phases, four numbered units — but it is a real course, not a fixture: it exercises every part of the manifest schema (tracks, milestones, materials, graders, all four reference schemes) and it compiles clean. Copy this directory and start editing when you want a course of your own.
 
 ---
 
@@ -16,7 +16,7 @@ This is the example course that ships with curricle. It is deliberately small �
 
 **Tests are your grader.** From Unit 1 onward you keep a test suite. The house style: test the shapes and the invariants rather than exact strings, so a change to error formatting doesn't turn twenty tests red at once.
 
-**Working with Claude.** *"Teach me Unit 2 interactively"* runs the Socratic lesson guide; *"quiz me on Phase 1"* draws from the checkpoint quiz.
+**Working with your assistant.** *"Teach me Unit 2 interactively"* runs the Socratic lesson guide; *"quiz me on Phase 1"* draws from the checkpoint quiz.
 
 ---
 

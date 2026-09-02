@@ -6,16 +6,13 @@ anyone working in this repository.
 
 ## Where they come from
 
-The bodies are portable role definitions maintained outside this repository —
-originally the author's user-level `~/.claude/agents/` and a sibling project.
-Each file then carries an appended `## In this repo` section holding only what
-that role additionally needs to know about curricle.
+The bodies above the `---` are portable role definitions; the appended
+`## In this repo` section below it holds only what that role additionally
+needs to know about curricle. Both files are self-contained: nothing here
+depends on a copy of the role living anywhere else.
 
-That upstream is personal and not public, so treat these two files as the
-authoritative copies here. Nothing depends on the upstream existing.
-
-Keep project context in the appended section and nowhere else, so re-syncing an
-upstream improvement stays a mechanical diff above the `---`.
+Keep project context in the appended section and nowhere else, so an
+improvement to the portable body stays a mechanical diff above the `---`.
 
 ## What is here, and why only these two
 
@@ -33,6 +30,6 @@ need curricle-specific framing, live here:
 ## What belongs in `## In this repo`
 
 Only what is role-specific and not already loaded. `CLAUDE.md` is in every
-agent's context and carries the architecture, the invariants, and the phase
-map — copying any of it here would create a second, independently-rotting
-copy. Verify before you add.
+agent's context and carries the architecture, the invariants, and the
+conventions — copying any of it here would create a second,
+independently-rotting copy. Verify before you add.

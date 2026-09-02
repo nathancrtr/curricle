@@ -1,8 +1,8 @@
 """The profile-evidence ledger.
 
-Phase 2's founding table: profile claims as append-only events, same house
-pattern as the progress ledger — sequence by identity id, a pure fold, any
-stored profile document a projection. The kind vocabulary encodes the
+The profile pipeline's founding table: profile claims as append-only events,
+same house pattern as the progress ledger — sequence by identity id, a pure
+fold, any stored profile document a projection. The kind vocabulary encodes the
 review discipline in the store itself: `assert` is the learner speaking in
 their own voice (accepted on arrival — the human is the authority on
 themselves); `propose` is anything the system believes about the learner

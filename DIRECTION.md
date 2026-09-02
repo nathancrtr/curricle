@@ -1,21 +1,17 @@
 # Direction: companion — learning as a relationship you keep
 
-> **Status — this now describes `main`.** The direction landed as an
-> eight-PR stack, all of it merged. `curricle/theme.py` is the single source
-> of tokens; `hubrender`, `currender`, `resrender`, `profilerender` and the
-> front door all compose `theme.style(own_css)` and none defines a palette.
-> The prose below is written in the present tense and, as of the stack
-> completing, that tense is accurate: a palette edit in `theme.py` really is
-> one edit. The contrast table is asserted by `tests/test_theme.py`, which
-> also guards every stylesheet for undefined tokens and for `--faint` on
-> copy, so the numbers here cannot drift from the code without the suite
-> saying so.
->
-> Two things below are *not* on `main` and are marked where they appear: the
-> screenshots referenced in the composed round lived on the design branch and
-> were deliberately not committed, and the "left undone" items are still
-> undone. Known defects found while landing this are tracked as issues, not
-> hidden here.
+This is the design rationale for curricle's design system: the signature
+gesture, the judgment calls, the contrast provenance, and what was rejected
+and why. Three candidate directions were drawn — companion, atlas, momentum —
+and companion was chosen; the other two lent structural mechanics to the
+composed round described below. `curricle/theme.py` is the single source of
+tokens: `hubrender`, `currender`, `resrender`, `profilerender` and the front
+door all compose `theme.style(own_css)` and none defines a palette, so a
+palette edit really is one edit. `tests/test_theme.py` recomputes the contrast
+table below from the hex values in `theme.py` and asserts each pair against its
+floor, and guards every stylesheet for undefined tokens and for `--faint` on
+copy — the numbers here cannot drift from the code without the suite saying
+so.
 
 ## Thesis
 
@@ -34,8 +30,8 @@ core-path meter. Three rules give it its meaning:
 
 1. **Zero is a path, not a void.** At 0/26 the entire path renders as visible
    unlit stones with the copy "**The path is laid.** 26 steps from here to
-   done — begin with …". The old design's invisible `0/26` bar (brief defect
-   #4) is replaced by the strongest moment on the page.
+   done — begin with …". The old design's invisible `0/26` bar is replaced by
+   the strongest moment on the page.
 2. **You are here.** The next undone stone is a hollow coral ring — the only
    outlined stone — so resuming ("where was I?") is answered before a word is
    read.
@@ -138,10 +134,9 @@ the attribute exists so a toggle or a test can pin either theme).
 ## Contrast — computed, not eyeballed
 
 WCAG relative-luminance ratios, floors: 4.5 text, 3.0 large text/meaningful
-non-text. Originally computed by a throwaway script on the design branch; the
-provenance now lives in the repo as `tests/test_theme.py`, which recomputes
-the ratios from the hex values in `theme.py` and asserts each pair below
-against its floor. A token edit that breaks a floor fails the suite.
+non-text. The provenance lives in the repo as `tests/test_theme.py`, which
+recomputes the ratios from the hex values in `theme.py` and asserts each pair
+below against its floor. A token edit that breaks a floor fails the suite.
 
 | pair | light | dark | floor |
 |---|---|---|---|
@@ -183,28 +178,27 @@ buttons already used — the ring is now literally a hollow lit stone. The
 waypath remains `aria-hidden` decoration always paired with a text count.
 
 **Placeholder text is not decorative.** An earlier draft of this section
-listed it with the separators and arrows, and the design branch's
-`textarea::placeholder` accordingly took `--faint` over `--panel` — the same
-4.27 that disqualified `--faint` from small text three sentences earlier.
-Placeholder copy is instruction, read to be acted on, so it takes `--muted`
-(6.45 on panel). The renderer PRs inherit that as a requirement, not as a
-pre-blessed exception.
+listed it with the separators and arrows, and `textarea::placeholder`
+accordingly took `--faint` over `--panel` — the same 4.27 that disqualified
+`--faint` from small text three sentences earlier. Placeholder copy is
+instruction, read to be acted on, so it takes `--muted` (6.45 on panel). Every
+renderer inherits that as a requirement, not as a pre-blessed exception.
 
 ## Judgment calls (say-it-out-loud reasons)
 
 - **Hub h1 is the course title, not the slug.** "textual-flow" as a page
   title reads as infrastructure; the slug demotes to a small line under it.
-- **Chips live under the unit title, never beside it** (hub). This is the fix
-  for brief defect #2 — the title owns the full column width; chips are a
-  second line of metadata. In the curriculum's single wide column they stay
+- **Chips live under the unit title, never beside it** (hub). Chips beside the
+  title crowded it out of its own line; the title owns the full column width
+  and chips are a second line of metadata. In the curriculum's single wide column they stay
   inline, where there is room.
-- ~~Phase cards flow in CSS columns~~ — **overruled by the operator and
-  replaced in the composed round** (see "Composed round" below). The columns
+- ~~Phase cards flow in CSS columns~~ — **reversed in review and replaced in
+  the composed round** (see "Composed round" below). The columns
   packed evenly but made the top row read 0, 2, 4 and put sequential content
   in a card grid; the hub is now a single vertical spine.
 - **Milestones get the product's one drawn glyph** — a small flag in
-  currentColor — plus a green-tinted row (defect #5). The one such label in
-  the corpus — textual-flow's `p2-mail`, "📮 Contact milestone: INTF +
+  currentColor — plus a green-tinted row. The one such label in the corpus —
+  textual-flow's `p2-mail`, "📮 Contact milestone: INTF +
   McCollum emails sent" — has its leading `📮` normalized away at render time
   (`strip_leading_pictograph`, leading pictographs only; emoji inside prose
   are the author's business). This is presentation normalization of
@@ -212,12 +206,11 @@ pre-blessed exception.
 - **Widget/quiz card titles are ink with a coral ↗**, not coral wholesale —
   six saturated titles in a grid would compete with the accent's single
   meaning.
-- **Tag chips no longer carry meaning by color alone** (defect #6): every
-  chip keeps its text label; tints come from the semantic families (`widget`
-  = accent because it is the interactive thing; free/paid = green/warm; the
-  rest neutral).
-- **The front door** (defect #1) is the direction stated in one screen:
-  wordmark, time-of-day greeting, one card per course with title,
+- **Tag chips no longer carry meaning by color alone**: every chip keeps its
+  text label; tints come from the semantic families (`widget` = accent because
+  it is the interactive thing; free/paid = green/warm; the rest neutral).
+- **The front door** — the product had none — is the direction stated in one
+  screen: wordmark, time-of-day greeting, one card per course with title,
   description, mini waypath, honest state copy, and Begin/Continue/Revisit.
   Done-counts and next-up labels are *derived at render time* from the
   manifest + progress fold — nothing new is persisted (constraint honored).
@@ -231,7 +224,7 @@ pre-blessed exception.
   index needs no JS at all; L1 stays trivially true (no LLM anywhere near a
   request; all pages are pure functions of manifest + fold).
 
-## Taste forks decided unattended (operator may overrule)
+## Taste forks decided unattended (reversible)
 
 1. **Ground tint: faint peach (`#FDF6EF`) vs pure white.** Chose peach — the
    sunny ground is half the warmth; pure white with the same tokens reads
@@ -245,14 +238,14 @@ pre-blessed exception.
    feels too chatty, the static lede "Pick up where you left off." already
    carries the page.
 4. **Phase columns down-then-across vs preserving the baseline's row order.**
-   Chose columns — **the operator overruled this in review** ("a bizarre way
-   of displaying this kind of sequential information"); the composed round
+   Chose columns — **reversed in review**: a card grid is a bizarre way of
+   displaying this kind of sequential information, and the composed round
    replaced the layout entirely. See below.
 
 ## Deliberately rejected (do not relitigate)
 
-- Mascots, streaks, day counters, XP, badges, confetti — nixed by brief and
-  by the direction's own test.
+- Mascots, streaks, day counters, XP, badges, confetti — excluded by
+  requirement and by the direction's own test.
 - Serif display, cream-parchment gestalt, letterspaced mono eyebrows — the
   bookish status quo being replaced.
 - A second gesture (progress rings were sketched for the phase badges) —
@@ -263,20 +256,20 @@ pre-blessed exception.
 
 ## Composed round (v2) — the hub spine
 
-The operator chose this direction as the base with one emphatic correction:
-the hub's masonry phase columns were "very bad … a bizarre way of displaying
-this kind of sequential information," and the other two candidates' hubs
-(atlas's ruled phase spine, momentum's vertical rail with a now-band) were
-named as much closer. This round replaces the layout; the visual system,
-waypath, zero state, and front door are untouched by instruction.
+Decided in review: companion is the base, with one emphatic correction — the
+hub's masonry phase columns were "very bad … a bizarre way of displaying this
+kind of sequential information," and the other two candidates' hubs (atlas's
+ruled phase spine, momentum's vertical rail with a now-band) were much closer.
+This round replaces the layout; the visual system, waypath, zero state, and
+front door are untouched.
 
 **What the hub is now.** The program track is a single vertical spine — one
 column, phases in walking order, top to bottom, so sequence is carried by the
 layout itself and reading order cannot be ambiguous. A 2px hairline rail
 threads the phase badges (the badges are unchanged from round one; they
 became the rail's nodes) and ends at the last badge — a path should not trail
-past its final marker. Structure is borrowed from atlas/momentum as directed;
-the rendering is companion's own: warm ground, the same rounded badges,
+past its final marker. Structure is borrowed from atlas and momentum; the
+rendering is companion's own: warm ground, the same rounded badges,
 hairline rail rather than atlas's cool rule and mono grid references, no
 grey-and-orange. Specifically:
 
@@ -294,9 +287,9 @@ grey-and-orange. Specifically:
   white numerals). Everything else stays flat on the ground; the spine is
   deliberately not seven stacked cards, which would have been the card
   problem again, vertically.
-- **The welcome panel keeps the waypath and gains the now-band's behavior**
-  (the dispatch's default, accepted): the summary line already named the next
-  item; it now carries a primary **Begin → / Continue →** pill. One element,
+- **The welcome panel keeps the waypath and gains the now-band's behavior**:
+  the summary line already named the next item; it now carries a primary
+  **Begin → / Continue →** pill. One element,
   not two — the waypath *is* companion's now-band, and splitting them would
   have said "where you are" twice at the top of a page whose whole spine says
   it a third time. The pill hides on course completion.
@@ -311,12 +304,10 @@ grey-and-orange. Specifically:
   `--accent` to `--accent-strong`, 3.48/3.81 vs unlit (see the contrast
   section). This propagates to every waypath — wordmark, front door, meters.
 
-**Zero test changes.** The `PHASES`/`TRACKS` payload shape, storage keys,
-checkable ids, and progress-id pins are exactly as before; only the DOM built
-from the payload changed. The suite was green throughout, corpus parity
-included (the skip that appeared in this round's log was the ml-ai corpus,
-resolvable from a worktree since PR 0; today the suite runs 74 tests with no
-skips).
+**The payload is untouched.** The `PHASES`/`TRACKS` payload shape, storage
+keys, checkable ids, and progress-id pins are exactly as before; only the DOM
+built from the payload changed. The layout is a rendering decision and owes the
+ledger nothing.
 
 **Alternatives decided unattended this round:**
 
@@ -324,9 +315,8 @@ skips).
    the card-grid feel vertically and flatten the hierarchy the resuming
    learner needs.
 2. *A separate momentum-style now-band above the waypath* — rejected in favor
-   of merging its behavior into the welcome panel (above); the operator may
-   overrule by splitting the pill row into its own strip, which the markup
-   makes trivial.
+   of merging its behavior into the welcome panel (above); splitting the pill
+   row into its own strip stays trivial in the markup if that is reversed.
 3. *Atlas's proportional per-phase traverse strip and mono `P2·U04` grid
    references* — deliberately not imported: they are atlas's identity, not
    structural logic, and companion already carries position via the waypath
@@ -334,8 +324,8 @@ skips).
 
 ## The material contract (materials go native)
 
-Decided during the one-stop-shop spike and applied in the productionization
-pass; the factory's material roles inherit it for everything generated next.
+The factory's material roles inherit this contract for everything they
+generate next.
 
 A served material — widget, quiz, trainer — is a curricle surface, not a
 guest. The contract is three visible lines, never injected machinery:
@@ -343,8 +333,8 @@ guest. The contract is three visible lines, never injected machinery:
 1. **`<link rel="stylesheet" href="../../theme.css">`** (path-relative to
    the course root) and **no local chrome palette**: the material's own
    `<style>` holds layout and mechanics only, spelled in theme tokens. Both
-   themes arrive free; a material defining its own `--bg` is the same bug
-   hubrender's `:root` was in Phase 4.
+   themes arrive free; a material defining its own `--bg` is the same bug as
+   a renderer keeping its own `:root`.
 2. **The eyebrow crumb** replaces any bespoke nav or toolbar: back to the
    course hub, then the nearest home (its unit page, or the curriculum).
    Course-local theme toggles go too — one platform, one theming rule
@@ -374,11 +364,10 @@ function (the shim guard is `window.curricle &&`), they just render
 unthemed and tell no one. The static export, when it arrives, bundles both
 files rather than reopening this.
 
-## The unit page flows (one-stop-shop, round two)
+## The unit page flows
 
-The productionization pass after the spike; the aim is that clicking a unit
-lands on one readable document that walks end-to-end, not a stack of link
-dumps. Decisions taken:
+Clicking a unit lands on one readable document that walks end-to-end, not a
+stack of link dumps. Decisions taken:
 
 - **Content links by reference, not URL** (schema-spec rule 4, now real):
   `[W&G](res:wg)`, `[Unit 8](unit:u8)`, `[the trainer](mat:t-alphabet)`,
@@ -409,6 +398,13 @@ dumps. Decisions taken:
   a phase renders the full checkpoint (prose, track goals, quiz); earlier
   units get the one-line "builds toward it" strip. The checkpoint belongs
   to the walk, not to every page equally.
+- **The unit page gets no waypath.** It tracks one unit's mark and its steps;
+  a path gesture there would claim more than the page tracks, and the mark pill
+  plus live step checkboxes are the honest amount of liveness.
+- **A lesson guide announces what it is.** The reader banners it as a dialogue
+  script written for a tutor to run, because an in-browser tutor would put an
+  LLM on a request path and L1 is settled: the reader presents the script, the
+  learner's own assistant runs it.
 - **The path continues at the bottom**: prev/next pills in walking order
   (next is the primary pill — coral = your next action), and the reader
   ends with "Back to Unit N", so a lesson is a loop through the unit, not
@@ -425,8 +421,8 @@ dumps. Decisions taken:
 
 The wizard is the first ten minutes anybody spends with curricle, and it was
 built before this direction had been applied to a form. A live art-direction
-review of all fifteen stops produced four taste forks; the operator decided
-all four, and they are the design now rather than a recommendation.
+review of all fifteen stops produced four taste forks; all four were decided in
+review, and they are the design now rather than a recommendation.
 
 - **The masthead is the mark and the waypath** (fork A, over "keep the chip
   strip" and "words only"). Wordmark → six `.wp-stone`s, server-rendered, lit
@@ -460,8 +456,8 @@ all four, and they are the design now rather than a recommendation.
   between a screen you read and a screen you scroll. A `<details>` whose
   `open` comes off the fold — no script, no cookie, same rule as everything
   else on these pages.
-- **Three panels on the welcome screen** (fork D — **the operator's choice
-  over the art director's recommendation**, which was to make the
+- **Three panels on the welcome screen** (fork D — **decided in review against
+  the art director's recommendation**, which was to make the
   never-promises the *only* panel and let the two explanations sit on the
   ground, on the grounds that the promises are what a stranger is there to
   check). Three sibling sections now read as three siblings.
@@ -496,16 +492,8 @@ a CSS comment is a number on the page.)
 
 ## Left undone / notes
 
-- **Narrow screenshots** (design-branch artifacts; they were review evidence
-  and are deliberately not committed here): macOS headless Chrome clamps the
-  layout viewport at ~500px. The composed round adopted the iframe harness
-  the other directions used, so the narrow shots were **true 420px layouts**
-  (a 420px iframe inside a 500px window) and the rest true 500px direct
-  renders; widths between 420 and 500 are plain single-column CSS.
 - The rhyme-schemer exercise cards have no blurbs in the data, so those cards
   render title-only — slightly bare, honest to content.
-- Dark-mode screenshots pin the theme via `data-theme="dark"` on a copied
-  file — same tokens the media query serves; a live `prefers-color-scheme`
-  toggle was verified by the CSS structure, not by a separate shot.
-- Progress-id contracts, storage keys, and event payloads are untouched; all
-  74 tests pass including the textual-flow parity pins.
+- Progress-id contracts, storage keys, and event payloads are untouched by the
+  design system: nothing here is allowed to become a reason to migrate a
+  learner's state.

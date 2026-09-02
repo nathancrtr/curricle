@@ -292,7 +292,7 @@ Every current surface becomes a pure function of `(manifest, progress-fold, pros
 
 ## 8. Field notes from the first implementation (v0.2)
 
-The compiler exists: `~/repos/curricle` (schema, parser, compiler, sidecars, tests). Both mature courses compile clean. What the spike taught:
+The compiler exists in this repository (schema, parser, compiler, sidecars, tests). Both mature courses compile clean. What the spike taught:
 
 1. **Open question 1 is answered: row fidelity holds.** Unit rows survive verbatim — inline markdown, entities, em-dashes — with no round-trip loss. The label-bullet convention is more regular than feared.
 2. **Phase-body units are a real, recurring shape.** *Both* courses open with label-bullets under Phase 0 with no unit header; the sidecar's `phase_body: true` unit claims them. The phase-body unit takes id `u0`, not `p0` — a unit sharing its phase's id violates global id uniqueness, and since textual-flow's localStorage only ever stored the step ids, the rename is migration-safe.
@@ -306,4 +306,4 @@ The compiler exists: `~/repos/curricle` (schema, parser, compiler, sidecars, tes
 9. **The Resource schema grew to what the hand-built page proved it needed**: `cite`, `group`, `free`, labeled multi-`links`, plus `resource_tiers` (name, role, `compact`) and course-level `resources_intro`/`reading_order`. Chips derive from formats + cost/free; an identifier-only URL (`urn:isbn:`) satisfies "every resource has a URL" without rendering as a dead link.
 10. **The swap happened 2026-08-28**: textual-flow's three hand-built pages are now curricle-generated from `curriculum.md` + `learning/course.yaml` (the sidecar's canonical home is the course repo; the CLI defaults to it). All localStorage keys/ids preserved; the three-place registration rule is retired from its CLAUDE.md. **Phase 0's exit criterion is met.**
 
-*v0.1 — 2026-08-28: initial sketch. v0.2 — 2026-08-28: field notes after the compiler landed in ~/repos/curricle. v0.3 — 2026-08-28: resources model; the textual-flow swap.*
+*v0.1 — 2026-08-28: initial sketch. v0.2 — 2026-08-28: field notes after the compiler landed in this repository. v0.3 — 2026-08-28: resources model; the textual-flow swap.*

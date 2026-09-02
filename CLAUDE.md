@@ -48,7 +48,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - The YAML `on:` key parses as boolean True (YAML 1.1); the sidecar loader
   normalizes it. Don't rename schema fields to dodge YAML quirks.
 
-## The progress service (Phase 1)
+## The progress service
 
 - `db.py` is the only module that may spell `progress_events` — a guard test
   enforces it. Tenant-scoped rows are reached only through `TenantScope`,
@@ -71,13 +71,13 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - Dev runbook: `export CURRICLE_DATABASE_URL=postgresql+psycopg:///curricle`,
   `alembic upgrade head`, `python -m curricle serve --course … --tenant you`.
 
-## The profile pipeline (Phase 2)
+## The profile pipeline
 
 - The learner profile is a fold over `profile_events` (`profile.py`), and
   `~/.claude/skills/learner-profile/SKILL.md` is a **generated projection**
   (`profilerender.render_skill_md`) — never edit that file by hand; assert
   or propose evidence, then `python -m curricle profile render --tenant
-  you --out ~/.claude/skills/learner-profile/SKILL.md`. The pre-Phase-2
+  you --out ~/.claude/skills/learner-profile/SKILL.md`. The hand-authored
   original is backed up beside it as `SKILL.md.pre-curricle`.
 - Evidence tiers come from provenance, never confidence: `attested` (the
   learner said it), `demonstrated` (course activity proved it), `thin`
@@ -96,7 +96,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   `build/example-profile-SKILL.md`, exactly what `import-seed` + `render`
   produce from it. Regenerate that pair together, never by hand.
 
-## The course factory (Phase 3)
+## The course factory
 
 - Every LLM call goes through `llm.Runner.run_role` — streams, carries a
   stage label (the role name), writes `token_ledger`, refuses past the
@@ -125,14 +125,13 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - Two curriculum dialects exist: `bullets` (textual-flow, rhyme-schemer)
   and `headings` (ml-ai) — sidecar `dialect:` field selects.
 
-## The design system (Phase 4)
+## The design system
 
 - `curricle/theme.py` is the single source of design tokens, base CSS,
   `WAYPATH_JS`, the wordmark and the milestone glyph. Renderers compose
-  `theme.style(own_css)` and define no palette of their own — `hubrender.py`
-  carried its own `:root` into Phase 4, and composing it without deleting
-  that block would have overridden the whole system with pre-sprint values.
-  Every stylesheet is guarded: a new module spending tokens joins `SHEETS`
+  `theme.style(own_css)` and define no palette of their own — a module that
+  composes the theme while keeping its own `:root` block overrides the whole
+  system with its old palette. Every stylesheet is guarded: a new module spending tokens joins `SHEETS`
   in `tests/test_theme.py` or the suite fails.
 - The waypath goes only where something is genuinely tracked. The profile
   page has no waypath because it tracks nothing; a gesture meaning "where you
@@ -145,17 +144,17 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   selector, property); adding an entry means confirming the use is a mark.
 - `theme.WAYPATH_JS` stays `%`-free and `BASE_CSS` is never `%`-formatted:
   three renderers concatenate the former into a `SCRIPT % {...}` template,
-  and the latter is full of literal percents. This has taken a page down once.
+  and the latter is full of literal percents. Either mistake breaks the page.
 - The contrast table in `DIRECTION.md` is the record; `CONTRAST_PAIRS` in
   `tests/test_theme.py` recomputes it from `theme.py` and asserts each floor.
   Changing a token means recomputing both.
 - `build/*.html` are committed artifacts like the manifests: regenerate them
-  in the same commit as any renderer change. The committed HTML sat stale
-  from Phase 1 until #9 caught it.
+  in the same commit as any renderer change. The committed HTML has gone
+  stale before.
 - `DIRECTION.md` at the repo root is the design rationale — the gesture, the
   judgment calls, the contrast provenance, what was rejected and why.
 
-## The tutor export (Phase 4)
+## The tutor export
 
 - `mcpserver.py` is the MCP server (`python -m curricle mcp --course …
   --tenant you`, stdio): read tools serve context (course, profile

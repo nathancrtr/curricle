@@ -30,10 +30,10 @@ course:
   - Learn how interpreters work **by building tinylang** — a small dynamically-typed language with functions,
     closures, and a REPL — from raw characters through to a running program. For an experienced engineer
     at ~4 hrs/week; roughly 8 weeks, in phases that each stand alone.
-  - 'This is the example course that ships with curricle. It is deliberately small — four units and two
-    phases — but it is a real course, not a fixture: it exercises every part of the manifest schema (tracks,
-    milestones, materials, graders, all four reference schemes) and it compiles clean. Copy this directory
-    and start editing when you want a course of your own.'
+  - 'This is the example course that ships with curricle. It is deliberately small — an orientation phase
+    and two working phases, four numbered units — but it is a real course, not a fixture: it exercises
+    every part of the manifest schema (tracks, milestones, materials, graders, all four reference schemes)
+    and it compiles clean. Copy this directory and start editing when you want a course of your own.'
   - '## How this curriculum works'
   - '**The interpreter is the spine.** Every unit adds one stage to a pipeline that already runs end to
     end. By the end of Unit 1 you can turn source text into tokens; by the end of Unit 4 you can define
@@ -47,8 +47,8 @@ course:
   - '**Tests are your grader.** From Unit 1 onward you keep a test suite. The house style: test the shapes
     and the invariants rather than exact strings, so a change to error formatting doesn''t turn twenty
     tests red at once.'
-  - '**Working with Claude.** *"Teach me Unit 2 interactively"* runs the Socratic lesson guide; *"quiz
-    me on Phase 1"* draws from the checkpoint quiz.'
+  - '**Working with your assistant.** *"Teach me Unit 2 interactively"* runs the Socratic lesson guide;
+    *"quiz me on Phase 1"* draws from the checkpoint quiz.'
   resources_intro: '**Tier 1** is the core path, worked through in curriculum order. **Tier 2** is a second
     voice on the same material, for when one explanation doesn''t land. **Tier 3** is reference — looked
     up in, not read. Every entry says *why this one*. The core path is free; the one paid entry is optional

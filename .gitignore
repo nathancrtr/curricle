@@ -18,3 +18,12 @@ build/learner-profile-SKILL.md
 # unignored one stages an entire nested checkout on `git add -A`.
 .claude-worktrees/
 .claude/worktrees/
+
+# The README quickstart renders the example course's pages beside the course,
+# because their links are relative to it — the hub reaches curriculum.md, the
+# widget and the quiz reach ../../theme.css. Those outputs are a reader's
+# scratch copy, not artifacts: the committed inspection copies live in build/.
+examples/*/learning/index.html
+examples/*/learning/curriculum.html
+examples/*/learning/learning-resources.html
+examples/*/learning/theme.css

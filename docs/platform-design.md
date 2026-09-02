@@ -1,6 +1,6 @@
 # Curricle — a personalized-learning platform design
 
-*Working name: "Curricle" (a light, fast two-wheeled carriage; same Latin root as "curriculum." Placeholder — rename freely.)*
+*The name: "curricle" — a light, fast two-wheeled carriage; same Latin root as "curriculum."*
 
 *Design exploration, v0.1 — 2026-08-28. Distilled from rhyme-schemer, textual-flow, the learning/ monorepo, the course-builder skill family, and job-radar's architecture. Decisions recorded here were made in interview on 2026-08-28.*
 
@@ -19,7 +19,7 @@
 
 A vision-and-architecture document for a **learning management system built around deep per-learner calibration**: courses that are shaped by who the learner actually is — what they already know, what must be scaffolded from zero, how many hours they have, what domains make examples land — rather than one syllabus served to everyone.
 
-The system already exists in embryo. Four courses have been built with a stable set of conventions (`~/.claude/skills/course-builder/` and friends), and they work. What they lack is software: progress lives in hand-wired localStorage, curricula exist in three parallel representations synced by vigilance, and the learner profile is a static prose file nothing ever updates. This document designs the platform those conventions imply.
+The system already exists in embryo. Four courses have been built with a stable set of conventions (the author's user-level `course-builder` skill and friends), and they work. What they lack is software: progress lives in hand-wired localStorage, curricula exist in three parallel representations synced by vigilance, and the learner profile is a static prose file nothing ever updates. This document designs the platform those conventions imply.
 
 **Scope decisions (from interview):**
 
@@ -40,7 +40,7 @@ The system already exists in embryo. Four courses have been built with a stable 
 
 ### 2.1 The spec lives in skills; the instances prove it
 
-The generic layer is `~/.claude/skills/`:
+The generic layer is the author's user-level skills directory:
 
 - **`course-builder/SKILL.md`** — the pipeline: five stages (scope → resources → curriculum → interactive layer → assemble/support), three **course modes** (subject-driven, project-driven, research-driven), a canonical output tree, house-style rules, a quality checklist.
 - **`course-builder/references/course-structure.md`** — anatomy of the two static documents (tiered resources with mandatory "why this one"; phased curriculum with checkpoint blocks, dependency map, capstone, dated version footers).
@@ -121,7 +121,7 @@ Why the economics work: cost is proportional to learner **milestones**, not lear
 Today every course is a **frozen per-learner projection of the profile** — regenerate to re-personalize. At one learner that's fine. At consumer scale it's the dominant cost. Three models:
 
 **Model A — bespoke: per-learner generation (status quo).**
-Every enrollment runs the full factory. Rough sizing, from the corpus: a mature course is ~15–22 units, a resources doc with live-verified URLs, 7–16 lesson guides, 3–8 widgets (each a small app), quizzes, exercise scaffolds. As agentic work: order 5–20M tokens end-to-end. At Sonnet-class batch pricing, order **$15–60 per full course**; lazy phase generation defers ~60–70% of it and never spends it on learners who stall in Phase 1 (most learners, realistically — stall-heavy funnels are the genre's defining statistic).
+Every enrollment runs the full factory. Rough sizing, from the corpus: a mature course is ~15–22 units, a resources doc with live-verified URLs, 7–16 lesson guides, 3–8 widgets (each a small app), quizzes, exercise scaffolds. As agentic work: order 5–20M tokens end-to-end. At Sonnet-class batch pricing, order **$15–60 per full course**; lazy phase generation defers ~60–70% of it and never spends it on learners who stall in Phase 1 (most learners, realistically — stall-heavy funnels are the genre's defining statistic). [Measured after the factory shipped, the figure is far lower: roughly three dollars for a twelve-unit course at the prices in `models.yaml`.]
 *Pro:* maximum calibration — the course can be built around the learner's own project or research question; this is the rhyme-schemer/textual-flow magic, and it is the product's soul.
 *Con:* cost scales with signups × subjects; quality variance at generation scale becomes a real QA problem (every learner gets a course nobody has proofread); no network effects between learners of the same subject.
 
@@ -330,10 +330,10 @@ The four existing courses are the platform's fixtures and its first QA suite:
 
 Each phase produces something used in anger before the next starts.
 
-- **Phase 0 — Manifest + renderer extraction.** Manifest schema; compiler over the existing `curriculum.md` conventions; `build_site.py`/`style_source.py` generalized into a shared renderer package. *Exit: textual-flow's hand-mirrored HTML is deleted and regenerated; the three-place registration rule is retired.* Valuable with zero web app. **✅ Done 2026-08-28** — `~/repos/curricle`: schema, compiler, hub/curriculum/resources renderers, 44 tests; textual-flow swapped to generated pages with all learner state preserved. (rhyme-schemer's `site/` renderer generalization deferred to when that course swaps.)
+- **Phase 0 — Manifest + renderer extraction.** Manifest schema; compiler over the existing `curriculum.md` conventions; `build_site.py`/`style_source.py` generalized into a shared renderer package. *Exit: textual-flow's hand-mirrored HTML is deleted and regenerated; the three-place registration rule is retired.* Valuable with zero web app. **✅ Done 2026-08-28** — schema, compiler, hub/curriculum/resources renderers, and the test suite; textual-flow swapped to generated pages with all learner state preserved. (rhyme-schemer's `site/` renderer generalization deferred to when that course swaps.)
 - **Phase 1 — Progress service.** Postgres, event ledger + fold, hub/curriculum/unit views over it; T1–T5 in place; migrate localStorage state. *Exit: current courses driven day-to-day from the web app.* **🔨 Infrastructure complete 2026-08-28** — event ledger with append-time validation + pure fold, T1/T2/T4/T5 by construction (classification asserted at import, scope-guard test, derived purge/export, two-tenant fixtures, throwaway-Postgres test harness), Alembic chain, and the web app serving all three views in server mode with both courses loaded; `import-progress` CLI ready for the localStorage state. Exit criterion (daily driving) begins now.
 - **Phase 2 — Profile pipeline.** Evidence ledger, draft→review→promote onboarding, checkpoint misses flowing in as evidence. *Exit: the learner-profile skill file is a generated projection, not a source.* **✅ Done 2026-08-28** — `profile_events` ledger (assert/propose/accept/reject/retract; tiers from provenance), pure fold, /profile review page ("the system proposes, you publish"), checkpoint results auto-proposing `demonstrated` evidence, and the skill file installed as a projection (round-trip diff vs. the hand-authored original: two deliberate lines). The LLM-driven onboarding *interview* remains Phase 3 territory.
-- **Phase 3 — Course factory.** Roles, metered executor, token ledger, budgets; lazy phase-build jobs; exercise feedback. *Exit: ml-ai's Phase 2 interactive layer is built by the factory, not a Claude Code session.* **✅ Done 2026-08-28** — five role contracts, tier indirection via models.yaml, metered executor with per-stage budgets and token_ledger (migration 0003), refusal-grade output validation (generated exercise tests are executed against their stubs), draft→promote with compile-clean gate, and the parser's "headings" dialect bringing ml-ai into the fold. **Exit criterion met**: ml-ai's Phase 2 interactive layer (lesson guide, BPE merge lab, scaffolded exercise, checkpoint quiz, question-bank section) was built by the factory for $1.49 across five opus-5 calls, reviewed in draft, and promoted — with the derived profile visibly steering output (Latin-paradigm and parser corpora in the widget; "phonotactics" as the bank's tokenizer example). A mid-build credit outage proved the resume path: checkpointed build manifests merge across runs. Open items for later: exercise-feedback jobs, queue-based lazy triggers.
+- **Phase 3 — Course factory.** Roles, metered executor, token ledger, budgets; lazy phase-build jobs; exercise feedback. *Exit: ml-ai's Phase 2 interactive layer is built by the factory, not a Claude Code session.* **✅ Done 2026-08-28** — five role contracts, tier indirection via models.yaml, metered executor with per-stage budgets and token_ledger (migration 0003), refusal-grade output validation (generated exercise tests are executed against their stubs), draft→promote with compile-clean gate, and the parser's "headings" dialect bringing ml-ai into the fold. **Exit criterion met** against a private course: its interactive layer (lesson guide, merge lab, scaffolded exercise, checkpoint quiz, question-bank section) was built by the factory, reviewed in draft, and promoted — with the derived profile visibly steering output. Checkpointed build manifests merge across runs, so an interrupted build resumes where it stopped. Open items for later: exercise-feedback jobs, queue-based lazy triggers.
 - **Phase 4 — Tutor export.** MCP server over manifest/profile/progress. *Exit: a fresh Claude session teaches a unit through MCP with no repo checkout.* **✅ Done 2026-08-30** — `curricle/mcpserver.py`: stdio MCP (stdlib JSON-RPC, no SDK dependency), read tools (`get_course/get_profile/get_progress/get_lesson_guide/get_question_bank`), the trigger-phrase protocol as tools (`teach_unit/quiz_me/review_exercise/whats_next` — each a complete briefing: contract + unit + guide + profile), and both write tools (`record_progress_event` with checkpoint→evidence intact; `propose_profile_evidence` source-required, `demonstrated` refused over the wire, pending /profile). L1 guarded by test, same as the web app. **Exit criterion met**: a fresh `claude -p` session in an empty directory, `--strict-mcp-config`, reported next-up from the live ledger and opened Unit 2 with the lesson guide's own diagnostic question, then stopped at the contract's first wait.
 - **Phase 5 — Second learner.** Invite a real person; Model B spine for one subject; onboarding end-to-end. *Exit: the two-tenant fixture describes production.*
 - **Phase 6 — Pyodide exercise runtime; consumer onboarding polish.** Sequenced by what Phase 5's learner actually hits.
@@ -356,8 +356,8 @@ Each phase produces something used in anger before the next starts.
 
 | Platform concept | Lifted from |
 |---|---|
-| Course modes, five-stage pipeline, component decision table | `~/.claude/skills/course-builder/` |
-| Profile field decomposition, skip/scaffold lists, subject adapters | `~/.claude/skills/learner-profile/SKILL.md` |
+| Course modes, five-stage pipeline, component decision table | the `course-builder` skill family |
+| Profile field decomposition, skip/scaffold lists, subject adapters | the `learner-profile` skill |
 | Unit `rows[]` schema, curriculum-as-data | `textual-flow/learning/curriculum.html` |
 | Progress ids, %complete, next-up, second-track ladder | `textual-flow/learning/index.html` |
 | Manifest renderer seed, PAUSE→think-first transform, unit page layout | `rhyme-schemer/learning/build_site.py` |

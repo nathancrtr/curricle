@@ -397,7 +397,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                               if u.check else None),
                     "steps": ([[s.id, s.label] for s in u.steps] or None
                               if u.steps else None),
-                    # SPIKE (one-stop-shop): units link to their served page.
+                    # Units link to their served page.
                     # Only the app has unit pages — the standalone render
                     # carries no href key and the template renders nothing.
                     **({"href": f"unit/{u.id}.html"} if unit_pages else {}),
@@ -446,7 +446,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
         for tp in c.trigger_phrases:
             note = f" — {e(tp.note)}" if tp.note else ""
             items.append(f'<li><span class="say">{e(tp.say)}</span>{note}</li>')
-        says = ('<section class="section"><h2>Working with Claude</h2>'
+        says = ('<section class="section"><h2>Working with your assistant</h2>'
                 f'<ul class="saylist">{"".join(items)}</ul></section>')
 
     n_units = sum(1 for u in mf.units)

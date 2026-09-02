@@ -50,20 +50,27 @@ Requires Python 3.12+. Nothing below needs a database.
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# Compile the example course, then render its three static pages
-python -m curricle compile examples/tinylang --out build/tinylang.manifest.yaml
-python -m curricle hub        examples/tinylang --out /tmp/tinylang/index.html
-python -m curricle curriculum examples/tinylang --out /tmp/tinylang/curriculum.html
-python -m curricle resources  examples/tinylang --out /tmp/tinylang/learning-resources.html
-open /tmp/tinylang/index.html
+# Compile the example course, then render its pages beside it
+python -m curricle compile    examples/tinylang --out build/tinylang.manifest.yaml
+python -m curricle hub        examples/tinylang --out examples/tinylang/learning/index.html
+python -m curricle curriculum examples/tinylang --out examples/tinylang/learning/curriculum.html
+python -m curricle resources  examples/tinylang --out examples/tinylang/learning/learning-resources.html
+python -m curricle theme                        --out examples/tinylang/learning/theme.css
+# then open examples/tinylang/learning/index.html in a browser
 ```
+
+The pages go beside the course because everything they link is relative to it —
+the curriculum, the widget, the quiz — and `theme.css` is what styles the widget
+and the quiz when there is no server to hand it out. The four files that land
+beside the course are gitignored, so this leaves the tree clean.
 
 [`examples/tinylang`](examples/tinylang/README.md) is a real, complete course —
 build a small interpreted language over eight weeks — and it is the template to
-copy when you want one of your own. It is deliberately small, but it exercises
-every part of the schema: a parallel track, a milestone that is not a unit, all
-four material kinds, a grader, tiered resources, and all four reference schemes
-in the prose.
+copy when you want one of your own. It is deliberately small — an orientation
+phase and two working phases, four numbered units — but it exercises every part
+of the schema: a parallel track, a milestone that is not a unit, all four
+material kinds, a grader, tiered resources, and all four reference schemes in
+the prose.
 
 ## Running the served app
 

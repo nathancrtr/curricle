@@ -1,13 +1,13 @@
 """Block markdown → HTML, for lesson guides and other course documents.
 
-SPIKE NOTE (one-stop-shop): this module exists to answer a feasibility
-question — can the platform render lesson markdown as themed pages without
-taking a markdown dependency (the layer is stdlib + PyYAML only)? The
-corpus's lesson/task/question-bank files use a small, regular subset:
-ATX headings, paragraphs, bullet lists (one nesting level), ordered lists,
-blockquotes, pipe tables, indented code, and the inline set `inlinemd`
-already covers. That subset is rendered here; anything outside it falls
-back to a paragraph, never to silent loss. Like `inlinemd`, this stays a
+This module exists to answer one question: can the platform render lesson
+markdown as themed pages without taking a markdown dependency (the layer is
+stdlib + PyYAML only)? The corpus's lesson/task/question-bank files use a
+small, regular subset: ATX headings, paragraphs, bullet lists (one nesting
+level), ordered lists, blockquotes, pipe tables, indented code, and the
+inline set `inlinemd` already covers. That subset is rendered here;
+anything outside it falls back to a paragraph, never to silent loss. The
+answer was yes, and it stays small on purpose: like `inlinemd`, this is a
 deliberately small renderer of the corpus's actual dialect, not a general
 markdown engine — if authored materials outgrow it, the answer is a
 decision (grow the dialect or take the dependency), not quiet guessing.

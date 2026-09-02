@@ -36,6 +36,9 @@ def main(argv: list[str] | None = None) -> int:
                                          "(default: <course_root>/learning/course.yaml)")
         h.add_argument("--out", required=True, help="write the HTML here")
         h.add_argument("--quiet", action="store_true", help="suppress warnings")
+    th = sub.add_parser("theme", help="write the shared stylesheet a static "
+                                      "render's materials link as theme.css")
+    th.add_argument("--out", required=True, help="write the CSS here")
     t = sub.add_parser("tenant", help="manage tenants")
     tsub = t.add_subparsers(dest="tenant_command", required=True)
     tc = tsub.add_parser("create", help="provision a tenant")
@@ -133,6 +136,8 @@ def main(argv: list[str] | None = None) -> int:
         return _mcp(args)
     if args.command == "import-progress":
         return _import_progress(args)
+    if args.command == "theme":
+        return _theme(args)
 
     sidecar_path = args.sidecar or default_sidecar_path(args.course_root)
     sidecar = load_sidecar(sidecar_path)
@@ -156,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             from .currender import render_curriculum as render
         else:
             from .resrender import render_resources as render
+        ensure_out_dir(args.out)
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(render(manifest))
         print(f"wrote {args.out}")
@@ -169,10 +175,39 @@ def main(argv: list[str] | None = None) -> int:
           f"({sum(1 for i in issues if i.level == 'warning')} warning(s))")
 
     if args.out:
+        ensure_out_dir(args.out)
         with open(args.out, "w", encoding="utf-8") as f:
             yaml.safe_dump(manifest.to_dict(), f, sort_keys=False,
                            allow_unicode=True, width=100)
         print(f"wrote {args.out}")
+    return 0
+
+
+def ensure_out_dir(path: str) -> None:
+    """Make the parent directory of an `--out` path, if it isn't there.
+
+    Every writer here takes a path the user typed, and `--out
+    build/tinylang.hub.html` in a fresh clone means "put it there", not
+    FileNotFoundError about a directory the CLI could have made itself.
+    Absolute-ise first: `os.path.dirname("index.html")` is the empty string,
+    which `makedirs` refuses.
+    """
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+
+
+def _theme(args) -> int:
+    """Write the stylesheet the served app hands out at /c/{slug}/theme.css.
+
+    A native material links `../../theme.css` (DIRECTION, "The material
+    contract"), which the app serves and a static render has to put beside
+    the course itself — otherwise a widget opened from a rendered hub comes
+    up unstyled. Same expression as the route, so the two cannot drift.
+    """
+    from . import theme
+    ensure_out_dir(args.out)
+    with open(args.out, "w", encoding="utf-8") as f:
+        f.write(theme.style(""))
+    print(f"wrote {args.out}")
     return 0
 
 
@@ -235,6 +270,7 @@ def _profile(args) -> int:
         from .profilerender import render_skill_md
         text = render_skill_md(state)
         if args.out:
+            ensure_out_dir(args.out)
             with open(args.out, "w", encoding="utf-8") as f:
                 f.write(text)
             print(f"wrote {args.out}")

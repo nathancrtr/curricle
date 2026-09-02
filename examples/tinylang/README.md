@@ -29,16 +29,25 @@ rendered unit pages, and the interactive materials attached to the units that
 own them:
 
 ```bash
-python -m curricle hub examples/tinylang --out /tmp/tinylang/index.html
+python -m curricle hub        examples/tinylang --out examples/tinylang/learning/index.html
+python -m curricle curriculum examples/tinylang --out examples/tinylang/learning/curriculum.html
+python -m curricle resources  examples/tinylang --out examples/tinylang/learning/learning-resources.html
+python -m curricle theme                        --out examples/tinylang/learning/theme.css
+# then open examples/tinylang/learning/index.html in a browser
 ```
+
+The pages are rendered beside the course because their links are relative to
+it, and `theme.css` is what styles the widget and the quiz when there is no
+server to hand it out. All four are gitignored.
 
 ## As a template to copy
 
-This course exists to be edited. It is small — four units, two phases — but it
-exercises every part of the manifest schema: a parallel track with its own
-ladder, a milestone that is not a unit, all four material kinds, a grader, both
-tiered and grouped resources, and all four reference schemes (`res:`, `unit:`,
-`mat:`, `repo:`) in the curriculum prose.
+This course exists to be edited. It is small — an orientation phase and two
+working phases, four numbered units — but it exercises every part of the
+manifest schema: a parallel track with its own ladder, a milestone that is not
+a unit, all four material kinds, a grader, both tiered and grouped resources,
+and all four reference schemes (`res:`, `unit:`, `mat:`, `repo:`) in the
+curriculum prose.
 
 ```bash
 cp -r examples/tinylang ../my-course

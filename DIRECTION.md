@@ -65,7 +65,7 @@ chosen to read as *hospitality to that person*:
 
 - **Copy is plain second person, no exclamation points, no praise-babble.**
   "Welcome back. 3 of 26 done · next up: …" / "Every step walked." / "Good
-  evening, nathan." The greeting is computed from the actual clock — a real
+  evening, sam." The greeting is computed from the actual clock — a real
   courtesy, not a sticker.
 - **No guilt surface exists.** Nothing counts days away, nothing decays,
   the zero state is framed as a beginning, and the "empty" filter state says

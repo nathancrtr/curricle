@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[test]"
+      # The suite boots its own throwaway Postgres cluster with the initdb
+      # that ships on the runner (tests/pg.py finds it under
+      # /usr/lib/postgresql/*/bin); no service, no database URL.
+      - run: python -m unittest discover tests
+      # The shipped example course is held to zero warnings, not just zero errors.
+      - run: python -m curricle compile examples/tinylang --out /tmp/tinylang.manifest.yaml

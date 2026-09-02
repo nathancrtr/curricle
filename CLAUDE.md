@@ -69,7 +69,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   the migration chain. The suite never reads a database URL from the
   environment and so cannot be pointed at a real database. Never "fix" that.
 - Dev runbook: `export CURRICLE_DATABASE_URL=postgresql+psycopg:///curricle`,
-  `alembic upgrade head`, `python -m curricle serve --course … --tenant nathan`.
+  `alembic upgrade head`, `python -m curricle serve --course … --tenant you`.
 
 ## The profile pipeline (Phase 2)
 
@@ -77,7 +77,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   `~/.claude/skills/learner-profile/SKILL.md` is a **generated projection**
   (`profilerender.render_skill_md`) — never edit that file by hand; assert
   or propose evidence, then `python -m curricle profile render --tenant
-  nathan --out ~/.claude/skills/learner-profile/SKILL.md`. The pre-Phase-2
+  you --out ~/.claude/skills/learner-profile/SKILL.md`. The pre-Phase-2
   original is backed up beside it as `SKILL.md.pre-curricle`.
 - Evidence tiers come from provenance, never confidence: `attested` (the
   learner said it), `demonstrated` (course activity proved it), `thin`
@@ -158,7 +158,7 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 ## The tutor export (Phase 4)
 
 - `mcpserver.py` is the MCP server (`python -m curricle mcp --course …
-  --tenant nathan`, stdio): read tools serve context (course, profile
+  --tenant you`, stdio): read tools serve context (course, profile
   projection, progress, lesson guides, question bank), the trigger-phrase
   tools compose it (`teach_unit`, `quiz_me`, `review_exercise`,
   `whats_next`), and the two write tools go through the same validation as

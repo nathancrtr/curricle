@@ -12,6 +12,7 @@ also proves the migration chain.
 from __future__ import annotations
 
 import atexit
+import glob
 import os
 import shutil
 import subprocess
@@ -24,8 +25,14 @@ _datadir: str | None = None
 
 
 def _pg_bin(name: str) -> str:
-    for prefix in ("/opt/homebrew/opt/postgresql@16/bin", "/opt/homebrew/bin",
-                   "/usr/local/bin", "/usr/bin"):
+    """Find a Postgres binary without asking the environment: Homebrew's
+    keg and prefix on macOS, then Debian's versioned directories (which are
+    deliberately off PATH — that is how GitHub's Ubuntu runners ship
+    Postgres), newest first. Falls back to PATH."""
+    prefixes = ["/opt/homebrew/opt/postgresql@16/bin", "/opt/homebrew/bin",
+                "/usr/local/bin", "/usr/bin"]
+    prefixes += sorted(glob.glob("/usr/lib/postgresql/*/bin"), reverse=True)
+    for prefix in prefixes:
         candidate = os.path.join(prefix, name)
         if os.path.exists(candidate):
             return candidate

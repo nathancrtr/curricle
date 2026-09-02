@@ -209,7 +209,7 @@ class ReviewPageTest(unittest.TestCase):
     """
 
     def page(self, events):
-        return render_profile_page(profile.fold(events), "nathan")
+        return render_profile_page(profile.fold(events), "example")
 
     def test_a_claim_s_bullets_render_as_a_list(self):
         page = self.page([("assert", "subject_adapters", "agnostic",

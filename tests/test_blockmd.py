@@ -1,11 +1,12 @@
 """blockmd renders the corpus's block dialect — and only claims that much.
 
-The census that sized this renderer (SPIKE: one-stop-shop) found the
-lesson/task/question-bank corpus using exactly: ATX headings, paragraphs,
-bullet lists with one nesting level, short ordered lists, blockquotes, one
-pipe table, and a few indented code lines. These tests pin that dialect;
-the corpus round-trip lives in test_corpus-style spirit but stays synthetic
-here so the suite passes with the sibling repos absent.
+The census that sized this renderer (DIRECTION.md, "The material
+contract") found the lesson/task/question-bank corpus using exactly: ATX
+headings, paragraphs, bullet lists with one nesting level, short ordered
+lists, blockquotes, one pipe table, and a few indented code lines. These
+tests pin that dialect; the corpus round-trip lives in test_corpus-style
+spirit but stays synthetic here so the suite passes with the sibling repos
+absent.
 """
 
 import unittest

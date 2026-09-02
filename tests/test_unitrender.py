@@ -1,4 +1,4 @@
-"""The unit page and reader contracts, on a synthetic course (SPIKE).
+"""The unit page and reader contracts, on a synthetic course.
 
 What these pin: the unit page links every material its unit owns through
 the right route (markdown through read/, HTML straight), the phase

@@ -1,4 +1,4 @@
-"""Render the per-unit page and the document reader (SPIKE: one-stop-shop).
+"""Render the per-unit page and the document reader.
 
 The unit page is the click target the curriculum was missing: everything a
 unit owns, on one served page — the unit's own rows and steps, its lesson,

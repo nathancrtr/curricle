@@ -537,7 +537,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
         return render_resources(h.manifest, api="api/events",
                                 initial=_state(h)["resources"])
 
-    # SPIKE (one-stop-shop): the shared assets a native material links —
+    # The shared assets a native material links —
     # the theme as a stylesheet, and the one line of reporting machinery.
     # Serving them beside the content is the decision that materials are
     # served-app citizens, not standalone files (DIRECTION: server-required

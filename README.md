@@ -1,19 +1,46 @@
 # curricle
 
-A personalized-learning platform for one person: compile a course from
-markdown, serve it with real progress tracking, and let an LLM build its
-interactive layer under a budget.
+A personalized-learning platform for one person, run on your own machine.
+Tell it how you learn, in your own words; describe what you want to build;
+approve a price; and it drafts, builds, checks and publishes a course
+calibrated to you — with a path you can walk, materials you can run, and a
+tutor that is your own assistant.
 
-A **course manifest** is the single machine-readable source of truth for a
-course's structure — phases, units, tracks, milestones, materials, resources,
-and the derived progress-id contract. Markdown (`curriculum.md`) stays the
-authoring format; this package compiles it, together with a small **sidecar**
-(`course.yaml`) carrying what markdown doesn't, into a validated manifest that
-everything else renders from.
+![The onboarding wizard: profile forms in your own words, an outline behind a cost estimate, a built course with the waypath on it](docs/images/onboarding.gif)
+
+## What makes it different
+
+- **The course is data, and the data is honest.** A `curriculum.md` you can
+  read compiles, with a small `course.yaml` sidecar, into one validated
+  manifest that every page, the progress ledger, the factory and the tutor
+  render from. Ids are forever, derived data is never stored, and the compiler
+  refuses rather than guesses — every issue names a place you can act on.
+- **The model is on a leash.** No LLM call is ever on a request path. Every
+  call goes through one metered runner with a token ledger and a per-stage
+  budget; the only file that names a model or a price is `models.yaml`.
+  Generated material is refused, not reviewed: an exercise's generated tests
+  are run against the stub, and if they pass, the build fails.
+- **Money is shown before it is spent.** The wizard drafts an outline, then
+  puts the estimate and the headroom left before the runner refuses on the
+  screen you approve from, and prints the receipt when you land.
+- **The tutor is yours.** The course, your profile, your progress, the lesson
+  guides and the question bank are exported over MCP to whatever assistant you
+  already use, at your own inference cost. The profile it reads is a generated
+  projection of an evidence ledger — the learner's own claims, and what the
+  course actually demonstrated — never a file anyone edits by hand.
+- **It says only what it knows.** Elapsed time, never a forecast; a progress
+  path of real steps, never a percentage it would have to invent; evidence
+  tiers named in words, with colour as reinforcement.
+
+<p align="center">
+  <img src="docs/images/hub-light.png" alt="The course hub in the light theme: the waypath, the next step, the phases and their units" width="49%">
+  <img src="docs/images/hub-dark.png" alt="The same hub in the dark theme" width="49%">
+</p>
 
 The design and its decided trade-offs are in
 [`docs/platform-design.md`](docs/platform-design.md); the schema is specified
-in [`docs/platform-manifest.md`](docs/platform-manifest.md).
+in [`docs/platform-manifest.md`](docs/platform-manifest.md); the design system
+and its contrast provenance are in [`DIRECTION.md`](DIRECTION.md).
 
 ## Quickstart
 

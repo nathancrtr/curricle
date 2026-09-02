@@ -23,7 +23,7 @@ to it. The gaps were exactly four: units linked to nothing, markdown
 arrived as `text/plain`, materials wore pre-curricle styling, and no
 material reported into the ledger.
 
-## Decisions taken with Nathan (recorded, not reopened)
+## Decisions taken with the operator (recorded, not reopened)
 
 - **Scope:** rendered lessons, native widgets/quizzes, readable exercise
   briefs. No Pyodide — the exercise *runtime* stays Phase 6.

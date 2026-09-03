@@ -89,6 +89,10 @@ python -m curricle serve --course examples/tinylang --tenant example --port 8765
 
 Pass `--course` more than once to serve several courses from one front door.
 
+To run it somewhere permanent instead of a terminal, there is a published
+container image and a worked deployment:
+[`docs/self-hosting.md`](docs/self-hosting.md).
+
 ### Your first course
 
 A tenant with no courses lands in the onboarding wizard at `/onboarding/`:
@@ -245,8 +249,16 @@ Two things worth knowing before you read a green run as full coverage:
 curricle is **single-tenant by instance** and has no authentication. The tenant
 is resolved once at startup, there is no default tenant anywhere (an
 unconfigured caller gets an exception, never tenant 0), and `serve` binds
-`127.0.0.1`. That is the design for one person on their own machine, not an
-oversight.
+`127.0.0.1` unless you say otherwise. That is the design for one person on
+their own machine, not an oversight.
+
+`--host` widens the bind, and the default is deliberately the narrow one so
+that exposure is always something a person typed. The case it exists for is a
+container, where `127.0.0.1` is the container's own loopback and a published
+port would reach nothing at all; there the narrow bind belongs on the host's
+publish instead. **Passing `--host` makes authentication your job** — put the
+app behind something that has some. See
+[`docs/self-hosting.md`](docs/self-hosting.md).
 
 It is not built to be exposed to a network. Anyone who can reach the port is
 the tenant. If you put it behind a public address, you are the one adding

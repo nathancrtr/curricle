@@ -70,6 +70,27 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   environment and so cannot be pointed at a real database. Never "fix" that.
 - Dev runbook: `export CURRICLE_DATABASE_URL=postgresql+psycopg:///curricle`,
   `alembic upgrade head`, `python -m curricle serve --course … --tenant you`.
+- `serve --host` defaults to `127.0.0.1` and the **default is the security
+  posture**, not a convenience — this app has no auth, so widening the bind
+  has to be something a person typed. `tests/test_serve_cli.py` pins both the
+  default and that the flag reaches uvicorn. Don't change the default to
+  "make containers easier"; the container narrows the *publish* instead.
+
+## The container
+
+- `Dockerfile` ships a **checkout at `/app`**, not just the wheel, with
+  `CURRICLE_HOME=/app`. That is what keeps `models.yaml` and `roles/`
+  operator-editable and `alembic upgrade head` runnable — the same reasoning
+  that keeps them out of the package in the first place. Adding a new
+  root-level file the runtime reads means adding a `COPY` for it.
+- No `ENTRYPOINT`: `serve` and `work` are two processes from one image, and
+  L1 is the reason (the app may never call a model, the worker is the only
+  thing that may). Only the worker gets `ANTHROPIC_API_KEY`.
+- `.dockerignore` excludes `local/`. That is a credential boundary, not
+  tidiness — the image is published to a public registry.
+- `.github/workflows/release.yml` publishes `ghcr.io/nathancrtr/curricle` on
+  `v*` tags only, so a deployment can pin an exact version.
+  `docs/self-hosting.md` is the reader-facing contract; keep it true.
 
 ## The profile pipeline
 

@@ -1,0 +1,36 @@
+# What must not reach the build context.
+#
+# `local/` is the line that matters: it holds the Anthropic API key and the
+# personal profile seed. It is gitignored for that reason and it is excluded
+# here for the same one — a key that never entered the repository should not
+# enter an image that gets pushed to a public registry either. The Dockerfile
+# copies named paths rather than `COPY . .`, so this is belt and braces, and
+# that is the correct amount for a credential.
+
+.git/
+.github/
+.venv/
+.claude/
+.claude-worktrees/
+.claude/worktrees/
+local/
+
+# Committed artifacts for inspection, not things the app reads at runtime.
+build/
+
+# The suite brings its own Postgres and runs from a checkout; it has no job
+# inside the image.
+tests/
+
+__pycache__/
+*.pyc
+*.egg-info/
+.DS_Store
+
+# Prose that ships in the repo rather than the image. README.md and LICENSE
+# are exceptions — pyproject names them and the build needs them.
+docs/
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+CLAUDE.md
+DIRECTION.md

@@ -53,6 +53,16 @@ def main(argv: list[str] | None = None) -> int:
                    default=[], help="course repo root (repeatable)")
     s.add_argument("--tenant", required=True, help="tenant slug (no default — T1)")
     s.add_argument("--port", type=int, default=8765)
+    # Loopback by default, and the default is the security posture rather than
+    # a convenience: this app has no authentication, so anyone who can reach
+    # the port is the tenant. Widening the bind has to be something a person
+    # typed. The case that needs it is a container, where 127.0.0.1 is the
+    # container's own loopback and a published port reaches nothing — there
+    # the narrow bind lives on the host's publish instead (`127.0.0.1:8765:
+    # 8765`), and the gate in front of that is the operator's to build.
+    s.add_argument("--host", default="127.0.0.1",
+                   help="bind address (default: 127.0.0.1 — widening this "
+                        "makes authentication your responsibility)")
     # On `serve` and not on `work`: the worker writes no profile events —
     # checkpoint proposals arrive through this app's API and acceptance
     # happens on /profile — so the same flag there would configure a writer
@@ -352,8 +362,11 @@ def _serve(args) -> int:
     app = create_app(args.courses or [], tenant_slug=args.tenant,
                      courses_dir=coursehome.maybe_courses_dir(),
                      profile_skill_out=args.profile_skill_out)
-    print(f"serving tenant {args.tenant!r} on http://localhost:{args.port}/")
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    # Print what was actually bound, not a friendly fiction: an operator who
+    # asked for 0.0.0.0 and is told "localhost" has been told the app is
+    # narrower than it is, which is the one thing this line must never do.
+    print(f"serving tenant {args.tenant!r} on http://{args.host}:{args.port}/")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
     return 0
 
 

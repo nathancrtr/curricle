@@ -621,7 +621,7 @@ WIZARD_CSS = theme.style("""\
   .stepline { font-size:13.5px; font-weight:600; color:var(--muted);
               margin:12px 0 0; }
   .gatebox { background:var(--panel); border:1px solid var(--line);
-             border-radius:18px; box-shadow:var(--shadow); padding:20px 24px;
+             border-radius:var(--r-card); box-shadow:var(--shadow); padding:20px 24px;
              margin:26px 0; }
   .gatebox.attention { border-color:var(--accent); border-width:1.5px; }
   .gatebox h2 { font-size:19px; font-weight:700; margin:0 0 6px; }
@@ -679,7 +679,7 @@ WIZARD_CSS = theme.style("""\
              resize:vertical;
              font:14px/1.55 """ + theme.FONT_BODY + """;
              color:var(--ink); background:var(--panel);
-             border:1.5px solid var(--edge); border-radius:12px;
+             border:1.5px solid var(--edge); border-radius:var(--r-card);
              padding:10px 13px; }
   /* Placeholder copy is read to be acted on, so it is body text and takes
      --muted, never the decorative --faint. */
@@ -694,7 +694,7 @@ WIZARD_CSS = theme.style("""\
   input[type=text], input[type=number] { font:14px/1.55 """
              + theme.FONT_BODY + """; color:var(--ink);
              background:var(--panel); border:1.5px solid var(--edge);
-             border-radius:12px; padding:9px 13px; }
+             border-radius:var(--r-card); padding:9px 13px; }
   input[type=text] { width:100%; }
   input[type=number] { width:88px; }
   input:focus { border-color:var(--accent); }
@@ -707,7 +707,7 @@ WIZARD_CSS = theme.style("""\
   .hours { display:flex; flex-wrap:wrap; align-items:center; gap:10px;
            margin:0 0 13px; }
   .hours span { font-size:14px; color:var(--muted); }
-  .choice { display:block; border:1.5px solid var(--edge); border-radius:12px;
+  .choice { display:block; border:1.5px solid var(--edge); border-radius:var(--r-card);
             padding:11px 14px; margin:0 0 10px; }
   .choice b { font-size:14.5px; }
   /* 25px is the radio (17px, above) plus its own right margin: the sentence
@@ -732,7 +732,7 @@ WIZARD_CSS = theme.style("""\
      beside its kind so the row says what it is with every colour stripped
      out. What the hub will track is what the gate reads back. */
   .units li.ms { display:flex; gap:8px; background:var(--good-soft);
-                 border-radius:10px; padding:8px 11px; margin:0 0 15px; }
+                 border-radius:var(--r-ctl); padding:8px 11px; margin:0 0 15px; }
   .units li.ms .flag { flex:none; margin:3px 0 0; color:var(--good-text); }
   /* The steps of a stepped unit, under the unit that owns them: the hub
      checks these off one by one, so an outline that showed only the unit
@@ -822,7 +822,7 @@ WIZARD_CSS = theme.style("""\
   pre.projection { font:13px/1.62 """ + theme.FONT_MONO + """;
                    white-space:pre-wrap; overflow-wrap:anywhere;
                    background:var(--panel); border:1px solid var(--line);
-                   border-radius:18px; box-shadow:var(--shadow);
+                   border-radius:var(--r-card); box-shadow:var(--shadow);
                    color:var(--muted); padding:20px 24px; margin:14px 0 0; }
   pre.projection .mine { font:15px/1.6 """ + theme.FONT_BODY + """;
                    color:var(--ink); }
@@ -833,7 +833,7 @@ WIZARD_CSS = theme.style("""\
   pre.snippet { font:12.5px/1.6 """ + theme.FONT_MONO + """;
                 white-space:pre-wrap; overflow-wrap:anywhere;
                 background:var(--chip); border:1px solid var(--line);
-                border-radius:12px; color:var(--ink);
+                border-radius:var(--r-card); color:var(--ink);
                 padding:14px 16px; margin:0 0 12px; }
 """)
 
@@ -1047,8 +1047,8 @@ def _page(stop: str, screen: Screen, tenant_slug: str,
 <div class="wizard">
   <header class="masthead">
     <p class="wordmark">{theme.WORDMARK} curricle</p>
-    <p class="eyebrow">setting up curricle
-    <span class="sep">·</span> <a href="/profile">your profile page</a></p>
+    <p class="eyebrow">Setting up curricle
+    <span class="sep">/</span> <a href="/profile">Your profile page</a></p>
     {_waypath(stop, sub)}
   </header>
   {screen.body}
@@ -1159,7 +1159,7 @@ def welcome_screen(*, worker_running: bool) -> Screen:
     <ul class="never">{promises}</ul>
   </div>
   <p class="ask">
-    <a class="pill primary" href="/onboarding/?screen=1">Begin →</a>
+    <a class="pill primary" href="/onboarding/?screen=1">Begin</a>
     <span class="aside">About ten minutes, and you can stop between any two
     screens.</span>
   </p>
@@ -1324,7 +1324,7 @@ def _screen_nav(number: str, missing: tuple[str, ...]) -> str:
     e = html_mod.escape
     previous = SCREEN_ORDER[SCREEN_ORDER.index(number) - 1]
     back = (f'<a class="back" href="/onboarding/?screen={previous}">'
-            f"← {SCREEN_NAMES[previous]}</a>")
+            f"{SCREEN_NAMES[previous]}</a>")
     if missing:
         names = ", ".join(FIELD_LABELS[f] for f in missing)
         gate = f'<p class="gateline">{GATE_LEAD} <b>{e(names)}</b>.</p>'
@@ -1359,7 +1359,7 @@ def form_screen(number: str, profile_state: profile.ProfileState) -> Screen:
   <form method="post" action="/onboarding/profile/{e(number)}">
     {"".join(blocks)}
     <p class="ask">
-      <button class="pill primary" type="submit">Save this screen →</button>
+      <button class="pill primary" type="submit">Save this screen</button>
       <span class="aside">Saved in your own voice, and read back to you on
       your profile page. Nothing here is sent to a model.</span>
     </p>
@@ -1429,7 +1429,7 @@ def review_screen(profile_state: profile.ProfileState) -> Screen:
         top = bottom = """
   <form method="post" action="/onboarding/profile/publish">
     <p class="ask">
-      <button class="pill primary" type="submit">Publish my profile →</button>
+      <button class="pill primary" type="submit">Publish my profile</button>
       <span class="aside">Publishing opens the rest of the setup. Your claims
       stay editable on your profile page for as long as you have an account.</span>
     </p>
@@ -1441,7 +1441,7 @@ def review_screen(profile_state: profile.ProfileState) -> Screen:
 {top}
   <pre class="projection">{_projection(profile_state)}</pre>
   <div class="nav">
-    <a class="pill" href="/onboarding/?screen=1">← Edit your claims</a>
+    <a class="pill" href="/onboarding/?screen=1">Edit your claims</a>
     <a class="pill" href="/profile">See it as a page</a>
   </div>
 {bottom}
@@ -1531,7 +1531,7 @@ def scope_screen() -> Screen:
                              "What you have already read, built or half-"
                              "finished in this subject.", False))}
     <p class="ask">
-      <button class="pill primary" type="submit">Draft my outline →</button>
+      <button class="pill primary" type="submit">Draft my outline</button>
       <span class="aside">This starts the first stage that calls a model. It
       is the cheap one, and it stops at its own spending ceiling; the
       expensive stage waits for your approval of an estimate.</span>
@@ -1575,7 +1575,7 @@ def outline_screen(flow: onboarding.CourseFlow | None) -> Screen:
     <p class="wording">{worded}</p>
     <form method="post" action="/onboarding/outline/retry">
       <p class="ask">
-        <button class="pill primary" type="submit">Try again →</button>
+        <button class="pill primary" type="submit">Try again</button>
         <span class="aside">{OUTLINE_RETRY_ASIDE}</span>
       </p>
     </form>
@@ -2037,7 +2037,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     one was.</p>
     <form method="post" action="/onboarding/outline/retry">
       <p class="ask">
-        <button class="pill primary" type="submit">Draft it again →</button>
+        <button class="pill primary" type="submit">Draft it again</button>
         <span class="aside">This is the cheap stage, and it stops at its own
         spending ceiling.</span>
       </p>
@@ -2118,8 +2118,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
     <ul class="plan">{plan}</ul>
     <form method="post" action="/onboarding/outline/approve">
       <p class="ask">
-        <button class="pill primary" type="submit">Approve and build phase 1
-        →</button>
+        <button class="pill primary" type="submit">Approve and build phase 1</button>
         <span class="aside">Your approval is recorded with the numbers you
         were shown, and nothing spends a token without it.</span>
       </p>
@@ -2134,8 +2133,7 @@ def outline_gate_screen(flow: onboarding.CourseFlow,
       placeholder="Eight weeks on the front end is too many — I have four."
       ></textarea></label>
       <p class="ask">
-        <button class="pill" type="submit">Draft it again with this note
-        →</button>
+        <button class="pill" type="submit">Draft it again with this note</button>
         <span class="aside">This re-runs the cheap drafting stage. No
         materials are built and no estimate is approved.</span>
       </p>
@@ -2189,7 +2187,7 @@ def build_screen(flow: onboarding.CourseFlow | None,
     <p class="wording">{worded}</p>
     <form method="post" action="/onboarding/build/retry">
       <p class="ask">
-        <button class="pill primary" type="submit">Carry on →</button>
+        <button class="pill primary" type="submit">Carry on</button>
         <span class="aside">{aside}</span>
       </p>
     </form>
@@ -2248,7 +2246,7 @@ def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
     <p class="wording">{worded}</p>
     <form method="post" action="/onboarding/promote/retry">
       <p class="ask">
-        <button class="pill primary" type="submit">Try again →</button>
+        <button class="pill primary" type="submit">Try again</button>
         <span class="aside">{PROMOTE_RETRY_ASIDE}</span>
       </p>
     </form>
@@ -2394,7 +2392,7 @@ def landing_screen(flow: onboarding.CourseFlow, courses_dir: str | None,
   <p class="receipt">{receipt_line(spend, approved)}</p>
   <p class="ask">
     <a class="pill primary" href="/c/{e(course_id)}/index.html">Open your
-    course →</a>
+    course</a>
     <span class="aside">The hub is the front of it: the path, what comes
     next, and the materials as you reach them.</span>
   </p>
@@ -2415,7 +2413,7 @@ def landing_screen(flow: onboarding.CourseFlow, courses_dir: str | None,
     and what it can write.</p>
   </div>
   <div class="nav">
-    <a class="pill" href="/onboarding/?course=">Start another course →</a>
+    <a class="pill" href="/onboarding/?course=">Start another course</a>
     <a class="pill" href="/profile">Your profile</a>
   </div>
 """)

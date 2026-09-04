@@ -47,25 +47,24 @@ STYLE = theme.style("""\
   .chip.gate { background:var(--warn-soft); color:var(--warn-text); }
   .actions { display:flex; align-items:center; gap:14px; margin:20px 0 0; }
   .row { margin:0 0 14px; font-size:14.5px; line-height:1.6; max-width:68ch; }
-  .row b.lbl { display:block; font-size:11.5px; font-weight:700;
-               letter-spacing:.06em; text-transform:uppercase;
-               color:var(--muted); margin:0 0 3px; }
-  .key { background:var(--accent-soft); padding:11px 15px; border-radius:12px; }
+  .row b.lbl { display:block; font-size:14px; font-weight:700;
+               color:var(--ink); margin:0 0 3px; }
+  .key { border-left:2px solid var(--accent); padding:2px 0 2px 14px;
+         background:none; }
   .key b.lbl { color:var(--accent-text); }
   /* The deliverable takes the green family — the tint that means "done"
      everywhere else, because the milestone is what done will mean here. */
-  .deliver { background:var(--good-soft); padding:11px 15px; border-radius:12px; }
+  .deliver { border-left:2px solid var(--good); padding:2px 0 2px 14px;
+             background:none; }
   .deliver b.lbl { color:var(--good-text); }
   .rows { margin:30px 0 0; }
   .unote { margin:24px 0 0; padding:13px 17px; background:var(--chip);
-           border-radius:14px; font-size:14px; line-height:1.6;
+           border-radius:var(--r-card); font-size:14px; line-height:1.6;
            max-width:68ch; }
-  .unote b.lbl { display:block; font-size:11.5px; font-weight:700;
-                 letter-spacing:.06em; text-transform:uppercase;
-                 color:var(--muted); margin:0 0 3px; }
+  .unote b.lbl { display:block; font-size:14px; font-weight:700;
+                 color:var(--ink); margin:0 0 3px; }
   .steps { margin:26px 0 0; padding:16px 20px; }
-  .steps h2 { font-size:13px; font-weight:700; letter-spacing:.06em;
-              text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  .steps h2 { font-size:15px; font-weight:700; color:var(--ink); margin:0 0 10px; }
   .step-row { display:flex; align-items:baseline; gap:9px; font-size:14.5px;
               margin:0 0 6px; }
   .step-row input { width:17px; height:17px; accent-color:var(--accent-strong); }
@@ -86,19 +85,31 @@ STYLE = theme.style("""\
              color:var(--accent-text); text-decoration:none; }
   .cardact:hover { text-decoration:underline; text-underline-offset:3px; }
   details.check { margin:26px 0 0; padding:13px 17px; background:var(--panel);
-                  border:1.5px solid var(--line); border-radius:14px;
+                  border:1.5px solid var(--line); border-radius:var(--r-card);
                   font-size:14.5px; }
   details.check summary { cursor:pointer; font-weight:600; }
   details.check div { margin-top:10px; color:var(--muted); }
-  .cp { margin:30px 0 0; padding:16px 20px; background:var(--good-soft);
-        border:1px solid var(--good); border-radius:16px; font-size:14.5px; }
-  .cp b.cpl { display:block; font-size:12px; font-weight:700; letter-spacing:.06em;
-              text-transform:uppercase; color:var(--good-text); margin:0 0 6px; }
+  .cp { margin:30px 0 0; padding:2px 0 2px 16px; background:none;
+        border-left:2px solid var(--good); font-size:14.5px; }
+  .cp b.cpl { display:block; font-size:14px; font-weight:700;
+              color:var(--good-text); margin:0 0 6px; }
   .cp .track-goal { margin-top:8px; color:var(--muted); }
-  .unav { display:flex; align-items:center; gap:12px; margin:42px 0 0; }
+  /* Pagination, drawn as two destinations rather than two arrows. The
+     glyph pair said the direction and the ellipsis ate the title that said
+     the destination — on a 46%-wide nowrap pill, "Unit 3 — Local stemmata
+     and genealogical cohe..." is exactly the half of the label a reader
+     needs, clipped. A word says the direction unambiguously, including to a
+     screen reader, and the title is then free to wrap. */
+  .unav { display:flex; align-items:flex-start; gap:16px; margin:42px 0 0; }
   .unav .spacer { flex:1 1 auto; }
-  .unav a { max-width:46%; overflow:hidden; text-overflow:ellipsis;
-            white-space:nowrap; text-decoration:none; }
+  .unav a { max-width:46%; text-decoration:none; display:block;
+            border:1px solid var(--line); border-radius:var(--r-card);
+            padding:10px 14px; color:var(--ink); }
+  .unav a:hover { border-color:var(--accent); }
+  .unav a.next { text-align:right; }
+  .unav b.dir { display:block; font-size:12.5px; font-weight:700;
+                color:var(--muted); margin:0 0 2px; }
+  .unav a.next b.dir { color:var(--accent-text); }
 
   /* ---- the reader ---- */
   .doc { margin:26px 0 0; font-size:15.5px; line-height:1.65; }
@@ -109,9 +120,9 @@ STYLE = theme.style("""\
   .doc li { margin:0 0 6px; }
   .doc blockquote { margin:14px 0; padding:10px 16px; border-left:3px solid
                     var(--accent); background:var(--accent-soft);
-                    border-radius:0 12px 12px 0; }
+                    border-radius:0 var(--r-card) var(--r-card) 0; }
   .doc blockquote p { margin:0; }
-  .doc pre { background:var(--chip); padding:12px 15px; border-radius:12px;
+  .doc pre { background:var(--chip); padding:12px 15px; border-radius:var(--r-card);
              overflow-x:auto; font-size:13px; line-height:1.5; }
   .doc pre code { background:none; padding:0; }
   .doc .tablewrap { overflow-x:auto; }
@@ -119,11 +130,11 @@ STYLE = theme.style("""\
   .doc th, .doc td { border:1px solid var(--line); padding:5px 11px; text-align:left; }
   .doc th { background:var(--chip); }
   .banner { margin:22px 0 0; padding:13px 17px; border:1.5px solid var(--line);
-            border-radius:14px; font-size:14px; color:var(--muted);
+            border-radius:var(--r-card); font-size:14px; color:var(--muted);
             background:var(--panel); }
   .banner b { color:var(--ink); }
   .say { font:13px """ + theme.FONT_MONO + """; background:var(--chip);
-         padding:2px 8px; border-radius:8px; }
+         padding:2px 8px; border-radius:var(--r-ctl); }
 """)
 
 SCRIPT = """\
@@ -186,7 +197,7 @@ def _cards(materials: tuple[Material, ...], rr: RefResolver) -> str:
             f"{e(m.kind)}</span>"
             f'<h3><a href="{href}">{e(m.title)}</a></h3>{blurb}'
             f'<a class="cardact" href="{href}">'
-            f'{e(_VERB.get(m.kind, "Open"))} →</a></div>')
+            f'{e(_VERB.get(m.kind, "Open"))}</a></div>')
     return f'<div class="grid">{"".join(cards)}</div>'
 
 
@@ -301,13 +312,15 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
         parts = []
         if pos > 0:
             p_u = units_by_id[ordered[pos - 1]]
-            parts.append(f'<a class="pill" href="{e(p_u.id)}.html">'
-                         f"← Unit {p_u.num} — {e(p_u.title)}</a>")
+            parts.append(f'<a class="prev" href="{e(p_u.id)}.html">'
+                         f'<b class="dir">Previous</b>'
+                         f"Unit {p_u.num} — {e(p_u.title)}</a>")
         parts.append('<span class="spacer"></span>')
         if pos + 1 < len(ordered):
             n_u = units_by_id[ordered[pos + 1]]
-            parts.append(f'<a class="pill primary" href="{e(n_u.id)}.html">'
-                         f"Unit {n_u.num} — {e(n_u.title)} →</a>")
+            parts.append(f'<a class="next" href="{e(n_u.id)}.html">'
+                         f'<b class="dir">Next</b>'
+                         f"Unit {n_u.num} — {e(n_u.title)}</a>")
         nav = f'<nav class="unav">{"".join(parts)}</nav>'
 
     phase_line = ""
@@ -315,8 +328,6 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
         phase_line = (f'<p class="phasegoal"><b>Phase {phase.num} — '
                       f"{e(phase.title)}.</b> {inline_html(phase.goal, rr)}</p>")
 
-    phase_crumb = (f'<span class="sep">·</span> phase {phase.num}'
-                   if phase else "")
     script = SCRIPT % {
         "api": json.dumps(api),
         "unit": json.dumps({"id": u.id,
@@ -336,9 +347,9 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="../index.html">← course hub</a>
-    <span class="sep">·</span> <a href="../curriculum.html">curriculum</a>
-    <span class="sep">·</span> unit {u.num:02d}{phase_crumb}</p>
+    <p class="eyebrow"><a href="../index.html">Course hub</a>
+    <span class="sep">/</span> <a href="../curriculum.html">Curriculum</a>
+    <span class="sep">/</span> Unit {u.num:02d}</p>
     <h1>{e(u.title)}</h1>
     {gloss}
     {phase_line}
@@ -392,16 +403,17 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
                   "It is written for a tutor to run with you, one question "
                   f"at a time{phrase}. Reading it straight through works too "
                   "— the questions are the lesson.</div>")
-    crumb_unit = (f'<span class="sep">·</span> <a href="{up}{e(unit_href)}">'
-                  f"its unit</a>"
+    crumb_unit = (f'<span class="sep">/</span> <a href="{up}{e(unit_href)}">'
+                  f"Unit {unit.num:02d}</a>"
                   if unit else "")
     # The document flows back into the course: the way on from the last
     # line is the unit the document belongs to, not the browser's Back.
     onward = ""
     if unit:
         onward = (f'<nav class="unav"><span class="spacer"></span>'
-                  f'<a class="pill primary" href="{up}{e(unit_href)}">'
-                  f"Back to Unit {unit.num} — {e(unit.title)} →</a></nav>")
+                  f'<a class="next" href="{up}{e(unit_href)}">'
+                  f'<b class="dir">Back to the unit</b>'
+                  f"Unit {unit.num} — {e(unit.title)}</a></nav>")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -414,8 +426,8 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="{up}index.html">← course hub</a>
-    <span class="sep">·</span> <a href="{up}curriculum.html">curriculum</a>
+    <p class="eyebrow"><a href="{up}index.html">Course hub</a>
+    <span class="sep">/</span> <a href="{up}curriculum.html">Curriculum</a>
     {crumb_unit}</p>
   </header>
   {banner}

@@ -25,30 +25,30 @@
   h1 { font-size: 26px; margin: 14px 0 6px; }
   h2 { font-size: 18px; margin: 32px 0 8px; }
   .sub { color: var(--muted); margin: 0 0 14px; font-size: 14.5px; max-width: 62ch; }
-  .panel { border: 1px solid var(--line); border-radius: 12px;
+  .panel { border: 1px solid var(--line); border-radius:var(--r-card);
            background: var(--panel); padding: 14px 16px; }
   textarea { width: 100%; box-sizing: border-box; min-height: 108px;
              font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
              font-size: 14px; line-height: 1.55; padding: 10px 12px;
-             border: 1px solid var(--line); border-radius: 8px;
+             border: 1px solid var(--line); border-radius:var(--r-ctl);
              background: var(--bg); color: var(--ink); resize: vertical; }
   .cases { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; }
   button.case { padding: 5px 12px; font-size: 13.5px; cursor: pointer;
-                border: 1.5px solid var(--line); border-radius: 999px;
+                border: 1.5px solid var(--line); border-radius:var(--r-ctl);
                 background: var(--chip); color: var(--ink); }
   button.case:hover { border-color: var(--accent); }
   .stream { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-  .tok { border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px;
+  .tok { border: 1px solid var(--line); border-radius:var(--r-ctl); padding: 5px 9px;
          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
          font-size: 13px; line-height: 1.35; text-align: center; }
-  .tok .k { display: block; font-size: 10.5px; letter-spacing: .04em;
+  .tok .k { display: block; font-size: 10.5px;
             color: var(--muted); font-family: inherit; }
   .tok.NUMBER { background: var(--t-num); }
   .tok.STRING { background: var(--t-str); }
   .tok.IDENT, .tok.KEYWORD { background: var(--t-word); }
   .tok.OP, .tok.LPAREN, .tok.RPAREN { background: var(--t-op); }
   .tok.EOF { background: var(--t-end); color: var(--muted); }
-  .err { margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+  .err { margin-top: 10px; padding: 9px 12px; border-radius:var(--r-ctl);
          border: 1px solid var(--warn-line, var(--line));
          background: var(--chip); color: var(--warn-text, var(--ink));
          font-size: 14px; }

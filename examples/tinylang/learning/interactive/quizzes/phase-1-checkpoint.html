@@ -16,12 +16,12 @@
   .q { padding:16px 18px; margin-bottom:16px; }
   .q h3 { margin:0 0 10px; font-size:16px; }
   .opt { display:block; width:100%; text-align:left; margin:6px 0; padding:9px 13px;
-         border:1.5px solid var(--line); border-radius:12px; background:var(--chip);
+         border:1.5px solid var(--line); border-radius:var(--r-card); background:var(--chip);
          cursor:pointer; font-size:14px; line-height:1.45; color:var(--ink); }
   .opt:hover { border-color:var(--accent); }
   .opt.right { border-color:var(--good); background:var(--good-soft); }
   .opt.wrong { border-color:var(--warn-text); background:var(--warn-soft); }
-  .why { display:none; margin-top:4px; padding:8px 12px; border-radius:0 10px 10px 0;
+  .why { display:none; margin-top:4px; padding:8px 12px; border-radius:0 var(--r-card) var(--r-card) 0;
          font-size:13.5px; line-height:1.5; }
   .why.show { display:block; }
   .why.right { background:var(--good-soft); border-left:3px solid var(--good); }
@@ -31,9 +31,8 @@
 </head>
 <body>
 <div class="wrap">
-  <p class="eyebrow"><a href="../../index.html">← course hub</a>
-  <span class="sep">·</span> <a href="../../curriculum.html">curriculum</a>
-  <span class="sep">·</span> phase 1 checkpoint</p>
+  <p class="eyebrow"><a href="../../index.html">Course hub</a>
+  <span class="sep">/</span> <a href="../../curriculum.html">Curriculum</a></p>
   <h1>Phase 1 Checkpoint</h1>
   <p class="sub">Eight questions on lexing and parsing. Every option explains itself when clicked —
   the explanation is the point, the score is a side effect. First click per question counts.</p>

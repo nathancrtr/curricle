@@ -13,8 +13,9 @@
   --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
   --warn-text:#8A5A00; --warn-soft:#F8EFD8;
   --chip:#E9EDEA; --stone:#D3DAD6;
-  --shadow:0 1px 2px rgba(20,28,26,.05), 0 6px 18px rgba(20,28,26,.06);
-  --shadow-lift:0 2px 4px rgba(20,28,26,.06), 0 10px 28px rgba(20,28,26,.09);
+  --r-card:10px; --r-ctl:7px; --r-chip:4px;
+  --shadow:0 1px 2px rgba(20,28,26,.05);
+  --shadow-lift:0 2px 6px rgba(20,28,26,.09);
   color-scheme:light;
   }
   @media (prefers-color-scheme: dark) {
@@ -26,8 +27,9 @@
   --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
   --warn-text:#E9BC5E; --warn-soft:#3A2F14;
   --chip:#232A2B; --stone:#343D3D;
-  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  --r-card:10px; --r-ctl:7px; --r-chip:4px;
+  --shadow:0 1px 2px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
   color-scheme:dark;
     }
   }
@@ -39,8 +41,9 @@
   --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
   --warn-text:#E9BC5E; --warn-soft:#3A2F14;
   --chip:#232A2B; --stone:#343D3D;
-  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  --r-card:10px; --r-ctl:7px; --r-chip:4px;
+  --shadow:0 1px 2px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
   color-scheme:dark;
   }
   * { box-sizing:border-box; }
@@ -50,12 +53,12 @@
          font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
   a { color:var(--accent-text); }
   :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
-                   border-radius:6px; }
+                   border-radius:var(--r-ctl); }
   button { font:inherit; color:inherit; background:none; border:none; padding:0;
            cursor:pointer; }
   code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
-         padding:1px 5px; border-radius:6px; }
-  h1, h2, h3, .display { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+         padding:1px 5px; border-radius:var(--r-chip); }
+  h1, h2, h3, .display { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
 
   /* ---- the shared shell ---- */
   .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
@@ -71,15 +74,30 @@
      under the separator dot. Changing the gap means changing both. */
   .eyebrow a { text-decoration:none; color:var(--accent-text);
                padding:6px 8px; margin-left:-8px; margin-right:-8px;
-               border-radius:999px; }
+               border-radius:var(--r-ctl); }
   .eyebrow a:hover { background:var(--accent-soft); }
+  /* A breadcrumb separator, and only that. The eyebrow used to chain page
+     facts onto the end of the navigation with middots — "the curriculum ·
+     7 phases · 23 units", "unit 02 · phase 1" — which reads as one list but
+     is two things: where you can go back to, and what you are looking at.
+     The facts moved under the title where they belong, the separator became
+     the slash a breadcrumb has always used, and what is left in the eyebrow
+     is a path of places. */
   .eyebrow .sep { color:var(--faint); }
+  /* The facts the eyebrow used to carry, in the one place a fact about
+     this page belongs: under this page's title. */
+  .pagefacts { margin:8px 0 0; font-size:13.5px; color:var(--muted); }
 
   /* ---- cards & chips ---- */
   .panel { background:var(--panel); border:1px solid var(--line);
-           border-radius:18px; box-shadow:var(--shadow); }
-  .chip { display:inline-block; font-size:11.5px; font-weight:600;
-          letter-spacing:.02em; border-radius:999px; padding:2px 9px;
+           border-radius:var(--r-card); box-shadow:var(--shadow); }
+  /* Chips are labels, not lozenges. A pastel pill on every tag is the other
+     half of the pill-everything look; at 4px with the tint kept, the
+     semantic families still reinforce (the house rule stands — the word is
+     always printed and the tint only agrees with it) without six of them
+     turning a unit row into a row of buttons. */
+  .chip { display:inline-block; font-size:12px; font-weight:600;
+          border-radius:var(--r-chip); padding:2px 7px;
           background:var(--chip); color:var(--muted); white-space:nowrap; }
   .chip.acc { background:var(--accent-soft); color:var(--accent-text); }
   .chip.good { background:var(--good-soft); color:var(--good-text); }
@@ -88,7 +106,7 @@
   /* ---- pill controls (generous touch targets) ---- */
   .pill { display:inline-flex; align-items:center; gap:7px; min-height:38px;
           font-size:14px; font-weight:600; color:var(--muted);
-          border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
+          border:1px solid var(--edge); border-radius:var(--r-ctl); padding:6px 14px;
           background:var(--panel); cursor:pointer;
           transition:border-color .2s, color .2s, background .2s; }
   /* A pill is a button whether the element under it is one or is an anchor,
@@ -112,7 +130,7 @@
      is worse than none). A second copy of these four declarations beside a
      second copy of the drawing is how a mark drifts. */
   .wordmark { display:inline-flex; align-items:center; gap:10px;
-              font:700 22px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+              font:700 22px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
               text-decoration:none; letter-spacing:-.01em; }
   .wordmark svg { display:block; }
 
@@ -135,7 +153,7 @@
   .saving { position:fixed; bottom:18px; left:50%;
             transform:translateX(-50%) translateY(12px);
             font-size:13px; font-weight:600; background:var(--ink);
-            color:var(--bg); padding:8px 18px; border-radius:999px;
+            color:var(--bg); padding:8px 18px; border-radius:var(--r-ctl);
             opacity:0; pointer-events:none; transition:.25s; }
   .saving.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
@@ -150,8 +168,7 @@
        letter-spacing:-.01em; margin:14px 0 0; }
   .standfirst { max-width:60ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
   .how { margin:26px 0 0; padding:18px 22px; }
-  .how h2 { font-size:13px; font-weight:700; letter-spacing:.06em;
-            text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  .how h2 { font-size:15px; font-weight:700; color:var(--ink); margin:0 0 10px; }
   .how p { margin:0 0 10px; font-size:14.5px; line-height:1.6; }
   .how p:last-child { margin-bottom:0; }
   .controls { margin:26px 0 0; padding:16px 20px; }
@@ -161,18 +178,19 @@
   .phase { margin:52px 0 0; }
   .phase-head { display:flex; align-items:flex-start; gap:12px; }
   .phase-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
-               border-radius:12px; background:var(--accent-soft);
-               color:var(--accent-text); font:700 17px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
-  .phase-name { font-family:ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+               border-radius:var(--r-ctl); background:var(--bg);
+               border:1px solid var(--line);
+               color:var(--muted); font:700 17px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .phase-name { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
                 font-weight:700; margin:4px 0 0; }
   .phase-weeks { margin:8px 0 0 auto; }
   .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
   .entry { border-bottom:1px solid var(--line-soft); scroll-margin-top:18px; }
   .entry.hidden { display:none; }
   .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
-          text-align:left; padding:20px 0 4px; border-radius:12px; }
+          text-align:left; padding:20px 0 4px; border-radius:var(--r-card); }
   .head:hover .title { color:var(--accent-text); }
-  .num { font:600 13px ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--muted);
+  .num { font:600 13px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--muted);
          padding-top:7px; }
   /* A milestone's gutter carries the flag instead of a number, in the green
      that means done/checkpoint everywhere else — the same glyph in the same
@@ -184,7 +202,7 @@
   .gloss { position:relative; margin:8px 0 0; font-size:14.5px; line-height:1.55;
            max-width:62ch; color:var(--ink); }
   .gloss-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
-                background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
+                background:var(--good-soft); border-radius:.6em .3em .5em .4em;
                 transform:scaleX(0); transform-origin:0 50%;
                 transition:transform .55s cubic-bezier(.2,.7,.3,1); }
   .gloss-text { position:relative; z-index:1; }
@@ -194,7 +212,7 @@
              margin:8px 0 0; padding:0 0 18px 60px; }
   .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
          font-size:13.5px; font-weight:600; color:var(--muted);
-         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         border-radius:var(--r-ctl); padding:4px 10px; margin-left:-10px;
          transition:color .2s, background .2s; }
   .act:hover { color:var(--ink); background:var(--chip); }
   .chev { display:inline-block; transition:transform .3s ease; }
@@ -208,34 +226,35 @@
   .detail-inner { overflow:hidden; }
   .detail-pad { padding:0 0 26px 60px; max-width:68ch; }
   .row { margin:0 0 12px; font-size:14.5px; line-height:1.6; }
-  .row b.lbl { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
-               text-transform:uppercase; color:var(--muted); margin:0 0 3px; }
+  .row b.lbl { display:block; font-size:14px; font-weight:700; color:var(--ink);
+               margin:0 0 3px; }
   .row a { text-underline-offset:2px; }
-  .key { background:var(--accent-soft); padding:11px 15px; border-radius:12px; }
+  .key { border-left:2px solid var(--accent); padding:2px 0 2px 14px;
+         background:none; }
   .key b.lbl { color:var(--accent-text); }
   .steps { margin:0 0 12px; }
   .step-row { display:flex; align-items:baseline; gap:9px; font-size:14.5px; margin:0 0 6px; }
   .step-row input { width:17px; height:17px; accent-color:var(--accent-strong); }
   .step-row.done label { color:var(--muted); text-decoration:line-through;
                          text-decoration-color:var(--faint); }
-  .notes-label { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
-                 text-transform:uppercase; color:var(--muted); margin:18px 0 6px; }
+  .notes-label { display:block; font-size:14px; font-weight:700; color:var(--ink);
+                 margin:18px 0 6px; }
   textarea { width:100%; min-height:64px; resize:vertical;
              font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif;
              color:var(--ink); background:var(--panel); border:1.5px solid var(--line);
-             border-radius:12px; padding:10px 13px; }
+             border-radius:var(--r-card); padding:10px 13px; }
   /* Placeholder copy is read to be acted on, so it is body text, not a
-     decorative mark: --muted (6.45 on panel), never --faint (4.27). */
+     decorative mark: --muted, never --faint, which does not clear the 4.5
+     text floor in either palette. */
   textarea::placeholder { color:var(--muted); }
   textarea:focus { outline:none; border-color:var(--accent); }
-  .checkpoint { margin:26px 0 0; padding:16px 20px; background:var(--good-soft);
-                border:1px solid var(--good); border-radius:16px; font-size:14.5px; }
-  .checkpoint b.cp { display:block; font-size:12px; font-weight:700;
-                     letter-spacing:.06em; text-transform:uppercase;
+  .checkpoint { margin:26px 0 0; padding:2px 0 2px 16px; background:none;
+                border-left:2px solid var(--good); font-size:14.5px; }
+  .checkpoint b.cp { display:block; font-size:14px; font-weight:700;
                      color:var(--good-text); margin:0 0 6px; }
   .checkpoint .track-goal { margin-top:8px; color:var(--muted); }
   details.check { margin:22px 0 0; padding:13px 17px; background:var(--panel);
-                  border:1.5px solid var(--line); border-radius:14px; font-size:14.5px; }
+                  border:1.5px solid var(--line); border-radius:var(--r-card); font-size:14.5px; }
   details.check summary { cursor:pointer; font-weight:600; }
   details.check div { margin-top:10px; color:var(--muted); }
   .section { margin:56px 0 0; }
@@ -243,7 +262,7 @@
   .section p, .section li { font-size:14.5px; }
   .section .sub { color:var(--muted); margin:10px 0 0; }
   .say { font:13.5px ui-monospace, Menlo, Consolas, monospace; background:var(--chip); padding:3px 9px;
-         border-radius:8px; }
+         border-radius:var(--r-ctl); }
   .saylist { list-style:none; padding:0; margin:12px 0 0; }
   .saylist li { margin:0 0 10px; }
   .empty { display:none; padding:44px 0; text-align:center;
@@ -261,10 +280,10 @@
 <div class="wrap">
 
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a>
-    <span class="sep">·</span> the curriculum
-    <span class="sep">·</span> 3 phases · 5 units</p>
+    <p class="eyebrow"><a href="index.html">Course hub</a>
+    <span class="sep">/</span> Curriculum</p>
     <h1>Interpreters, end to end</h1>
+    <p class="pagefacts">3 phases, 5 units</p>
     <p class="standfirst">Learn how interpreters work by building tinylang — a small dynamically-typed language with functions, closures, and a REPL — from raw characters through to a running program.</p>
     <div class="how panel"><p>Learn how interpreters work <b>by building tinylang</b> — a small dynamically-typed language with functions, closures, and a REPL — from raw characters through to a running program. For an experienced engineer at ~4 hrs/week; roughly 8 weeks, in phases that each stand alone.</p><p>This is the example course that ships with curricle. It is deliberately small — an orientation phase and two working phases, four numbered units — but it is a real course, not a fixture: it exercises every part of the manifest schema (tracks, milestones, materials, graders, all four reference schemes) and it compiles clean. Copy this directory and start editing when you want a course of your own.</p><h2>How this curriculum works</h2><p><b>The interpreter is the spine.</b> Every unit adds one stage to a pipeline that already runs end to end. By the end of Unit 1 you can turn source text into tokens; by the end of Unit 4 you can define a closure and call it. Nothing is scaffolding that gets thrown away.</p><p><b>Each unit has:</b> Build (the implementation step) · Read (precise sources — see <code>learning-resources.md</code> for every citation) · Concepts · Exercise · Milestone, and sometimes a Key insight. The Interactive row is not written here — it is derived from the material registry in <code>course.yaml</code>, so a widget or a lesson appears on the unit page as soon as it is registered.</p><p><b>Pacing.</b> One unit ≈ two weeks at four hours. Unit 2 (parsing) is the long one; Unit 3 is the one that suddenly feels like magic. Phases end with checkpoints; if a checkpoint feels shaky, camp there.</p><p><b>Tests are your grader.</b> From Unit 1 onward you keep a test suite. The house style: test the shapes and the invariants rather than exact strings, so a change to error formatting doesn't turn twenty tests red at once.</p><p><b>Working with your assistant.</b> <i>"Teach me Unit 2 interactively"</i> runs the Socratic lesson guide; <i>"quiz me on Phase 1"</i> draws from the checkpoint quiz.</p></div>
     <div class="controls panel">
@@ -286,7 +305,7 @@
     Rendered by curricle from the course manifest — canonical text:
     <a href="curriculum.md">curriculum.md</a> (v1.0, 2026-08-30) ·
     progress marks are shared with <a href="index.html">the hub</a> and
-    live in this browser's localStorage · <a href="index.html">← back to the hub</a>
+    live in this browser's localStorage · <a href="index.html">Back to the hub</a>
   </footer>
 </div>
 <div class="saving" id="toast">Saved</div>
@@ -370,7 +389,7 @@ function render() {
           <div class="actions">
             <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
-            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
+            ${e.href ? `<a class="act" href="${e.href}">Unit page</a>` : ""}
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
             ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `

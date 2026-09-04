@@ -62,11 +62,12 @@ STYLE = theme.style("""\
   .phase-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px;
                 margin:0 0 4px; }
   .phase-num { position:absolute; left:0; top:-2px; display:grid;
-               place-items:center; width:32px; height:32px; border-radius:10px;
-               background:var(--accent-soft); color:var(--accent-text);
-               box-shadow:0 0 0 5px var(--bg);
+               place-items:center; width:32px; height:32px; border-radius:var(--r-ctl);
+               background:var(--bg); color:var(--muted);
+               border:1px solid var(--line); box-shadow:0 0 0 5px var(--bg);
                font:700 15px """ + theme.FONT_DISPLAY + """; }
   .phase.current .phase-num { background:var(--accent-strong);
+                              border-color:var(--accent-strong);
                               color:var(--on-accent); }
   .phase h3 { margin:0; font-size:17px; font-weight:700; line-height:1.3; }
   .phase-count { margin-left:auto; font-size:13.5px; font-weight:600;
@@ -77,7 +78,7 @@ STYLE = theme.style("""\
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
           gap:16px; }
   .unit { display:flex; align-items:flex-start; gap:10px; padding:7px 10px;
-          margin:0 -10px; border-radius:12px; font-size:15px; line-height:1.5; }
+          margin:0 -10px; border-radius:var(--r-card); font-size:15px; line-height:1.5; }
   .unit input { flex:none; width:18px; height:18px; margin:3px 0 0;
                 accent-color:var(--accent-strong); cursor:pointer;
                 scroll-margin-top:24vh; }
@@ -118,20 +119,19 @@ STYLE = theme.style("""\
     .spine::before { left:12px; }
     .phase { padding-left:40px; }
     .phase:last-child::after { left:11px; top:28px; }
-    .phase-num { width:26px; height:26px; border-radius:8px; top:0;
+    .phase-num { width:26px; height:26px; border-radius:var(--r-ctl); top:0;
                  font-size:13px; box-shadow:0 0 0 4px var(--bg); }
   }
 
   .card { padding:16px 18px; }
   .card h3 { margin:0 0 4px; font-size:16px; font-weight:700; }
   .card h3 a { color:var(--ink); text-decoration:none; }
-  .card h3 a::after { content:" ↗"; color:var(--accent-text); font-weight:600; }
   .card h3 a:hover { color:var(--accent-text); text-decoration:underline;
                      text-underline-offset:3px; }
   .card p { margin:0; font-size:13.5px; line-height:1.5; color:var(--muted); }
 
   .say { font:13.5px """ + theme.FONT_MONO + """; background:var(--chip);
-         padding:3px 9px; border-radius:8px; display:inline-block; margin:2px 0; }
+         padding:3px 9px; border-radius:var(--r-ctl); display:inline-block; margin:2px 0; }
   .phrases { padding:16px 18px; font-size:14.5px; line-height:2; }
   ul.docs { margin:0; padding:0 0 0 2px; list-style:none;
             font-size:14.5px; line-height:2.1; }
@@ -142,7 +142,7 @@ STYLE = theme.style("""\
   .track { display:flex; flex-wrap:wrap; gap:8px; align-items:center;
            padding:14px 16px; font-size:14px; }
   .track .step { min-height:36px; display:inline-flex; align-items:center;
-                 border:1.5px solid var(--line); border-radius:999px;
+                 border:1.5px solid var(--line); border-radius:var(--r-ctl);
                  padding:4px 14px; background:var(--chip); cursor:pointer;
                  font-weight:500; transition:border-color .2s, background .3s; }
   .track .step:hover { border-color:var(--accent); }
@@ -201,7 +201,7 @@ function refresh() {
       // a standalone file jumps down this page to the row itself.
       r.href = API ? `curriculum.html#u-${encodeURIComponent(nextId)}`
                    : `#${encodeURIComponent(nextId)}`;
-      r.textContent = done === 0 ? "Begin →" : "Continue →";
+      r.textContent = done === 0 ? "Begin" : "Continue";
     }
   }
 }
@@ -327,7 +327,7 @@ def render_hub(mf: Manifest, *, api: str | None = None,
     # --- sections -----------------------------------------------------------
     parts: list[str] = []
     if api:
-        parts.append('<p class="eyebrow"><a href="/">← your courses</a></p>')
+        parts.append('<p class="eyebrow"><a href="/">Your courses</a></p>')
     parts.append('<header class="top">')
     parts.append(f"<h1>{e(c.title)}</h1>")
     parts.append(f'<p class="courseid">{e(c.id)}</p>')

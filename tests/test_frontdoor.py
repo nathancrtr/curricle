@@ -149,7 +149,7 @@ class FrontDoorShapeTest(unittest.TestCase):
     def test_one_course_takes_the_singular_lede(self):
         page = client(self.engine, [TF_ROOT], "frontdoor-one").get("/")
         self.assertEqual(page.status_code, 200, page.text)
-        self.assertIn("Your course is ready when you are.", page.text)
+        self.assertIn("Your course, and where you are on it.", page.text)
         self.assertIn('href="/c/textual-flow/"', page.text)
         self.assertEqual(len(stones(page.text)), 1)
 
@@ -214,15 +214,15 @@ class WaypathAgreementTest(unittest.TestCase):
         # Zero progress: the whole path is laid, ahead of you, with the ring
         # on the first stone. This is the state the direction cares most about.
         page = self.client.get("/").text
-        self.assertIn("steps</b>, ready when you are", page)
-        self.assertIn("Begin →", page)
+        self.assertIn("<b>26 steps</b> · begin with", page)
+        self.assertIn(">Begin<", page)
         self.assert_path(0)
 
         # Mid course: the ring walks with you, and the copy counts honestly.
         self.mark(self.ids[:3])
         page = self.client.get("/").text
         self.assertIn(f"<b>3 of {len(self.ids)}</b> done · next up:", page)
-        self.assertIn("Continue →", page)
+        self.assertIn(">Continue<", page)
         self.assert_path(3)
 
         self.mark(self.ids[3:9])
@@ -233,7 +233,7 @@ class WaypathAgreementTest(unittest.TestCase):
         page = self.client.get("/").text
         self.assertIn(f"<b>Complete.</b> All {len(self.ids)} steps walked.",
                       page)
-        self.assertIn("Revisit →", page)
+        self.assertIn(">Revisit<", page)
         self.assert_path(len(self.ids))
 
     def test_the_js_rule_the_static_stones_mirror(self):

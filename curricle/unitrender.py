@@ -130,6 +130,15 @@ STYLE = theme.style("""\
   .doc th, .doc td { border:1px solid var(--line); padding:5px 11px; text-align:left; }
   .doc th { background:var(--chip); }
   .doc h2, .doc h3 { scroll-margin-top:16px; }
+  .doc figure { margin:18px 0; }
+  /* Figures are mostly Graphviz SVGs: black strokes on a transparent
+     ground, so they get a white plate in both themes rather than vanishing
+     against the dark panel. */
+  .doc figure img { display:block; max-width:100%; height:auto; padding:8px;
+                    background:#FFFFFF; border:1px solid var(--line);
+                    border-radius:var(--r-card); }
+  .doc figcaption { margin:6px 0 0; font-size:13.5px; color:var(--muted);
+                    max-width:68ch; }
   .doc sup.fn { font-size:.72em; line-height:0; }
   .doc sup.fn a { text-decoration:none; font-weight:600; }
   .doc .footnotes { margin:38px 0 0; padding:14px 0 0; border-top:1px solid var(--line);
@@ -405,12 +414,17 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
 
 def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
                   material: Material | None = None,
-                  depth: int | None = None) -> str:
+                  depth: int | None = None,
+                  doc_dir: str | None = None) -> str:
     e = html.escape
     if depth is None:
         depth = doc_depth(material) if material else 1
     up = "../" * depth
-    rr = RefResolver(mf, to_root=up)   # the reader exists only served
+    if doc_dir is None:
+        doc_dir = posixpath.dirname(material.path) if material else ""
+    # The reader exists only served; the document's own directory lets its
+    # relative figures resolve through the content route.
+    rr = RefResolver(mf, to_root=up, doc_dir=doc_dir)
     unit = (next((x for x in mf.units if x.id == material.unit), None)
             if material and material.unit else None)
     unit_href = f"unit/{unit.id}.html" if unit else "curriculum.html"

@@ -126,6 +126,15 @@ class TestCompile(unittest.TestCase):
         self.assertIsNone(mf)
         self.assertTrue(any("id used by both" in i.message for i in issues))
 
+    def test_a_figures_directory_is_a_chapters_assets_not_a_material(self):
+        figs = os.path.join(self.root, "learning", "interactive", "chapters", "figures")
+        os.makedirs(figs)
+        with open(os.path.join(figs, "graph.svg"), "w") as f:
+            f.write("<svg/>\n")
+        mf, issues = compile_course(self.root, base_sidecar())
+        self.assertIsNotNone(mf)
+        self.assertFalse(any("figures" in i.message for i in issues), [str(i) for i in issues])
+
     def test_unregistered_file_warns(self):
         extra = os.path.join(self.root, "learning", "interactive", "lessons", "stray.md")
         with open(extra, "w") as f:

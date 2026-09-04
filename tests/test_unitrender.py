@@ -143,6 +143,15 @@ class TestReader(unittest.TestCase):
         self.assertNotIn("dialogue script", page)
         self.assertIn('<section class="footnotes">', page)
 
+    def test_a_chapter_figure_resolves_from_the_chapter_directory(self):
+        m = next(m for m in self.mf.materials if m.id == "c-u1")
+        page = render_reader(self.mf, "# C\n\n![A graph](figures/g.svg)\n",
+                             doc_title="The chapter", material=m)
+        # read/interactive/chapters/u1.md is three deep; the figure is served
+        # by the content route at interactive/chapters/figures/g.svg
+        self.assertIn('<img src="../../../interactive/chapters/figures/g.svg" alt="A graph">', page)
+        self.assertIn("<figcaption>A graph</figcaption>", page)
+
     def test_plain_document_renders_without_banner(self):
         page = render_reader(self.mf, "# Doc\n\nBody.", doc_title="Doc")
         self.assertNotIn("dialogue script", page)

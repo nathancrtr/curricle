@@ -318,6 +318,12 @@ def _validate(mf: Manifest, content_root: str, issues: Issues, *,
                    for d in registered_dirs):
                 dirnames.clear()          # an exercise dir registers as a whole
                 continue
+            if os.path.basename(rel_dir) == "figures":
+                # A chapter's rendered figures live in a `figures/` directory
+                # beside it (docs/chapter-pattern.md): assets of a registered
+                # document, not materials, so coverage skips them.
+                dirnames.clear()
+                continue
             for fn in filenames:
                 if fn.startswith("."):
                     continue

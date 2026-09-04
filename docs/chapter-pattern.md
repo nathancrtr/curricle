@@ -112,6 +112,17 @@ unverified rows is the goal; a chapter that hides them is a failure.
   collation is), and glossed on first use.
 - Length: 3,000–5,000 words. Longer means the unit wants splitting.
 
+## Figures
+
+A figure is an image on a line of its own: `![caption](figures/name.svg)`.
+The reader renders it as a `<figure>` with the alt text as the caption, on a
+white plate so a Graphviz SVG survives dark mode; GitHub shows the image with
+the alt on hover. Put the files in a `figures/` directory beside the chapter
+(`learning/interactive/chapters/figures/`); the compiler treats that
+directory as the chapters' assets and does not ask for it to be registered.
+Prefer SVG for graphs (crisp, small, greppable). A figure is evidence like a
+number: say in the ledger what produced it and when.
+
 ## Registering a chapter
 
 ```yaml

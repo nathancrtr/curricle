@@ -22,7 +22,8 @@ the same in the repo and in the app:
   `[!IMPORTANT]`, `[!WARNING]` or `[!CAUTION]` (GitHub's alert syntax)
   becomes a titled callout; blank `>` lines split a quote into paragraphs.
 
-Headings from h2 down also carry an id (a slug of their text) so a chapter
+A paragraph that is only an image renders as a `<figure>` with the alt text
+as its caption. Headings from h2 down also carry an id (a slug of their text) so a chapter
 can be linked into by section. The renderer stays small on purpose: it is
 a deliberately small renderer of the corpus's actual dialect, not a general
 markdown engine — if authored materials outgrow it, the answer is a
@@ -48,6 +49,7 @@ _DETAILS_OPEN = re.compile(r"^<details(?: open)?>\s*$")
 _SUMMARY = re.compile(r"^<summary>(.*)</summary>\s*$")
 _DETAILS_CLOSE = re.compile(r"^</details>\s*$")
 _CODE_SPAN = re.compile(r"(<code>.*?</code>)")
+_IMAGE_ONLY = re.compile(r"^!\[([^\]]*)\]\(([^)\s]+)\)$")
 _SLUG_STRIP = re.compile(r"<[^>]+>")
 _SLUG_JUNK = re.compile(r"[^a-z0-9]+")
 
@@ -101,9 +103,19 @@ def block_html(text: str, resolver: RefResolver | None = None) -> str:
     seen_slugs: dict[str, int] = {}
 
     def flush_para() -> None:
-        if para:
-            out.append(f"<p>{inline_html(' '.join(para))}</p>")
-            para.clear()
+        if not para:
+            return
+        text = " ".join(para)
+        if len(para) == 1 and (m := _IMAGE_ONLY.match(text)):
+            # A line that is nothing but an image is a figure, and its alt
+            # text is the caption — the one place a chapter's figure gets
+            # described in words that GitHub shows only on hover.
+            caption = (f"<figcaption>{inline_html(m.group(1))}</figcaption>"
+                       if m.group(1).strip() else "")
+            out.append(f"<figure>{inline_html(text)}{caption}</figure>")
+        else:
+            out.append(f"<p>{inline_html(text)}</p>")
+        para.clear()
 
     def flush_quote() -> None:
         if not quote:

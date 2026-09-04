@@ -127,3 +127,16 @@ class TestChapterDialect(unittest.TestCase):
         self.assertIn('<h2 id="sub-head">', out)
         self.assertIn('<h2 id="sub-head-2">', out)
         self.assertIn('<h3 id="third-more">', out)
+
+
+class TestFigures(unittest.TestCase):
+    def test_image_alone_on_a_line_is_a_figure_with_its_alt_as_caption(self):
+        out = block_html("Intro.\n\n![The local stemma for *one* unit](figures/ls.svg)\n\nAfter.")
+        # alt text is plain (an attribute); the caption carries the markup
+        self.assertIn('<figure><img src="figures/ls.svg" alt="The local stemma for one unit">'
+                      "<figcaption>The local stemma for <i>one</i> unit</figcaption></figure>", out)
+
+    def test_image_inside_prose_stays_inline(self):
+        out = block_html("See ![icon](i.png) here.")
+        self.assertIn('<p>See <img src="i.png" alt="icon"> here.</p>', out)
+        self.assertNotIn("<figure>", out)

@@ -131,6 +131,8 @@ class RefResolver:
     mf: Manifest
     to_root: str = ""
     served: bool = True
+    doc_dir: str = ""     # content-root-relative directory of the document
+                          # being rendered, for its relative assets (images)
 
     # -- per-kind targets ---------------------------------------------------
 
@@ -172,6 +174,15 @@ class RefResolver:
         content_dir = posixpath.dirname(
             self.mf.course.docs.curriculum_doc or "learning/curriculum.md")
         return f"{self.to_root}{posixpath.relpath(path, content_dir or '.')}"
+
+    def asset_href(self, src: str) -> str:
+        """A document's own relative asset (an image beside a chapter). An
+        absolute URL or a root-relative path passes through; anything else
+        is the document's neighbour, so it resolves from the document's
+        directory, the same way GitHub resolves it in the repo."""
+        if src.startswith(("http://", "https://", "/", "data:")):
+            return src
+        return f"{self.to_root}{posixpath.normpath(posixpath.join(self.doc_dir, src))}"
 
     # -- the one entry point ------------------------------------------------
 

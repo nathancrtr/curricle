@@ -262,7 +262,7 @@ class WordmarkTest(unittest.TestCase):
     behind when the path moves. It happened once — the lit stone kept
     `--accent` through the contrast fix that lit every other waypath with
     `--accent-strong` (#16) — and it is invisible from the wordmark's own
-    line, which spells a token that still exists and still looks coral.
+    line, which spells a token that still exists and still looks accented.
     """
 
     def setUp(self):

@@ -1,10 +1,12 @@
 """The design system — one source of truth for every rendered surface.
 
-Direction: *companion* — learning as a relationship you keep. Warmth read as
-respect and hospitality for an adult doing hard work over a long time, never
-as a children's app. Concretely: a warm neutral scale on a sunlit ground, one
-coral accent that always means "your progress / your next step", rounded
-geometry, soft elevation, humanist type, and plain second-person copy.
+Direction: *companion* — learning as a relationship you keep. Hospitality for
+an adult doing hard work over a long time, never a children's app. The warmth
+is carried by the geometry, the copy, and the gesture below; the color is
+mineral and quiet, so that the one saturated thing on a page is the thing you
+are meant to do next. Concretely: a cool neutral scale on a faintly green-grey
+ground, one verdigris accent that always means "your progress / your next
+step", generous radii, soft elevation, humanist type, plain second-person copy.
 
 The signature gesture is **the waypath**: a rounded, segmented progress path —
 one stone per tracked item — rendered identically on every surface that
@@ -14,14 +16,27 @@ stone. Completion lights a stone with a small pop. Everything else on the
 page practices restraint so this one move can carry the personality.
 
 Both themes come from the same tokens, each tuned by hand (the dark values
-are not an inversion — they are a warm lamplit room). Every color pair below
-was validated against WCAG AA by computation; the table lives in
-DIRECTION.md at the repo root of this branch.
+are not an inversion — they are a cool, low-lit room, and the accent lifts
+several steps to survive it). Every color pair below was validated against
+WCAG AA by computation; the table lives in DIRECTION.md at the repo root.
 
 House rules encoded here:
-- Color is semantic or absent. Coral = your progress and primary action;
-  green = done/checkpoint/free; warm brown-orange = costs/caution. Chips
-  always carry their text label; tint is reinforcement, never the message.
+- Color is semantic or absent, and the palette is deliberately two hues wide.
+  Verdigris = your progress and primary action; ochre = costs/caution. Done
+  is not a third hue: the whole `--good` family is the neutral ramp, because
+  a finished thing has stopped being live and the page should quiet down
+  around it, leaving the accent as the only saturated mark on the screen.
+  (The tokens stay, spelled everywhere they were, so "done" keeps a name a
+  renderer can reason about and the decision can be revisited in three lines
+  rather than forty.) Within that family the split is by job, not by shade:
+  `--good-text` is `--ink`, because done *text* is still text; `--good` is
+  the non-text member — dots, checkbox fills, the border of a milestone or
+  checkpoint box — and sits at border weight rather than ink weight, because
+  those boxes are passive and a passive box drawn in full ink outweighs the
+  live row it shares a page with. That is not a contrast concession: it
+  clears the 3:1 non-text floor with room, and the floor is asserted.
+  Chips always carry their text label; tint is reinforcement, never the
+  message.
 - Radii are generous (cards 18px, controls a full pill) — the rounded
   geometry *is* the warmth; borders stay hairline so it never turns toy.
   A decorative hairline is `--line`; the edge of a control a learner types
@@ -41,25 +56,25 @@ import re
 # --------------------------------------------------------------------------
 
 LIGHT_VARS = """\
-  --bg:#FDF6EF; --panel:#FFFFFF; --ink:#3B2A1E; --muted:#6D5B4E; --faint:#8A7767;
-  --line:#EFDFD2; --line-soft:#F5EAE0; --edge:#A68A73;
-  --accent:#E06A4E; --accent-text:#B8432A; --accent-strong:#C6492E;
-  --accent-soft:#FBE9E2; --on-accent:#FFFFFF;
-  --good:#3D7A4A; --good-text:#2F6B3C; --good-soft:#E4F0E5;
-  --warn-text:#9C4A21; --warn-soft:#F9E9DC;
-  --chip:#F7EADF; --stone:#EBD9C8;
-  --shadow:0 1px 2px rgba(80,48,28,.05), 0 6px 18px rgba(80,48,28,.07);
-  --shadow-lift:0 2px 4px rgba(80,48,28,.06), 0 10px 28px rgba(80,48,28,.10);
+  --bg:#F4F6F4; --panel:#FFFFFF; --ink:#1B2124; --muted:#5C6568; --faint:#828B8E;
+  --line:#E1E6E3; --line-soft:#ECF0ED; --edge:#849091;
+  --accent:#1B8577; --accent-text:#0F6B5F; --accent-strong:#126E62;
+  --accent-soft:#DFF0EC; --on-accent:#FFFFFF;
+  --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
+  --warn-text:#8A5A00; --warn-soft:#F8EFD8;
+  --chip:#E9EDEA; --stone:#D3DAD6;
+  --shadow:0 1px 2px rgba(20,28,26,.05), 0 6px 18px rgba(20,28,26,.06);
+  --shadow-lift:0 2px 4px rgba(20,28,26,.06), 0 10px 28px rgba(20,28,26,.09);
   color-scheme:light;"""
 
 DARK_VARS = """\
-  --bg:#221A14; --panel:#2C221B; --ink:#F5EAE0; --muted:#C4AE9D; --faint:#A78F7C;
-  --line:#42352A; --line-soft:#382C22; --edge:#836D5A;
-  --accent:#F0754F; --accent-text:#FFA184; --accent-strong:#F0754F;
-  --accent-soft:#43291F; --on-accent:#221A14;
-  --good:#7FBF8B; --good-text:#8FCF9B; --good-soft:#28382B;
-  --warn-text:#EFA275; --warn-soft:#3E2C1E;
-  --chip:#3A2D23; --stone:#4A3A2C;
+  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
+  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
+  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
+  --accent-soft:#153531; --on-accent:#0B1615;
+  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
+  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
+  --chip:#232A2B; --stone:#343D3D;
   --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
   --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
   color-scheme:dark;"""

@@ -21,6 +21,7 @@ from __future__ import annotations
 import html
 import json
 import posixpath
+import re
 
 from . import theme
 from .inlinemd import inline_html
@@ -32,7 +33,8 @@ STYLE = theme.style("""\
   .masthead { padding:40px 0 26px; }
   h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
        letter-spacing:-.01em; margin:14px 0 0; }
-  .standfirst { max-width:60ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .standfirst { max-width:var(--measure); margin:14px 0 0;
+                color:var(--muted); font-size:16.5px; }
   .how { margin:26px 0 0; padding:18px 22px; }
   .how h2 { font-size:15px; font-weight:700; color:var(--ink); margin:0 0 10px; }
   .how p { margin:0 0 10px; font-size:14.5px; line-height:1.6; }
@@ -50,7 +52,8 @@ STYLE = theme.style("""\
   .phase-name { font-family:""" + theme.FONT_DISPLAY + """; font-size:21px;
                 font-weight:700; margin:4px 0 0; }
   .phase-weeks { margin:8px 0 0 auto; }
-  .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted);
+                max-width:var(--measure); }
   .entry { border-bottom:1px solid var(--line-soft); scroll-margin-top:18px; }
   .entry.hidden { display:none; }
   .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
@@ -66,7 +69,7 @@ STYLE = theme.style("""\
   .title { font-weight:600; font-size:19px; line-height:1.3; margin:0; }
   .title .chip { vertical-align:3px; margin-left:8px; }
   .gloss { position:relative; margin:8px 0 0; font-size:14.5px; line-height:1.55;
-           max-width:62ch; color:var(--ink); }
+           max-width:var(--measure); color:var(--ink); }
   .gloss-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
                 background:var(--good-soft); border-radius:.6em .3em .5em .4em;
                 transform:scaleX(0); transform-origin:0 50%;
@@ -83,14 +86,14 @@ STYLE = theme.style("""\
   .act:hover { color:var(--ink); background:var(--chip); }
   .chev { display:inline-block; transition:transform .3s ease; }
   .entry.open .chev { transform:rotate(90deg); }
-  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
+  .dot { width:11px; height:11px; border-radius:0; border:2px solid var(--faint);
          background:transparent; transition:.3s; }
   .entry.done .dot { background:var(--good); border-color:var(--good); }
   .entry.done .mlabel { color:var(--good-text); }
   .detail { display:grid; grid-template-rows:0fr; transition:grid-template-rows .35s cubic-bezier(.4,0,.2,1); }
   .entry.open .detail { grid-template-rows:1fr; }
   .detail-inner { overflow:hidden; }
-  .detail-pad { padding:0 0 26px 60px; max-width:68ch; }
+  .detail-pad { padding:0 0 26px 60px; max-width:var(--measure); }
   .row { margin:0 0 12px; font-size:14.5px; line-height:1.6; }
   .row b.lbl { display:block; font-size:14px; font-weight:700; color:var(--ink);
                margin:0 0 3px; }
@@ -451,8 +454,22 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
                 f'<ul class="saylist">{"".join(items)}</ul></section>')
 
     n_units = sum(1 for u in mf.units)
+
+    # A course whose curriculum.md opens by restating its own description —
+    # which is the natural thing for an author to write, and what the shipped
+    # example does — printed that sentence twice in a row: once as the
+    # standfirst and again as the first line of the panel below it, at two
+    # different measures, sixty pixels apart. The page is the authored text's
+    # frame, so the authored text wins and the standfirst stands down.
+    def _opens_with_description() -> bool:
+        if not (c.description and c.preamble):
+            return False
+        squash = lambda t: " ".join(t.split()).casefold()
+        first = squash(re.sub(r"[*_`\[\]]", "", c.preamble[0]))
+        return first.startswith(squash(c.description)[:60])
+
     standfirst = (f'<p class="standfirst">{e(c.description)}</p>'
-                  if c.description else "")
+                  if c.description and not _opens_with_description() else "")
 
     # Where the marks actually go: the tenant's ledger when served, this
     # browser only when the page is a standalone file. See hubrender — the

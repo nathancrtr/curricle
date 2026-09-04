@@ -34,19 +34,26 @@ from .refs import RefResolver
 from .schema import Manifest, Material, Unit
 
 STYLE = theme.style("""\
-  .wrap { max-width:760px; margin:0 auto; padding:0 24px 90px; }
+  /* 600 - 48px of padding = 552px, which is `--measure` exactly. The unit
+     page is a text page: when the column is wider than the measure, the
+     heading and the nav end 160px to the right of every paragraph and the
+     page grows a phantom margin nothing occupies. One edge instead. */
+  .wrap { max-width:600px; margin:0 auto; padding:0 24px 90px; }
   .masthead { padding:36px 0 10px; }
   h1 { font-weight:700; font-size:clamp(26px,5vw,36px); line-height:1.15;
        letter-spacing:-.01em; margin:14px 0 0; }
-  .gloss { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:62ch; }
-  .phasegoal { margin:10px 0 0; color:var(--muted); font-size:14px; max-width:66ch; }
+  .gloss { margin:12px 0 0; color:var(--muted); font-size:16px;
+           max-width:var(--measure); }
+  .phasegoal { margin:10px 0 0; color:var(--muted); font-size:14px;
+               max-width:var(--measure); }
   .phasegoal b { color:var(--ink); font-weight:600; }
   .context { margin:14px 0 0; color:var(--muted); font-size:13.5px;
-             line-height:1.7; max-width:68ch; }
+             line-height:1.7; max-width:var(--measure); }
   .context .chip { vertical-align:1px; }
   .chip.gate { background:var(--warn-soft); color:var(--warn-text); }
   .actions { display:flex; align-items:center; gap:14px; margin:20px 0 0; }
-  .row { margin:0 0 14px; font-size:14.5px; line-height:1.6; max-width:68ch; }
+  .row { margin:0 0 14px; font-size:14.5px; line-height:1.6;
+         max-width:var(--measure); }
   .row b.lbl { display:block; font-size:14px; font-weight:700;
                color:var(--ink); margin:0 0 3px; }
   .key { border-left:2px solid var(--accent); padding:2px 0 2px 14px;
@@ -60,7 +67,7 @@ STYLE = theme.style("""\
   .rows { margin:30px 0 0; }
   .unote { margin:24px 0 0; padding:13px 17px; background:var(--chip);
            border-radius:var(--r-card); font-size:14px; line-height:1.6;
-           max-width:68ch; }
+           max-width:var(--measure); }
   .unote b.lbl { display:block; font-size:14px; font-weight:700;
                  color:var(--ink); margin:0 0 3px; }
   .steps { margin:26px 0 0; padding:16px 20px; }
@@ -73,7 +80,9 @@ STYLE = theme.style("""\
   .mats { margin:34px 0 0; }
   .mats h2 { font-size:20px; font-weight:700; margin:0 0 4px; }
   .mats .sub { color:var(--muted); font-size:14px; margin:0 0 14px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr));
+  /* auto-fit, not auto-fill: a unit with one material had it sitting in a
+     230px track with two empty tracks beside it. Empty tracks collapse. */
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
           gap:14px; }
   .card { padding:15px 18px 13px; display:flex; flex-direction:column; }
   .card .chip { margin:0 0 9px; align-self:flex-start; }
@@ -102,7 +111,10 @@ STYLE = theme.style("""\
      screen reader, and the title is then free to wrap. */
   .unav { display:flex; align-items:flex-start; gap:16px; margin:42px 0 0; }
   .unav .spacer { flex:1 1 auto; }
-  .unav a { max-width:46%; text-decoration:none; display:block;
+  /* Equal halves. Sizing each to its own label gave two boxes of different
+     widths sitting side by side, which is the sort of thing a reader feels
+     without being able to name. */
+  .unav a { flex:0 1 46%; max-width:46%; text-decoration:none; display:block;
             border:1px solid var(--line); border-radius:var(--r-card);
             padding:10px 14px; color:var(--ink); }
   .unav a:hover { border-color:var(--accent); }
@@ -116,7 +128,7 @@ STYLE = theme.style("""\
   .doc h1 { font-size:clamp(24px,4.5vw,32px); margin:26px 0 8px; }
   .doc h2 { font-size:20px; margin:30px 0 8px; }
   .doc h3 { font-size:16.5px; margin:24px 0 6px; }
-  .doc p, .doc li { max-width:68ch; }
+  .doc p, .doc li { max-width:var(--measure); }
   .doc li { margin:0 0 6px; }
   .doc blockquote { margin:14px 0; padding:10px 16px; border-left:3px solid
                     var(--accent); background:var(--accent-soft);

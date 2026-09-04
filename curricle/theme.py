@@ -46,10 +46,21 @@ House rules encoded here:
   that is a decision on the record rather than an oversight — see DESIGN.md.
   What carries this direction's identity is the blue-line/wash split, the
   square geometry and state-as-fill, none of which depend on the ground.
+- `--measure` is the reading measure, and prose that stacks in one column
+  spends it rather than picking its own `ch` value. Six different measures
+  (58ch, 60ch, 62ch, 64ch, 66ch, 68ch, across five renderers and sometimes
+  twice on one page) rendered as 514/548/552px, so consecutive paragraphs
+  ended at three different places and nothing shared a right edge. `ch`
+  cannot align across two font sizes; a length can.
 - Radii are zero and elevation is `none`. A block book has ruled fields, not
   floating cards; hierarchy is carried by rule weight and fill. The three
   radius tokens stay, spelled everywhere they were, so the decision is
   revisitable in three lines rather than forty.
+- `--chip` clears **both** surfaces, not just the ground. With `--panel`
+  below `--bg`, a chip tuned against the ground alone computed 1.01 on a
+  panel and every chip inside one vanished — trigger phrases, tier labels,
+  inline code. The chip now sits below the panel, which is also the right
+  drawing: a chip is a smaller field on the same sheet.
 - A decorative hairline is `--line`; the edge of a control a learner types
   into is `--edge`, computed against the 3:1 non-text floor, because a box
   whose boundary cannot be seen is a box that is not there.
@@ -64,26 +75,28 @@ import re
 # --------------------------------------------------------------------------
 
 LIGHT_VARS = """\
-  --bg:#F4F2F1; --panel:#EAE6E3; --ink:#241C1C; --muted:#6E645E; --faint:#958A83;
+  --bg:#F4F2F1; --panel:#EAE6E3; --ink:#241C1C; --muted:#665D57; --faint:#958A83;
   --line:#D8D0CB; --line-soft:#E7E2DF; --edge:#8F7C70;
   --accent:#2D455D; --accent-text:#2D455D; --accent-strong:#213345;
   --accent-soft:#E4EBF1; --on-accent:#EAE6E3;
   --good:#7A894D; --good-text:#606C3D; --good-soft:#E5EAD7;
   --warn-text:#8A5F15; --warn-soft:#F6E6CB;
-  --chip:#EBE7E5; --stone:#6D8FB0;
+  --chip:#E1DAD6; --stone:#6D8FB0;
+  --measure:552px;
   --r-card:0px; --r-ctl:0px; --r-chip:0px;
   --shadow:none;
   --shadow-lift:none;
   color-scheme:light;"""
 
 DARK_VARS = """\
-  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#A89F99; --faint:#6E645E;
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#AFA7A1; --faint:#6E645E;
   --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
   --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
   --accent-soft:#243342; --on-accent:#1C1917;
   --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
   --warn-text:#CD9637; --warn-soft:#3B2E16;
-  --chip:#34302D; --stone:#4D6984;
+  --chip:#423C38; --stone:#4D6984;
+  --measure:552px;
   --r-card:0px; --r-ctl:0px; --r-chip:0px;
   --shadow:none;
   --shadow-lift:none;
@@ -143,8 +156,12 @@ BASE_CSS = f"""\
                    border-radius:var(--r-ctl); }}
   button {{ font:inherit; color:inherit; background:none; border:none; padding:0;
            cursor:pointer; }}
+  /* A command that wraps mid-token is a command nobody can read or copy:
+     `python -m curricle profile assert` broke after the hyphen and the next
+     line opened with a bare "m". Inline code is an atom. */
   code {{ font-family:{FONT_MONO}; font-size:.88em; background:var(--chip);
-         padding:1px 5px; border-radius:var(--r-chip); }}
+         padding:1px 5px; border-radius:var(--r-chip);
+         white-space:nowrap; }}
   h1, h2, h3, .display {{ font-family:{FONT_DISPLAY}; }}
 
   /* ---- the shared shell ---- */

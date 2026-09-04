@@ -206,7 +206,8 @@ _STYLE = theme.style("""\
   .masthead { padding:40px 0 10px; }
   h1 { font-weight:700; font-size:clamp(28px,5vw,38px); letter-spacing:-.01em;
        margin:14px 0 0; }
-  .lede { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:60ch; }
+  .lede { margin:12px 0 0; color:var(--muted); font-size:16px;
+          max-width:var(--measure); }
   h2 { font-size:20px; font-weight:700; margin:44px 0 4px; }
   .claim { border-bottom:1px solid var(--line-soft); padding:14px 0; font-size:14.5px;
            line-height:1.6; }

@@ -606,7 +606,7 @@ WIZARD_CSS = theme.style("""\
   .masthead .eyebrow { margin:12px 0 0; }
   h1 { font-weight:700; font-size:clamp(26px,5vw,34px); letter-spacing:-.01em;
        margin:14px 0 0; }
-  .lede { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:60ch; }
+  .lede { margin:12px 0 0; color:var(--muted); font-size:16px; max-width:var(--measure); }
   /* The waypath, at the size the hub draws it: the setup is six stones and
      the same gesture the finished course will use. A list rather than a row
      of bare spans, because each stop is an item with a position — the stone
@@ -641,14 +641,14 @@ WIZARD_CSS = theme.style("""\
      The list sits on the panel's own inset, so it takes no top margin. */
   .never { margin:0; padding:0 0 0 22px; }
   .never li { font-size:14.5px; line-height:1.6; color:var(--muted);
-              margin:9px 0; max-width:62ch; }
+              margin:9px 0; max-width:var(--measure); }
   .ask { display:flex; flex-wrap:wrap; align-items:center; gap:14px;
          margin:28px 0 0; }
   .ask .aside { font-size:13.5px; color:var(--muted); }
   .field { padding:20px 24px; margin:22px 0; }
   .field h3 { font-size:17px; font-weight:700; margin:0 0 5px; }
   .field .explain { font-size:14.5px; line-height:1.6; color:var(--muted);
-                    margin:0 0 13px; max-width:62ch; }
+                    margin:0 0 13px; max-width:var(--measure); }
   /* The examples are a <details>, open only while the field is empty (the
      operator's Fork C): they teach the register, and once a learner has
      written in it they have done their job. No script — the `open`
@@ -666,7 +666,7 @@ WIZARD_CSS = theme.style("""\
           color:var(--muted); margin:0; }
   .claimkey { display:block; margin:0 0 5px; }
   .eg p { font-size:13.5px; line-height:1.55; color:var(--muted);
-          margin:0 0 7px; max-width:62ch; }
+          margin:0 0 7px; max-width:var(--measure); }
   .eg p:last-child { margin-bottom:0; }
   label.claim { display:block; margin:0 0 13px; }
   /* --edge, not --line: a hairline is decoration and computes 1.30 against
@@ -714,7 +714,7 @@ WIZARD_CSS = theme.style("""\
      hangs under the mode's name, not under the control. Resizing the radio
      means moving this. */
   .choice span { display:block; font-size:13.5px; line-height:1.55;
-                 color:var(--muted); margin:4px 0 0 25px; max-width:58ch; }
+                 color:var(--muted); margin:4px 0 0 25px; max-width:var(--measure); }
   .choice input { margin:0 8px 0 0; }
   .hint { font-size:13px; line-height:1.6; color:var(--muted); margin:0 0 13px; }
   .hint:last-child { margin-bottom:0; }
@@ -722,7 +722,7 @@ WIZARD_CSS = theme.style("""\
      panels the forms use, so the review of a course reads in the same
      rhythm as the questions that produced it. */
   ol.units, ul.shelf { margin:0; padding:0; list-style:none; }
-  .units li, .shelf li { margin:0 0 15px; max-width:62ch; }
+  .units li, .shelf li { margin:0 0 15px; max-width:var(--measure); }
   .units li:last-child, .shelf li:last-child { margin-bottom:0; }
   .units b, .shelf b { font-size:14.5px; }
   .units span, .shelf p { display:block; font-size:13.5px; line-height:1.6;
@@ -771,7 +771,7 @@ WIZARD_CSS = theme.style("""\
              + theme.FONT_BODY + """; letter-spacing:0;
              color:var(--muted); margin:2px 0 0; }
   .gatebox p.spent { font-size:14.5px; line-height:1.6; color:var(--muted);
-          margin:0 0 10px; max-width:62ch; }
+          margin:0 0 10px; max-width:var(--measure); }
   /* The plan as a list, because it is the thing the money is approved
      against and a run-on sentence is not a thing anybody checks. At body
      weight, though: five bold lines in a row read as five headings over
@@ -781,20 +781,20 @@ WIZARD_CSS = theme.style("""\
   .gatebox p.buys { font-size:14.5px; font-weight:600; color:var(--ink);
           margin:16px 0 0; }
   ul.plan { margin:8px 0 0; padding:0; list-style:none; }
-  .plan li { margin:0 0 11px; max-width:62ch; }
+  .plan li { margin:0 0 11px; max-width:var(--measure); }
   .plan li:last-child { margin-bottom:0; }
   .plan .what { display:block; font-size:14.5px; color:var(--ink); }
   .plan span.detail { display:block; font-size:13.5px; line-height:1.55;
                color:var(--muted); margin:2px 0 0; }
   .receipt { font-size:14.5px; line-height:1.6; color:var(--muted);
-             margin:14px 0 0; max-width:62ch; }
+             margin:14px 0 0; max-width:var(--measure); }
   .receipt b { color:var(--ink); }
   /* The lede's copy of the number: the same drawing as the card's, with a
      little more air over it because it sits on the ground, and one sentence
      under it saying where the decision itself is. */
   p.cost.upfront { margin:22px 0 4px; }
   .costline { font-size:14.5px; line-height:1.6; color:var(--muted);
-              margin:8px 0 0; max-width:62ch; }
+              margin:8px 0 0; max-width:var(--measure); }
   /* The course's own name, on the ground rather than in a card: it is the
      one moment of arrival on the gate, and an h3 inside a panel identical to
      the phase panels under it made it a list item (F23). The phases read as
@@ -807,10 +807,10 @@ WIZARD_CSS = theme.style("""\
      and not a pill: one forward action per screen, and it is Save. */
   .nav .back { font-size:14px; font-weight:600; }
   .gateline { font-size:14.5px; line-height:1.6; color:var(--muted);
-              margin:16px 0 0; max-width:62ch; }
+              margin:16px 0 0; max-width:var(--measure); }
   .gateline b { color:var(--ink); }
   .caption { font-size:14.5px; line-height:1.6; color:var(--ink);
-             margin:26px 0 0; max-width:62ch; }
+             margin:26px 0 0; max-width:var(--measure); }
   /* The projection, shown as what it is: a text file, in a text file's
      typeface, wrapping rather than scrolling sideways so every line of it
      can be read without a horizontal gesture.

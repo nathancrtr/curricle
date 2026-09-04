@@ -50,7 +50,14 @@ STYLE = theme.style("""\
   /* the program spine — one column, phases in walking order. Sequence is
      carried by the layout itself: a vertical rail threads the phase badges
      top to bottom, so reading order can never be ambiguous. */
-  .spine { position:relative; max-width:820px; }
+  /* The spine shares the column's right edge with every panel on the page.
+     It used to stop 152px short, so the page's right edge stepped in and out
+     down its length — the single most visible "nobody looked at this" tell.
+     Rows bleed left only: the left bleed carries the tint past the label
+     into the phase indent, but on the right there is nothing to bleed past,
+     and bleeding anyway pushed every "n of m" count 10px in from the edge
+     the rest of the page holds. */
+  .spine { position:relative; }
   .spine::before { content:""; position:absolute; left:15px; top:10px; bottom:12px;
                    width:2px; border-radius:1px; background:var(--line); }
   .phase { position:relative; padding:0 0 0 50px; margin:0 0 34px; }
@@ -74,11 +81,14 @@ STYLE = theme.style("""\
                  color:var(--muted); white-space:nowrap;
                  font-variant-numeric:tabular-nums; }
   .phase .goal { font-size:14px; line-height:1.55; color:var(--muted);
-                 margin:0 0 10px; max-width:64ch; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+                 margin:0 0 10px; max-width:var(--measure); }
+  /* auto-fit: a lone widget or quiz fills its row rather than sitting in
+     one track with empty ones beside it. */
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
           gap:16px; }
   .unit { display:flex; align-items:flex-start; gap:10px; padding:7px 10px;
-          margin:0 -10px; border-radius:var(--r-card); font-size:15px; line-height:1.5; }
+          margin:0 0 0 -10px; border-radius:var(--r-card); font-size:15px;
+          line-height:1.5; }
   .unit input { flex:none; width:18px; height:18px; margin:3px 0 0;
                 accent-color:var(--accent-strong); cursor:pointer;
                 scroll-margin-top:24vh; }
@@ -94,8 +104,13 @@ STYLE = theme.style("""\
   .unit label .next-flag { display:none; margin:0 8px 0 0; }
   .unit.done label { color:var(--muted); text-decoration:line-through;
                      text-decoration-color:var(--faint); }
+  /* Same bleed as a plain row, so the hot row's edges land in the stack
+     rather than 2px outside it, and the 1.5px border is paid for out of the
+     padding so the label still starts on the same vertical as every other
+     row's. Two rows in one list drawn to two different edges is exactly the
+     kind of miss that reads as carelessness even when nobody can name it. */
   .unit.next { background:var(--panel); border:1.5px solid var(--accent);
-               box-shadow:var(--shadow); padding:10px 12px; margin:5px -12px; }
+               box-shadow:var(--shadow); padding:8.5px; margin:5px 0 5px -10px; }
   .unit.next label .next-flag { display:inline-block; }
   /* Source order is load-bearing here: .unit.ms and .unit.next are both
      (0,2,0), so a milestone that is *also* the next row keeps its green fill

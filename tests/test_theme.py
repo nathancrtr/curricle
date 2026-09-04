@@ -244,7 +244,7 @@ class TestPalettes(unittest.TestCase):
         # only for whoever is running that theme — the failure a renderer
         # test would never see.
         self.assertEqual(sorted(LIGHT), sorted(DARK))
-        self.assertEqual(len(LIGHT), 25)   # grow deliberately; renderers know these
+        self.assertEqual(len(LIGHT), 26)   # grow deliberately; renderers know these
 
     def test_the_radius_scale_is_three_steps_and_no_more(self):
         # Radii are a scale, not a per-component opinion: card, control,

@@ -132,11 +132,15 @@ INDEX_STYLE = theme.style("""\
                   border-color:var(--accent); }
   .course h2 { font-size:20px; font-weight:700; margin:0 0 4px; }
   .course .desc { font-size:14.5px; line-height:1.55; color:var(--muted);
-                  margin:0 0 14px; max-width:58ch; }
+                  margin:0 0 14px; max-width:var(--measure); }
   .course .waypath { margin:0 0 10px; gap:5px; }
   .course .wp-stone { width:11px; height:11px; }
+  /* The card's own padding is symmetric; the meta row's inherited bottom
+     margin was not, so every course card sat 23px from its top edge and
+     37px from its bottom and read as sagging. */
   .course .meta { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
-                  font-size:14px; font-weight:600; color:var(--muted); }
+                  margin:14px 0 0; font-size:14px; font-weight:600;
+                  color:var(--muted); }
   .course .meta b { color:var(--ink); }
   .course .go { margin-left:auto; color:var(--accent-text); white-space:nowrap; }
   footer { border-top:none; margin-top:48px; padding-top:0; font-size:13px;

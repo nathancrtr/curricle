@@ -73,6 +73,13 @@ CONTRAST_PAIRS = [
     ("--accent-text", "--panel", 4.5),
     ("--accent-text", "--accent-soft", 4.5),
     ("--good-text", "--panel", 4.5),
+    # `--good` is the done family's non-text member — done dots, milestone
+    # checkbox fills, the border of a checkpoint box. It is deliberately
+    # lighter than `--good-text` (which is ink) so a passive "done" box does
+    # not outweigh the live row beside it, and that lightness is exactly what
+    # needs a floor asserted rather than eyeballed.
+    ("--good", "--panel", 3.0),
+    ("--good", "--bg", 3.0),
     ("--good-text", "--good-soft", 4.5),
     ("--warn-text", "--panel", 4.5),
     ("--warn-text", "--warn-soft", 4.5),

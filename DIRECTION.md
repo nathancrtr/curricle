@@ -18,8 +18,9 @@ so.
 curricle should feel like something that is glad you came back: a course
 written for one adult, met with warmth that reads as respect and hospitality —
 never as a children's app. Personality comes from one signature move plus
-discipline everywhere else; the warmth is carried by geometry, color, and
-voice, not by mascots, confetti, or exclamation points.
+discipline everywhere else; the warmth is carried by geometry, voice, and
+the gesture, not by mascots, confetti, or exclamation points — and not, since
+the palette was retired, by the color, which is now the quiet part.
 
 ## The signature gesture: **the waypath**
 
@@ -32,10 +33,10 @@ core-path meter. Three rules give it its meaning:
    unlit stones with the copy "**The path is laid.** 26 steps from here to
    done — begin with …". The old design's invisible `0/26` bar is replaced by
    the strongest moment on the page.
-2. **You are here.** The next undone stone is a hollow coral ring — the only
+2. **You are here.** The next undone stone is a hollow accent ring — the only
    outlined stone — so resuming ("where was I?") is answered before a word is
    read.
-3. **Completion is felt once.** A stone lights coral with a one-shot scale
+3. **Completion is felt once.** A stone lights verdigris with a one-shot scale
    pop *only when its state changes in-session* (`theme.WAYPATH_JS` tracks
    prior state); a page load never animates. Guarded by
    `prefers-reduced-motion`.
@@ -70,7 +71,7 @@ chosen to read as *hospitality to that person*:
   earned event. No confetti, no bouncing.
 - **Rounded ≠ cartoon.** Radii are generous (cards 18px, pills 999) but
   borders are hairline, shadows are quiet, and the type is a humanist sans at
-  adult sizes — the geometry is warm, the voice is level.
+  adult sizes — the geometry is warm, the voice is level, the color is cool.
 
 ## The token system (`curricle/theme.py`)
 
@@ -94,32 +95,47 @@ one edit.
 
 ### Color
 
-One accent with one meaning: **coral = your progress and your next action**
-(waypath, primary buttons, links, phase number badges). **Green = done /
-checkpoint / free.** **Warm brown-orange = costs and caution** (paid chips,
-thin evidence). Neutrals are a warm brown ramp on a faintly peach ground
-`#FDF6EF` — deliberately sunnier than the old gray-cream, because panels,
-rounded sans, and saturated coral (not serifs and hairlines) now carry the
-gestalt. Dark is a tuned "lamplit room", not an inversion: warm near-black
-ground, browner panels, coral lifted two steps for contrast.
+The palette is **two hues wide**, and that is the whole idea. **Verdigris =
+your progress and your next action** (waypath, primary buttons, links, phase
+number badges). **Ochre = costs and caution** (paid chips, thin evidence).
+**Done is ink** — `--good` *is* `--ink`, and `--good-soft` is a neutral fill
+— because a finished thing has stopped being live, and a green tick competing
+with a verdigris "next" is two claims on the same glance. Neutrals are a cool
+grey-green ramp on a mineral ground `#F4F6F4`. Dark is not an inversion: a
+cool low-lit room, near-black ground at `#111516`, panels a step up, and the
+accent lifted well clear of it at `#4FC3B0`.
+
+This replaces a warm palette — peach ground, brown ink, coral accent, sage
+green for done — that was retired for a reason worth recording, because it
+was competently built and every contrast pair in it passed. It was the
+default. Cream-and-terracotta with a warm brown ink is what an LLM reaches
+for unprompted, to the point that two unrelated products built the same month
+landed on near-identical values; the owner recognised it across his own tools
+before anyone else did. A house style you did not choose is not a house
+style. Verdigris was chosen over cobalt (correct, anonymous, the other
+default) and over plum (more voice, harder to keep from turning candy in the
+dark theme) because it is a hue with a point of view that still reads as an
+instrument rather than a toy, and because collapsing "done" onto ink left it
+the only saturated thing on a page — which is exactly the job the direction
+already gave it.
 
 | token | light | dark | role |
 |---|---|---|---|
-| `--bg` | `#FDF6EF` | `#221A14` | page ground |
-| `--panel` | `#FFFFFF` | `#2C221B` | cards |
-| `--ink` | `#3B2A1E` | `#F5EAE0` | body text |
-| `--muted` | `#6D5B4E` | `#C4AE9D` | secondary text (AA at any size) |
-| `--faint` | `#8A7767` | `#A78F7C` | decorative marks only (see contrast note) |
-| `--line` / `--line-soft` | `#EFDFD2` / `#F5EAE0` | `#42352A` / `#382C22` | decorative hairlines |
-| `--edge` | `#A68A73` | `#836D5A` | edges of controls you type into |
-| `--accent` | `#E06A4E` | `#F0754F` | accent borders & hovers (next-row ring) |
-| `--accent-text` | `#B8432A` | `#FFA184` | links & small accent text |
-| `--accent-strong` | `#C6492E` | `#F0754F` | button fills carrying `--on-accent` text; lit waypath stones (v2) |
-| `--accent-soft` | `#FBE9E2` | `#43291F` | tints (badges, key-insight cards) |
-| `--good` / `--good-text` / `--good-soft` | `#3D7A4A` / `#2F6B3C` / `#E4F0E5` | `#7FBF8B` / `#8FCF9B` / `#28382B` | done/checkpoint/free |
-| `--warn-text` / `--warn-soft` | `#9C4A21` / `#F9E9DC` | `#EFA275` / `#3E2C1E` | paid/thin |
-| `--chip` | `#F7EADF` | `#3A2D23` | neutral chip fill |
-| `--stone` | `#EBD9C8` | `#4A3A2C` | unlit waypath stone |
+| `--bg` | `#F4F6F4` | `#111516` | page ground |
+| `--panel` | `#FFFFFF` | `#191E20` | cards |
+| `--ink` | `#1B2124` | `#E7ECEA` | body text |
+| `--muted` | `#5C6568` | `#A6B0AE` | secondary text (AA at any size) |
+| `--faint` | `#828B8E` | `#7C8785` | decorative marks only (see contrast note) |
+| `--line` / `--line-soft` | `#E1E6E3` / `#ECF0ED` | `#28302F` / `#20272A` | decorative hairlines |
+| `--edge` | `#849091` | `#606E6C` | edges of controls you type into |
+| `--accent` | `#1B8577` | `#4FC3B0` | accent borders & hovers (next-row ring) |
+| `--accent-text` | `#0F6B5F` | `#7ED8C8` | links & small accent text |
+| `--accent-strong` | `#126E62` | `#4FC3B0` | button fills carrying `--on-accent` text; lit waypath stones |
+| `--accent-soft` | `#DFF0EC` | `#153531` | tints (badges, key-insight cards) |
+| `--good` / `--good-text` / `--good-soft` | `#55605F` / `#1B2124` / `#E6EAE8` | `#8A9794` / `#E7ECEA` / `#2A3230` | done/checkpoint/free — the neutral ramp, not a hue: text is ink, marks and borders sit lighter |
+| `--warn-text` / `--warn-soft` | `#8A5A00` / `#F8EFD8` | `#E9BC5E` / `#3A2F14` | paid/thin |
+| `--chip` | `#E9EDEA` | `#232A2B` | neutral chip fill |
+| `--stone` | `#D3DAD6` | `#343D3D` | unlit waypath stone |
 
 Spacing/radii/elevation: cards 18px radius + `--shadow` (two quiet layers);
 controls are pills with ≥34–38px hit height; checkboxes and radios 17–18px
@@ -140,48 +156,53 @@ below against its floor. A token edit that breaks a floor fails the suite.
 
 | pair | light | dark | floor |
 |---|---|---|---|
-| ink on bg | **12.76** | **14.46** | 4.5 |
-| ink on panel | **13.67** | **13.12** | 4.5 |
-| muted on bg | **6.02** | **8.07** | 4.5 |
-| muted on panel | **6.45** | **7.32** | 4.5 |
-| accent-text on bg | **5.06** | **8.71** | 4.5 |
-| accent-text on panel | **5.42** | **7.90** | 4.5 |
-| accent-text on accent-soft | **4.61** | **6.78** | 4.5 |
-| good-text on panel | **6.38** | **8.56** | 4.5 |
-| good-text on good-soft | **5.44** | **6.84** | 4.5 |
-| warn-text on panel | **6.15** | **7.47** | 4.5 |
-| warn-text on warn-soft | **5.19** | **6.37** | 4.5 |
-| ink on chip | **11.58** | **11.22** | 4.5 |
-| muted on chip | **5.46** | **6.26** | 4.5 |
-| on-accent text on accent-strong | **4.78** | **6.01** | 4.5 |
-| accent fill vs bg (non-text) | **3.09** | **6.01** | 3.0 |
-| accent fill vs panel (non-text) | **3.31** | **5.45** | 3.0 |
-| lit stone (accent-strong) vs unlit stone (v2) | **3.48** | **3.81** | 3.0 |
-| lit stone (accent-strong) vs bg (v2) | **4.46** | **6.01** | 3.0 |
-| hot ring (accent-strong) vs milestone fill (good-soft) | **4.07** | **4.35** | 3.0 |
-| faint on bg (decorative only) | 3.99 | 5.60 | — |
-| edge on panel (control boundary) | **3.23** | **3.18** | 3.0 |
-| edge on bg (control boundary) | **3.01** | **3.51** | 3.0 |
+| ink on bg | **14.99** | **15.39** | 4.5 |
+| ink on panel | **16.28** | **14.09** | 4.5 |
+| muted on bg | **5.50** | **8.26** | 4.5 |
+| muted on panel | **5.97** | **7.57** | 4.5 |
+| accent-text on bg | **5.88** | **10.98** | 4.5 |
+| accent-text on panel | **6.39** | **10.05** | 4.5 |
+| accent-text on accent-soft | **5.42** | **7.91** | 4.5 |
+| good-text on panel | **16.28** | **14.09** | 4.5 |
+| done mark (good) vs panel | **6.51** | **5.56** | 3.0 |
+| done mark (good) vs bg | **6.00** | **6.07** | 3.0 |
+| good-text on good-soft | **13.41** | **11.01** | 4.5 |
+| warn-text on panel | **5.93** | **9.47** | 4.5 |
+| warn-text on warn-soft | **5.17** | **7.40** | 4.5 |
+| ink on chip | **13.78** | **12.23** | 4.5 |
+| muted on chip | **5.05** | **6.57** | 4.5 |
+| on-accent text on accent-strong | **6.12** | **8.57** | 4.5 |
+| accent fill vs bg (non-text) | **4.14** | **8.55** | 3.0 |
+| accent fill vs panel (non-text) | **4.50** | **7.83** | 3.0 |
+| lit stone (accent-strong) vs unlit stone | **4.30** | **5.19** | 3.0 |
+| lit stone (accent-strong) vs bg | **5.63** | **8.55** | 3.0 |
+| hot ring (accent-strong) vs milestone fill (good-soft) | **5.04** | **6.11** | 3.0 |
+| faint on bg (decorative only) | 3.21 | 4.95 | — |
+| edge on panel (control boundary) | **3.29** | **3.16** | 3.0 |
+| edge on bg (control boundary) | **3.03** | **3.45** | 3.0 |
 
 Two audit-driven fixes: every small-text use of `--faint` (eyebrow labels,
 citations, row labels, unit numbers, sources) was promoted to `--muted`
-because light faint-on-panel computes 4.27; `--faint` now colors only
-decorative marks (separators, arrows, the entry dot ring).
+because faint-on-panel does not clear the 4.5 text floor (4.27 under the
+retired warm palette, 3.48 under this one); `--faint` now colors only
+decorative marks (separators, arrows, the entry dot ring). The floor is the
+rule, not the number, so the promotion stands whatever the palette.
 And **lit vs unlit stones**: round one accepted 2.41 (light) as an
 `aria-hidden` exception. The composed round retired the exception — lit
-stones now fill with `--accent-strong` (`#C6492E` light / `#F0754F` dark),
-which computes **3.48 light / 3.81 dark** against the unlit stone: above the
+stones fill with `--accent-strong` (`#126E62` light / `#4FC3B0` dark), which
+computes **4.30 light / 5.19 dark** against the unlit stone: above the
 3:1 floor with the gesture intact. Nothing was traded away: the zero state's
-unlit stones are unchanged, the deeper coral still reads unmistakably as
-coral, and it is the same token the "you are here" ring and the primary
+unlit stones are unchanged, the deeper accent still reads unmistakably as
+the accent, and it is the same token the "you are here" ring and the primary
 buttons already used — the ring is now literally a hollow lit stone. The
 waypath remains `aria-hidden` decoration always paired with a text count.
 
 **Placeholder text is not decorative.** An earlier draft of this section
 listed it with the separators and arrows, and `textarea::placeholder`
-accordingly took `--faint` over `--panel` — the same 4.27 that disqualified
-`--faint` from small text three sentences earlier. Placeholder copy is
-instruction, read to be acted on, so it takes `--muted` (6.45 on panel). Every
+accordingly took `--faint` over `--panel` — the same shortfall that
+disqualified `--faint` from small text three sentences earlier. Placeholder
+copy is instruction, read to be acted on, so it takes `--muted` (5.97 on
+panel). Every
 renderer inherits that as a requirement, not as a pre-blessed exception.
 
 ## Judgment calls (say-it-out-loud reasons)
@@ -203,7 +224,7 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
   (`strip_leading_pictograph`, leading pictographs only; emoji inside prose
   are the author's business). This is presentation normalization of
   decoration living in content, not a content edit.
-- **Widget/quiz card titles are ink with a coral ↗**, not coral wholesale —
+- **Widget/quiz card titles are ink with an accent ↗**, not accent wholesale —
   six saturated titles in a grid would compete with the accent's single
   meaning.
 - **Tag chips no longer carry meaning by color alone**: every chip keeps its
@@ -226,9 +247,12 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
 
 ## Taste forks decided unattended (reversible)
 
-1. **Ground tint: faint peach (`#FDF6EF`) vs pure white.** Chose peach — the
-   sunny ground is half the warmth; pure white with the same tokens reads
-   more "tool", less "companion". Flipping is a one-token edit in `theme.py`.
+1. **Ground tint: mineral grey-green (`#F4F6F4`) vs pure white.** Chose the
+   tint — a ground a shade off white lets `--panel` stay pure white and read
+   as raised without a heavier shadow. Flipping is a one-token edit in
+   `theme.py`. (Under the retired warm palette this fork read the other way
+   round: the peach ground was carrying the warmth, and white would have cost
+   the direction something. It no longer is, and does not.)
 2. **Stone shape: rounded lozenge vs circle.** Chose the 20×10 lozenge —
    circles at 26-per-course read as dots/dippers and collide with checkbox
    circles; lozenges read as paving. Alternative kept in mind if the mark
@@ -282,7 +306,7 @@ grey-and-orange. Specifically:
   numerals, no praise-babble: companion's voice.
 - **One hot element** (momentum's mechanic): the first undone row is raised —
   panel background, 1.5px `--accent` border (3.31:1 vs panel), quiet shadow,
-  a small coral "next" chip so the meaning is worded, not color-alone. The
+  a small accent "next" chip so the meaning is worded, not color-alone. The
   phase holding it fills its number badge `--accent-strong` (4.78:1 under
   white numerals). Everything else stays flat on the ground; the spine is
   deliberately not seven stacked cards, which would have been the card
@@ -387,7 +411,7 @@ stack of link dumps. Decisions taken:
 - **Material cards lead with the thing's name.** The verb ("Take the quiz")
   demoted from `<h3>` to the action line; a grid of four headings now reads
   as four materials, not four imperatives.
-- **The Milestone row takes the green family** — the tint that means
+- **The Milestone row takes the done family** — the neutral fill that means
   "done" everywhere else, because the milestone is what done will mean
   here. `Key insight` keeps the accent tint; every other row stays plain.
 - **The page carries what the sidecar always knew**: the phase goal under
@@ -406,7 +430,7 @@ stack of link dumps. Decisions taken:
   LLM on a request path and L1 is settled: the reader presents the script, the
   learner's own assistant runs it.
 - **The path continues at the bottom**: prev/next pills in walking order
-  (next is the primary pill — coral = your next action), and the reader
+  (next is the primary pill — the accent = your next action), and the reader
   ends with "Back to Unit N", so a lesson is a loop through the unit, not
   a dead end. The reader's dialogue banner retargets the course's trigger
   phrase to the unit at hand ("Teach me Unit 6 interactively", not the

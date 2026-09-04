@@ -105,11 +105,14 @@ STYLE = theme.style("""\
   .unit.ms { background:var(--good-soft); }
   .unit.ms .flag { flex:none; margin:5px 1px 0; color:var(--good-text); }
   .unit.ms input { accent-color:var(--good); }
-  /* ...and on that green fill the ring must change token: --accent on
-     --good-soft computes 2.82, under the 3.0 non-text floor, where
-     --accent-strong computes 4.07 light / 4.35 dark. It is the token the
-     holding phase's badge and the lit waypath stones already carry, so the
-     hot-row vocabulary stays one coral, not two. */
+  /* ...and on that fill the ring keeps --accent-strong. Under the warm
+     palette this was forced arithmetic: --accent on --good-soft computed
+     2.82, under the 3.0 non-text floor. Under verdigris it clears (3.71
+     light / 6.11 dark) and the rule survives on the reason that outlived
+     the number — the hot ring is one token everywhere it appears, the same
+     one the holding phase's badge and the lit waypath stones carry
+     (5.04 light / 6.11 dark here), because a "you are here" mark that
+     changes color with its background is two marks. */
   .unit.ms.next { border-color:var(--accent-strong); }
   @media (max-width:560px) {
     .spine::before { left:12px; }

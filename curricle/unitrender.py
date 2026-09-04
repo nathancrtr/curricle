@@ -129,6 +129,29 @@ STYLE = theme.style("""\
   .doc table { border-collapse:collapse; font-size:14px; }
   .doc th, .doc td { border:1px solid var(--line); padding:5px 11px; text-align:left; }
   .doc th { background:var(--chip); }
+  .doc h2, .doc h3 { scroll-margin-top:16px; }
+  .doc sup.fn { font-size:.72em; line-height:0; }
+  .doc sup.fn a { text-decoration:none; font-weight:600; }
+  .doc .footnotes { margin:38px 0 0; padding:14px 0 0; border-top:1px solid var(--line);
+                    font-size:13.5px; color:var(--muted); }
+  .doc .footnotes ol { padding-left:22px; }
+  .doc .footnotes li { max-width:72ch; margin:0 0 6px; }
+  .doc .footnotes li:target { color:var(--ink); }
+  .doc .fnback { text-decoration:none; margin-left:4px; }
+  .doc details { margin:14px 0; padding:10px 16px; border:1.5px solid var(--line);
+                 border-radius:var(--r-card); background:var(--panel); }
+  .doc details summary { cursor:pointer; font-weight:600; }
+  .doc details[open] summary { margin-bottom:8px; }
+  .doc .callout { margin:14px 0; padding:10px 16px; border-left:3px solid var(--accent);
+                  background:var(--accent-soft);
+                  border-radius:0 var(--r-card) var(--r-card) 0; }
+  .doc .callout p { margin:0 0 8px; }
+  .doc .callout p:last-child { margin-bottom:0; }
+  .doc .callout-title { font-weight:700; font-size:13px; letter-spacing:.04em;
+                        text-transform:uppercase; }
+  .doc .callout.tip { border-color:var(--good); background:var(--good-soft); }
+  .doc .callout.warning, .doc .callout.caution {
+    border-color:var(--warn-text); background:var(--warn-soft); }
   .banner { margin:22px 0 0; padding:13px 17px; border:1.5px solid var(--line);
             border-radius:var(--r-card); font-size:14px; color:var(--muted);
             background:var(--panel); }
@@ -179,7 +202,8 @@ sync();
 
 # What a card invites you to do, by material kind. The title names the
 # thing; the chip says what it is, in words; the verb is the action line.
-_VERB = {"lesson": "Read the lesson guide", "widget": "Open the widget",
+_VERB = {"chapter": "Read the chapter",
+         "lesson": "Read the lesson guide", "widget": "Open the widget",
          "trainer": "Open the trainer", "quiz": "Take the quiz",
          "exercise": "Read the brief", "companion": "Read the companion",
          "question-bank": "Browse the questions"}
@@ -260,12 +284,15 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
             for s in u.steps)
         steps = f'<div class="steps panel"><h2>The steps</h2>{items}</div>'
 
-    mats = mf.materials_for_unit(unit_id)
+    # The chapter is the unit's text, so it leads the cards whatever the
+    # registry order; everything else keeps its declared order.
+    mats = tuple(sorted(mf.materials_for_unit(unit_id),
+                        key=lambda m: m.kind != "chapter"))
     mats_html = ""
     if mats:
         mats_html = ('<section class="mats"><h2>This unit\'s materials</h2>'
-                     '<p class="sub">Lessons read here; widgets and quizzes '
-                     "open right in the browser.</p>" + _cards(mats, rr)
+                     '<p class="sub">Chapters and lessons read here; widgets '
+                     "and quizzes open right in the browser.</p>" + _cards(mats, rr)
                      + "</section>")
 
     check = ""
@@ -388,7 +415,16 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
             if material and material.unit else None)
     unit_href = f"unit/{unit.id}.html" if unit else "curriculum.html"
     banner = ""
-    if material and material.kind == "lesson":
+    if material and material.kind == "chapter":
+        # A chapter is the unit's own text: it carries its sources as
+        # footnotes and closes by saying how it was checked, so the banner
+        # says what the page is and where its reliability comes from.
+        banner = ('<div class="banner"><b>This is the unit\'s chapter.</b> '
+                  "It teaches the unit's content in full; the readings on the "
+                  "unit page go deeper, they are not required to follow it. "
+                  "Footnotes name the source of every substantive claim, and "
+                  "the last section says what was verified against what.</div>")
+    elif material and material.kind == "lesson":
         # The course's own trigger phrase, aimed at *this* unit: the corpus
         # phrases name a unit by number ("Teach me Unit 2 interactively."),
         # so the example is retargeted rather than always citing Unit 2.

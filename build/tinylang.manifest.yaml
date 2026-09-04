@@ -294,10 +294,10 @@ units:
       and `#` comments by skipping them. Report an unterminated string as an error that names the line,
       not as a crash.'
   - label: Read
-    content: '[Crafting Interpreters](res:crafting), the "Scanning" chapter, all of it — it is the closest
-      thing to a canonical treatment. Then look at [Python''s `tokenize` module](res:tokenize) output
-      for a small Python file (`python -m tokenize somefile.py`) to see what a production lexer emits
-      and how much more of it there is than you expected.'
+    content: '[this unit''s chapter](mat:chapter-u1) first. Then [Crafting Interpreters](res:crafting),
+      the "Scanning" chapter, all of it — it is the closest thing to a canonical treatment. Then look
+      at [Python''s `tokenize` module](res:tokenize) output for a small Python file (`python -m tokenize
+      somefile.py`) to see what a production lexer emits and how much more of it there is than you expected.'
   - label: Concepts
     content: lexeme vs. token vs. token kind; maximal munch, and why `<=` must be one token rather than
       two; why keywords are recognised *after* identifiers rather than during; the lookahead question
@@ -453,6 +453,12 @@ milestones:
     — you are about to spend four weeks reading your own error messages.
   after_unit: u2
 materials:
+- id: chapter-u1
+  kind: chapter
+  title: Unit 1 — Characters to tokens
+  path: interactive/chapters/unit-01-lexing.md
+  unit: u1
+  blurb: The unit's text — read this first; the readings go deeper.
 - id: lesson-u1
   kind: lesson
   title: Unit 1 — the lexer, Socratically

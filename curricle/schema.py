@@ -22,6 +22,7 @@ COURSE_MODES = ("subject", "project", "research")
 PROVENANCES = ("spine", "overlay", "fork", "bespoke")
 MATERIAL_KINDS = (
     "lesson", "widget", "quiz", "trainer", "exercise", "companion", "question-bank",
+    "chapter",   # the unit's own instructional text — read, not run (docs/chapter-pattern.md)
 )
 GRADER_TYPES = (
     "unit-test", "property-test", "oracle", "drill", "annotation", "artifact", "external",
@@ -386,7 +387,9 @@ class Manifest:
         """
         tags: list[str] = []
         for m in self.materials_for_unit(unit_id):
-            if m.kind == "lesson" and "lesson" not in tags:
+            if m.kind == "chapter" and "chapter" not in tags:
+                tags.append("chapter")
+            elif m.kind == "lesson" and "lesson" not in tags:
                 tags.append("lesson")
             elif m.kind in ("widget", "trainer") and "widget" not in tags:
                 tags.append("widget")

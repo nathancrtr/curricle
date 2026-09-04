@@ -52,6 +52,9 @@ def make_manifest():
             f.write("<!doctype html>")
     with open(os.path.join(learning, "interactive/lessons/u1.md"), "w") as f:
         f.write("# Lesson\n\nRun as dialogue.\n")
+    os.makedirs(os.path.join(learning, "interactive", "chapters"))
+    with open(os.path.join(learning, "interactive/chapters/u1.md"), "w") as f:
+        f.write("# Chapter\n\nRead me.[^1]\n\n[^1]: A source.\n")
     sidecar = Sidecar(
         course=SidecarCourse(
             id="test-course", title="A test course",
@@ -69,6 +72,8 @@ def make_manifest():
                             path="interactive/quizzes/p0.html", phase_num=0),
             SidecarMaterial(id="l-u1", kind="lesson", title="The lesson",
                             path="interactive/lessons/u1.md", unit="u1"),
+            SidecarMaterial(id="c-u1", kind="chapter", title="The chapter",
+                            path="interactive/chapters/u1.md", unit="u1"),
         ),
     )
     mf, issues = compile_course(root, sidecar)
@@ -102,6 +107,21 @@ class TestUnitPage(unittest.TestCase):
         self.assertIn('const API = "../api/events"', page)
 
 
+class TestChapterOnUnitPage(unittest.TestCase):
+    def setUp(self):
+        self.mf = make_manifest()
+
+    def test_chapter_card_leads_and_says_read_the_chapter(self):
+        page = render_unit(self.mf, "u1", api="../api/events")
+        self.assertIn("Read the chapter", page)
+        self.assertLess(page.index("The chapter"), page.index("The lesson"))
+        self.assertIn('href="../read/interactive/chapters/u1.md"', page)
+
+    def test_chapter_contributes_its_own_tag(self):
+        self.assertIn("chapter", self.mf.tags_for_unit("u1"))
+        self.assertIn("lesson", self.mf.tags_for_unit("u1"))
+
+
 class TestReader(unittest.TestCase):
     def setUp(self):
         self.mf = make_manifest()
@@ -114,6 +134,14 @@ class TestReader(unittest.TestCase):
         # read/interactive/lessons/u1.md sits three levels down
         self.assertIn('href="../../../index.html"', page)
         self.assertIn('href="../../../unit/u1.html"', page)
+
+    def test_chapter_gets_its_own_banner_not_the_dialogue_one(self):
+        m = next(m for m in self.mf.materials if m.id == "c-u1")
+        page = render_reader(self.mf, "# C\n\nBody.[^1]\n\n[^1]: Src.",
+                             doc_title="The chapter", material=m)
+        self.assertIn("This is the unit's chapter.", page)
+        self.assertNotIn("dialogue script", page)
+        self.assertIn('<section class="footnotes">', page)
 
     def test_plain_document_renders_without_banner(self):
         page = render_reader(self.mf, "# Doc\n\nBody.", doc_title="Doc")

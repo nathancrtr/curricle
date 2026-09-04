@@ -19,6 +19,9 @@ numbered units, about eight weeks at four hours a week.
 Everything under `interactive/` is registered in `course.yaml` and shows up on
 the unit pages automatically:
 
+- `chapters/` — the unit's own text: what the unit teaches, written to be
+  read, with sources in footnotes and a closing note on how it was checked.
+  Read the chapter first; the readings on the unit page go deeper.
 - `lessons/` — Socratic guides, written for your tutor — the assistant the
   course is exported to — rather than for you. Ask *"teach me Unit 1
   interactively"* and the lesson runs.

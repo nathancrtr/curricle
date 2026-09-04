@@ -224,6 +224,13 @@ milestones:
   after_unit: u2
 
 materials:
+- id: chapter-u1
+  kind: chapter
+  title: "Unit 1 — Characters to tokens"
+  path: interactive/chapters/unit-01-lexing.md
+  unit: u1
+  blurb: The unit's text — read this first; the readings go deeper.
+
 - id: lesson-u1
   kind: lesson
   title: "Unit 1 — the lexer, Socratically"

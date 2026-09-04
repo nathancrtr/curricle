@@ -179,6 +179,8 @@ materials:
   - id: l-u01
     kind: lesson                    # lesson | widget | quiz | trainer
                                     # | exercise | companion | question-bank
+                                    # | chapter (the unit's own instructional
+                                    #   text — see docs/chapter-pattern.md)
     title: "The collation data model"
     path: interactive/lessons/unit-01-collation-data-model.md
     unit: u1

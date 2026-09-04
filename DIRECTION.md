@@ -86,12 +86,24 @@ one edit.
 
 - Body: `"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui` at 16px/1.6 —
   humanist, warm, everywhere available, no font pipeline (constraint honored).
-- Display (`h1–h3`): `ui-rounded` first — SF Rounded where the platform has
-  it (the one honest "rounded" move), falling back to the body stack. Chrome
-  falls back to Avenir Next; the design must and does work on both.
+- Display (`h1–h3`): **the same stack**. `FONT_DISPLAY` used to lead with
+  `ui-rounded` — SF Rounded where the platform had it — and it was called
+  the one honest "rounded" move. It went with the warm palette and for the
+  same reason: a rounded display face is the other half of the friendly-app
+  default, and a product whose whole thesis is *hospitality to an adult
+  doing hard work* should not open every page in the face a children's app
+  would choose. With no pipeline to spend, one humanist face separated by
+  size, weight and tracking is the more disciplined answer than two
+  separated by shape. The constant survives because it names the *role*: the
+  day a display face earns a pipeline, it changes in one place.
 - Mono only for things that are literally typed (trigger phrases, code).
-  The letterspaced-mono-small-caps eyebrow vocabulary of the bookish status
-  quo is entirely removed.
+- **No letterspaced uppercase anywhere.** The eyebrow vocabulary
+  (`BUILD`, `READ`, `MILESTONE`, `PHASE 1 CHECKPOINT`, `HOW THIS CURRICULUM
+  WORKS`) was declared removed in the first round and was still in four
+  renderers; it is gone now, replaced by sentence-case bold at a size a
+  person reads rather than squints at. Tracked small caps is the single most
+  legible signature of a template, and it was labelling content the author
+  had already capitalised correctly.
 
 ### Color
 
@@ -137,8 +149,23 @@ already gave it.
 | `--chip` | `#E9EDEA` | `#232A2B` | neutral chip fill |
 | `--stone` | `#D3DAD6` | `#343D3D` | unlit waypath stone |
 
-Spacing/radii/elevation: cards 18px radius + `--shadow` (two quiet layers);
-controls are pills with ≥34–38px hit height; checkboxes and radios 17–18px
+### Shape
+
+Radii are a **three-step scale**, spelled as tokens and asserted by
+`tests/test_theme.py`: `--r-card` 10px, `--r-ctl` 7px, `--r-chip` 4px. What
+this replaced was eleven distinct hard-coded radii across the renderers, an
+18px card, and a 999px pill on more or less anything that held text — which
+is the point at which "rounded" has stopped being a decision and become a
+habit, and the habit reads as a template. The waypath stone keeps its own
+geometry deliberately: it is a lozenge because it is paving, and it is the
+one shape in the system that carries meaning rather than tone.
+
+Elevation is one layer, not two. A card on a tinted ground with a hairline
+`--line` does not need a second shadow to be read as a card, and the
+two-layer soft shadow under every panel was the same "floating card" move
+the radii were making.
+
+Spacing/elevation: controls keep ≥34–38px hit height; checkboxes and radios 17–18px
 with `accent-color`. **Control edges are `--edge`, never `--line`** — a
 text box, a number box and the wizard's radio cards draw their boundary with
 a token computed against the 3:1 non-text floor, while `--line` stays the
@@ -209,6 +236,40 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
 
 - **Hub h1 is the course title, not the slug.** "textual-flow" as a page
   title reads as infrastructure; the slug demotes to a small line under it.
+- **Nothing is marked by tint alone, and less is marked by tint at all.**
+  Three tinted things were retired in the structural round. *Phase and tier
+  numeral badges* gave up their `--accent-soft` fill: a phase number is an
+  ordinal, not a status, and tinting seven of them spent the accent —
+  which means "your next action" — on the one element on the page that is
+  never the answer to "what now". They keep their shape, because the hub's
+  rail needs a node; the phase holding the hot row still fills, because
+  that one *is* a status. *Callout blocks* (key insight, deliverable,
+  checkpoint, milestone) gave up their pastel fills for a 2px left rule
+  and the label they already carried in words — four different tints down
+  one page is a page that looks colour-coded without any colour meaning
+  something a reader could name. *The curriculum's highlighter sweep* moved
+  from `--accent-soft` to the done family: it fires on completion, so it
+  was the one animated gesture in the product spending the accent on the
+  opposite of what the accent means.
+- **The eyebrow is navigation, and only navigation.** It used to chain page
+  facts onto the end of the breadcrumb with middots — "the curriculum · 7
+  phases · 23 units", "unit 02 · phase 1", "the learner profile · tenant
+  nathan" — which reads as one list but is two things: where you can go
+  back to, and what you are looking at. The facts moved to a `.pagefacts`
+  line under the title, the separator became the slash a breadcrumb has
+  always used, and the crumb that said "phase 1" went entirely, because the
+  page says that in a full sentence two lines further down.
+- **No trailing arrow on an action.** "Begin →", "Unit page →", "Open the
+  widget →", "Save this screen →" — twenty-one of them across the
+  renderers and the wizard. The verb already says the direction; the glyph
+  is decoration that every generated interface is currently wearing. The
+  external-link ↗ on resource links stays, because that one is a
+  convention carrying information the label does not.
+- **Unit pagination names its destination.** The prev/next pills were a
+  glyph plus a title clipped at 46% with an ellipsis, which is to say: the
+  arrow said the direction and the ellipsis ate the destination. They are
+  now two bordered cards labelled "Previous" and "Next" in words, with the
+  title free to wrap — which a screen reader can also read.
 - **Chips live under the unit title, never beside it** (hub). Chips beside the
   title crowded it out of its own line; the title owns the full column width
   and chips are a second line of metadata. In the curriculum's single wide column they stay

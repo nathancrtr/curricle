@@ -63,8 +63,9 @@ LIGHT_VARS = """\
   --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
   --warn-text:#8A5A00; --warn-soft:#F8EFD8;
   --chip:#E9EDEA; --stone:#D3DAD6;
-  --shadow:0 1px 2px rgba(20,28,26,.05), 0 6px 18px rgba(20,28,26,.06);
-  --shadow-lift:0 2px 4px rgba(20,28,26,.06), 0 10px 28px rgba(20,28,26,.09);
+  --r-card:10px; --r-ctl:7px; --r-chip:4px;
+  --shadow:0 1px 2px rgba(20,28,26,.05);
+  --shadow-lift:0 2px 6px rgba(20,28,26,.09);
   color-scheme:light;"""
 
 DARK_VARS = """\
@@ -75,8 +76,9 @@ DARK_VARS = """\
   --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
   --warn-text:#E9BC5E; --warn-soft:#3A2F14;
   --chip:#232A2B; --stone:#343D3D;
-  --shadow:0 1px 2px rgba(0,0,0,.25), 0 6px 18px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 4px rgba(0,0,0,.30), 0 10px 28px rgba(0,0,0,.38);
+  --r-card:10px; --r-ctl:7px; --r-chip:4px;
+  --shadow:0 1px 2px rgba(0,0,0,.30);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
   color-scheme:dark;"""
 
 # The dark block is emitted twice: once behind the media query (system
@@ -98,8 +100,17 @@ TOKENS_CSS = f"""\
 
 FONT_BODY = ('"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, '
              '-apple-system, sans-serif')
-FONT_DISPLAY = ('ui-rounded, "Avenir Next", Avenir, Seravek, "Segoe UI", '
-                'system-ui, -apple-system, sans-serif')
+# Display and body are the same stack. `ui-rounded` used to lead this one —
+# SF Rounded where the platform had it — and it was the direction's one
+# honest "rounded" move. It went with the warm palette, for the same reason:
+# a rounded display face is the other half of the friendly-app default, and
+# a system that says "adult doing hard work" should not open every page in
+# the face a children's app would pick. With no font pipeline to spend
+# (that constraint stands), the professional move is one humanist face
+# separated by size, weight and tracking rather than two by shape. The
+# constant stays because renderers spell it: it names the *role*, and the
+# day a display face is worth a pipeline, it changes here alone.
+FONT_DISPLAY = FONT_BODY
 FONT_MONO = 'ui-monospace, Menlo, Consolas, monospace'
 
 # A formatting hazard, because the renderers reach for two different tools:
@@ -118,11 +129,11 @@ BASE_CSS = f"""\
          font:16px/1.6 {FONT_BODY}; }}
   a {{ color:var(--accent-text); }}
   :focus-visible {{ outline:2px solid var(--accent-strong); outline-offset:3px;
-                   border-radius:6px; }}
+                   border-radius:var(--r-ctl); }}
   button {{ font:inherit; color:inherit; background:none; border:none; padding:0;
            cursor:pointer; }}
   code {{ font-family:{FONT_MONO}; font-size:.88em; background:var(--chip);
-         padding:1px 5px; border-radius:6px; }}
+         padding:1px 5px; border-radius:var(--r-chip); }}
   h1, h2, h3, .display {{ font-family:{FONT_DISPLAY}; }}
 
   /* ---- the shared shell ---- */
@@ -139,15 +150,30 @@ BASE_CSS = f"""\
      under the separator dot. Changing the gap means changing both. */
   .eyebrow a {{ text-decoration:none; color:var(--accent-text);
                padding:6px 8px; margin-left:-8px; margin-right:-8px;
-               border-radius:999px; }}
+               border-radius:var(--r-ctl); }}
   .eyebrow a:hover {{ background:var(--accent-soft); }}
+  /* A breadcrumb separator, and only that. The eyebrow used to chain page
+     facts onto the end of the navigation with middots — "the curriculum ·
+     7 phases · 23 units", "unit 02 · phase 1" — which reads as one list but
+     is two things: where you can go back to, and what you are looking at.
+     The facts moved under the title where they belong, the separator became
+     the slash a breadcrumb has always used, and what is left in the eyebrow
+     is a path of places. */
   .eyebrow .sep {{ color:var(--faint); }}
+  /* The facts the eyebrow used to carry, in the one place a fact about
+     this page belongs: under this page's title. */
+  .pagefacts {{ margin:8px 0 0; font-size:13.5px; color:var(--muted); }}
 
   /* ---- cards & chips ---- */
   .panel {{ background:var(--panel); border:1px solid var(--line);
-           border-radius:18px; box-shadow:var(--shadow); }}
-  .chip {{ display:inline-block; font-size:11.5px; font-weight:600;
-          letter-spacing:.02em; border-radius:999px; padding:2px 9px;
+           border-radius:var(--r-card); box-shadow:var(--shadow); }}
+  /* Chips are labels, not lozenges. A pastel pill on every tag is the other
+     half of the pill-everything look; at 4px with the tint kept, the
+     semantic families still reinforce (the house rule stands — the word is
+     always printed and the tint only agrees with it) without six of them
+     turning a unit row into a row of buttons. */
+  .chip {{ display:inline-block; font-size:12px; font-weight:600;
+          border-radius:var(--r-chip); padding:2px 7px;
           background:var(--chip); color:var(--muted); white-space:nowrap; }}
   .chip.acc {{ background:var(--accent-soft); color:var(--accent-text); }}
   .chip.good {{ background:var(--good-soft); color:var(--good-text); }}
@@ -156,7 +182,7 @@ BASE_CSS = f"""\
   /* ---- pill controls (generous touch targets) ---- */
   .pill {{ display:inline-flex; align-items:center; gap:7px; min-height:38px;
           font-size:14px; font-weight:600; color:var(--muted);
-          border:1.5px solid var(--line); border-radius:999px; padding:6px 16px;
+          border:1px solid var(--edge); border-radius:var(--r-ctl); padding:6px 14px;
           background:var(--panel); cursor:pointer;
           transition:border-color .2s, color .2s, background .2s; }}
   /* A pill is a button whether the element under it is one or is an anchor,
@@ -203,7 +229,7 @@ BASE_CSS = f"""\
   .saving {{ position:fixed; bottom:18px; left:50%;
             transform:translateX(-50%) translateY(12px);
             font-size:13px; font-weight:600; background:var(--ink);
-            color:var(--bg); padding:8px 18px; border-radius:999px;
+            color:var(--bg); padding:8px 18px; border-radius:var(--r-ctl);
             opacity:0; pointer-events:none; transition:.25s; }}
   .saving.show {{ opacity:1; transform:translateX(-50%) translateY(0); }}
 

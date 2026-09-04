@@ -393,7 +393,21 @@ class HouseExemplarTest(unittest.TestCase):
         self.assertNotIn("quiz-p1", out)
         self.assertIn("<title>Phase 3 Checkpoint — Tiny demo</title>", out)
         self.assertNotIn("tinylang", out)
-        self.assertIn("phase 3 checkpoint", out)          # the lowercase eyebrow
+        self.assertIn("<h1>Phase 3 Checkpoint</h1>", out)
+        # The phase substitution preserves the case it found, and the house
+        # shell no longer contains a lowercase site to prove it with: the
+        # eyebrow that used to read "phase 1 checkpoint" went when the
+        # breadcrumb stopped carrying page facts. A learner-authored shell
+        # may still spell it either way, so the branch keeps its coverage
+        # here rather than losing it to a design change.
+        lower = factory.house_exemplar("quiz").replace(
+            "<h1>Phase 1 Checkpoint</h1>",
+            "<h1>Phase 1 Checkpoint</h1>\n  <p>continues phase 1 below</p>")
+        out_lower = factory.render_quiz_html(
+            lower, json.loads(GOOD_QUIZ), 3, 1,
+            material_id="q-phase-3", course_title="Tiny demo")
+        self.assertIn("continues phase 3 below", out_lower)
+        self.assertIn("<h1>Phase 3 Checkpoint</h1>", out_lower)
         # Both branches of the house copy are neutralised: counted intro,
         # phase-relative pass, and a fail branch that sends the learner back to
         # this course's materials rather than to tinylang's widget.

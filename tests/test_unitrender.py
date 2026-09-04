@@ -124,7 +124,7 @@ class TestReader(unittest.TestCase):
         m = next(m for m in self.mf.materials if m.id == "l-u1")
         page = render_reader(self.mf, "# L\n\nBody.", doc_title="The lesson",
                              material=m)
-        self.assertIn("Back to Unit 1 — The unit", page)
+        self.assertIn("Unit 1 — The unit", page)
 
 
 # --- the flowing unit page (fuller synthetic course) -------------------------
@@ -212,9 +212,11 @@ class TestFlowingUnitPage(unittest.TestCase):
         self.assertNotIn("Runs long", self.u1)
 
     def test_prev_next_walk_the_course_order(self):
-        self.assertIn('href="u2.html">Unit 2 — The deep end →', self.u1)
-        self.assertNotIn("← Unit", self.u1)          # nothing before u1
-        self.assertIn('href="u1.html">← Unit 1 — First steps', self.u2)
+        self.assertIn('href="u2.html">'
+                      '<b class="dir">Next</b>Unit 2 — The deep end', self.u1)
+        self.assertNotIn("Previous", self.u1)        # nothing before u1
+        self.assertIn('href="u1.html">'
+                      '<b class="dir">Previous</b>Unit 1 — First steps', self.u2)
 
     def test_checkpoint_prose_lands_on_the_phase_closing_unit_only(self):
         self.assertIn("this unit closes the phase", self.u2)

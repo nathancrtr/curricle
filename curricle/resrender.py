@@ -44,13 +44,13 @@ STYLE = theme.style("""\
   .tier { margin:52px 0 0; }
   .tier-head { display:flex; align-items:flex-start; gap:12px; }
   .tier-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
-              border-radius:12px; background:var(--accent-soft);
-              color:var(--accent-text); font:700 17px """ + theme.FONT_DISPLAY + """; }
+              border-radius:var(--r-ctl); background:var(--bg);
+              border:1px solid var(--line);
+              color:var(--muted); font:700 17px """ + theme.FONT_DISPLAY + """; }
   .tier-name { font-family:""" + theme.FONT_DISPLAY + """; font-size:21px;
                font-weight:700; margin:4px 0 0; }
   .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
-  .subhead { font-size:12px; font-weight:700; letter-spacing:.06em;
-             text-transform:uppercase; color:var(--muted); margin:26px 0 0; }
+  .subhead { font-size:14px; font-weight:700; color:var(--ink); margin:26px 0 0; }
   .entry { border-bottom:1px solid var(--line-soft); padding:18px 0 16px; }
   .entry.hidden { display:none; }
   .entry.compact { padding:12px 0 10px; }
@@ -77,13 +77,13 @@ STYLE = theme.style("""\
   .rlink { display:inline-flex; align-items:center; gap:5px; min-height:30px;
            font-size:12.5px; font-weight:600; text-decoration:none;
            color:var(--accent-text); background:var(--accent-soft);
-           border-radius:999px; padding:2px 12px; transition:filter .2s; }
+           border-radius:var(--r-ctl); padding:2px 12px; transition:filter .2s; }
   .rlink:hover { filter:brightness(.96); }
   .rlink .arr { opacity:.7; }
   .actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 20px; margin:8px 0 0; }
   .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
          font-size:13.5px; font-weight:600; color:var(--muted);
-         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         border-radius:var(--r-ctl); padding:4px 10px; margin-left:-10px;
          transition:color .2s, background .2s; }
   .act:hover { color:var(--ink); background:var(--chip); }
   .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
@@ -96,7 +96,7 @@ STYLE = theme.style("""\
   textarea { width:100%; max-width:64ch; min-height:52px; resize:vertical; margin-top:10px;
              font:14px/1.55 """ + theme.FONT_BODY + """; color:var(--ink);
              background:var(--panel); border:1.5px solid var(--line);
-             border-radius:12px; padding:9px 12px; }
+             border-radius:var(--r-card); padding:9px 12px; }
   textarea::placeholder { color:var(--muted); }
   textarea:focus { outline:none; border-color:var(--accent); }
   .entry.hasnote .nlabel { color:var(--accent-text); }
@@ -324,8 +324,8 @@ def _no_shelf(mf: Manifest, api: str | None) -> str:
                 "it simply has not been brought into curricle yet.</p>")
     body = f"""
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a>
-    <span class="sep">·</span> the resources</p>
+    <p class="eyebrow"><a href="index.html">Course hub</a>
+    <span class="sep">/</span> Resources</p>
     <h1>Your resources</h1>
   </header>
 
@@ -341,7 +341,7 @@ def _no_shelf(mf: Manifest, api: str | None) -> str:
   <footer>
     Rendered by curricle from the course manifest ·
     <a href="curriculum.html">the curriculum</a> ·
-    <a href="index.html">← back to the hub</a>
+    <a href="index.html">Back to the hub</a>
   </footer>
 """
     return _shell(c, body)
@@ -394,8 +394,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
                    '<p class="tier-intro">The curriculum formalizes this; here it is '
                    f"at a glance.</p><ol>{items}</ol></section>")
     verified = next((r.verified_at for r in mf.resources if r.verified_at), None)
-    verified_line = (f'<span class="sep">·</span> every url verified {e(verified)}'
-                     if verified else "")
+    verified_line = (f", every URL verified {e(verified)}" if verified else "")
 
     # Where the marks actually go. Served, they are rows in the tenant's
     # ledger and survive a cleared browser; standalone, localStorage really
@@ -426,10 +425,10 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     }
     body = f"""
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a>
-    <span class="sep">·</span> the resources
-    <span class="sep">·</span> {len(mf.resource_tiers)} tiers {verified_line}</p>
+    <p class="eyebrow"><a href="index.html">Course hub</a>
+    <span class="sep">/</span> Resources</p>
     <h1>Your resources</h1>
+    <p class="pagefacts">{len(mf.resource_tiers)} tiers{verified_line}</p>
     {standfirst}
     <div class="controls panel">
       <div class="waypath" id="ticks" aria-hidden="true"></div>
@@ -451,7 +450,7 @@ def render_resources(mf: Manifest, *, api: str | None = None,
     Rendered by curricle from the course manifest{canonical} In-hand marks and notes
     {kept} ·
     <a href="curriculum.html">the curriculum</a> ·
-    <a href="index.html">← back to the hub</a>
+    <a href="index.html">Back to the hub</a>
   </footer>
 """
     return _shell(c, body, tail=f"""<div class="saving" id="toast">Saved</div>

@@ -238,7 +238,20 @@ class TestPalettes(unittest.TestCase):
         # only for whoever is running that theme — the failure a renderer
         # test would never see.
         self.assertEqual(sorted(LIGHT), sorted(DARK))
-        self.assertEqual(len(LIGHT), 22)   # grow deliberately; renderers know these
+        self.assertEqual(len(LIGHT), 25)   # grow deliberately; renderers know these
+
+    def test_the_radius_scale_is_three_steps_and_no_more(self):
+        # Radii are a scale, not a per-component opinion: card, control,
+        # chip. The look this replaced had eleven different hard-coded radii
+        # across the renderers and a 999 pill on anything that held text,
+        # which is how "rounded" stops being a decision and becomes a habit.
+        # The waypath stone keeps its own geometry on purpose — it is a
+        # lozenge because it is paving, and it is the one shape in the
+        # system that carries meaning rather than tone.
+        self.assertEqual([t for t in sorted(LIGHT) if t.startswith("--r-")],
+                         ["--r-card", "--r-chip", "--r-ctl"])
+        for tok in ("--r-card", "--r-ctl", "--r-chip"):
+            self.assertEqual(LIGHT[tok], DARK[tok])
 
     def test_each_palette_declares_its_color_scheme(self):
         # Without color-scheme the browser paints native controls and

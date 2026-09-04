@@ -34,8 +34,7 @@ STYLE = theme.style("""\
        letter-spacing:-.01em; margin:14px 0 0; }
   .standfirst { max-width:60ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
   .how { margin:26px 0 0; padding:18px 22px; }
-  .how h2 { font-size:13px; font-weight:700; letter-spacing:.06em;
-            text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  .how h2 { font-size:15px; font-weight:700; color:var(--ink); margin:0 0 10px; }
   .how p { margin:0 0 10px; font-size:14.5px; line-height:1.6; }
   .how p:last-child { margin-bottom:0; }
   .controls { margin:26px 0 0; padding:16px 20px; }
@@ -45,8 +44,9 @@ STYLE = theme.style("""\
   .phase { margin:52px 0 0; }
   .phase-head { display:flex; align-items:flex-start; gap:12px; }
   .phase-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
-               border-radius:12px; background:var(--accent-soft);
-               color:var(--accent-text); font:700 17px """ + theme.FONT_DISPLAY + """; }
+               border-radius:var(--r-ctl); background:var(--bg);
+               border:1px solid var(--line);
+               color:var(--muted); font:700 17px """ + theme.FONT_DISPLAY + """; }
   .phase-name { font-family:""" + theme.FONT_DISPLAY + """; font-size:21px;
                 font-weight:700; margin:4px 0 0; }
   .phase-weeks { margin:8px 0 0 auto; }
@@ -54,7 +54,7 @@ STYLE = theme.style("""\
   .entry { border-bottom:1px solid var(--line-soft); scroll-margin-top:18px; }
   .entry.hidden { display:none; }
   .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
-          text-align:left; padding:20px 0 4px; border-radius:12px; }
+          text-align:left; padding:20px 0 4px; border-radius:var(--r-card); }
   .head:hover .title { color:var(--accent-text); }
   .num { font:600 13px """ + theme.FONT_DISPLAY + """; color:var(--muted);
          padding-top:7px; }
@@ -68,7 +68,7 @@ STYLE = theme.style("""\
   .gloss { position:relative; margin:8px 0 0; font-size:14.5px; line-height:1.55;
            max-width:62ch; color:var(--ink); }
   .gloss-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
-                background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
+                background:var(--good-soft); border-radius:.6em .3em .5em .4em;
                 transform:scaleX(0); transform-origin:0 50%;
                 transition:transform .55s cubic-bezier(.2,.7,.3,1); }
   .gloss-text { position:relative; z-index:1; }
@@ -78,7 +78,7 @@ STYLE = theme.style("""\
              margin:8px 0 0; padding:0 0 18px 60px; }
   .act { display:inline-flex; align-items:center; gap:7px; min-height:34px;
          font-size:13.5px; font-weight:600; color:var(--muted);
-         border-radius:999px; padding:4px 10px; margin-left:-10px;
+         border-radius:var(--r-ctl); padding:4px 10px; margin-left:-10px;
          transition:color .2s, background .2s; }
   .act:hover { color:var(--ink); background:var(--chip); }
   .chev { display:inline-block; transition:transform .3s ease; }
@@ -92,34 +92,35 @@ STYLE = theme.style("""\
   .detail-inner { overflow:hidden; }
   .detail-pad { padding:0 0 26px 60px; max-width:68ch; }
   .row { margin:0 0 12px; font-size:14.5px; line-height:1.6; }
-  .row b.lbl { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
-               text-transform:uppercase; color:var(--muted); margin:0 0 3px; }
+  .row b.lbl { display:block; font-size:14px; font-weight:700; color:var(--ink);
+               margin:0 0 3px; }
   .row a { text-underline-offset:2px; }
-  .key { background:var(--accent-soft); padding:11px 15px; border-radius:12px; }
+  .key { border-left:2px solid var(--accent); padding:2px 0 2px 14px;
+         background:none; }
   .key b.lbl { color:var(--accent-text); }
   .steps { margin:0 0 12px; }
   .step-row { display:flex; align-items:baseline; gap:9px; font-size:14.5px; margin:0 0 6px; }
   .step-row input { width:17px; height:17px; accent-color:var(--accent-strong); }
   .step-row.done label { color:var(--muted); text-decoration:line-through;
                          text-decoration-color:var(--faint); }
-  .notes-label { display:block; font-size:11.5px; font-weight:700; letter-spacing:.06em;
-                 text-transform:uppercase; color:var(--muted); margin:18px 0 6px; }
+  .notes-label { display:block; font-size:14px; font-weight:700; color:var(--ink);
+                 margin:18px 0 6px; }
   textarea { width:100%; min-height:64px; resize:vertical;
              font:14px/1.55 """ + theme.FONT_BODY + """;
              color:var(--ink); background:var(--panel); border:1.5px solid var(--line);
-             border-radius:12px; padding:10px 13px; }
+             border-radius:var(--r-card); padding:10px 13px; }
   /* Placeholder copy is read to be acted on, so it is body text, not a
-     decorative mark: --muted (6.45 on panel), never --faint (4.27). */
+     decorative mark: --muted, never --faint, which does not clear the 4.5
+     text floor in either palette. */
   textarea::placeholder { color:var(--muted); }
   textarea:focus { outline:none; border-color:var(--accent); }
-  .checkpoint { margin:26px 0 0; padding:16px 20px; background:var(--good-soft);
-                border:1px solid var(--good); border-radius:16px; font-size:14.5px; }
-  .checkpoint b.cp { display:block; font-size:12px; font-weight:700;
-                     letter-spacing:.06em; text-transform:uppercase;
+  .checkpoint { margin:26px 0 0; padding:2px 0 2px 16px; background:none;
+                border-left:2px solid var(--good); font-size:14.5px; }
+  .checkpoint b.cp { display:block; font-size:14px; font-weight:700;
                      color:var(--good-text); margin:0 0 6px; }
   .checkpoint .track-goal { margin-top:8px; color:var(--muted); }
   details.check { margin:22px 0 0; padding:13px 17px; background:var(--panel);
-                  border:1.5px solid var(--line); border-radius:14px; font-size:14.5px; }
+                  border:1.5px solid var(--line); border-radius:var(--r-card); font-size:14.5px; }
   details.check summary { cursor:pointer; font-weight:600; }
   details.check div { margin-top:10px; color:var(--muted); }
   .section { margin:56px 0 0; }
@@ -127,7 +128,7 @@ STYLE = theme.style("""\
   .section p, .section li { font-size:14.5px; }
   .section .sub { color:var(--muted); margin:10px 0 0; }
   .say { font:13.5px """ + theme.FONT_MONO + """; background:var(--chip); padding:3px 9px;
-         border-radius:8px; }
+         border-radius:var(--r-ctl); }
   .saylist { list-style:none; padding:0; margin:12px 0 0; }
   .saylist li { margin:0 0 10px; }
   .empty { display:none; padding:44px 0; text-align:center;
@@ -205,7 +206,7 @@ function render() {
           <div class="actions">
             <button class="act toggle"><span class="chev">›</span><span class="tlabel">${TOGGLE(e)[0]}</span></button>
             <button class="act mark"><span class="dot"></span><span class="mlabel">${isDone(e) ? "Done" : "Mark done"}</span></button>
-            ${e.href ? `<a class="act" href="${e.href}">Unit page →</a>` : ""}
+            ${e.href ? `<a class="act" href="${e.href}">Unit page</a>` : ""}
           </div>
           <div class="detail"><div class="detail-inner"><div class="detail-pad">
             ${e.steps ? `<div class="steps">${e.steps.map(([sid, slabel]) => `
@@ -488,10 +489,10 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
 <div class="wrap">
 
   <header class="masthead">
-    <p class="eyebrow"><a href="index.html">← course hub</a>
-    <span class="sep">·</span> the curriculum
-    <span class="sep">·</span> {len(mf.phases)} phases · {n_units} units</p>
+    <p class="eyebrow"><a href="index.html">Course hub</a>
+    <span class="sep">/</span> Curriculum</p>
     <h1>{e(c.title)}</h1>
+    <p class="pagefacts">{len(mf.phases)} phases, {n_units} units</p>
     {standfirst}
     {how}
     <div class="controls panel">
@@ -513,7 +514,7 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
     Rendered by curricle from the course manifest — canonical text:
     <a href="{e(cur_href)}">{e(cur_name)}</a> (v{e(c.version.rev)}, {e(c.version.date)}) ·
     progress marks are shared with <a href="index.html">the hub</a> and
-    {kept} · <a href="index.html">← back to the hub</a>
+    {kept} · <a href="index.html">Back to the hub</a>
   </footer>
 </div>
 <div class="saving" id="toast">Saved</div>

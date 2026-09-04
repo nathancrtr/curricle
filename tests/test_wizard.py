@@ -316,14 +316,14 @@ class WelcomeCopyTest(WizardFixture):
             self.assertIn(promise, page)
         # Above the ask, not in a footer.
         self.assertLess(page.index(wizard.NEVER_PROMISES[0]),
-                        page.index("Begin →"))
+                        page.index(">Begin<"))
 
     def test_the_worker_banner_says_so_before_the_first_form(self):
         page = self.screen()
         self.assertIn("python -m curricle work", page)
         self.assertIn("is not running", page)
         self.assertLess(page.index("Start the worker before you begin"),
-                        page.index("Begin →"))
+                        page.index(">Begin<"))
         # Mark and word, always both: the chip carries an alert mark, and it
         # also says, in words, which state it is in.
         self.assertIn(f'<span class="chip warn state">{wizard._ALERT}'
@@ -335,7 +335,7 @@ class WelcomeCopyTest(WizardFixture):
             page = self.screen()
         self.assertNotIn("Start the worker before you begin", page)
         self.assertNotIn("python -m curricle work", page)
-        self.assertIn("Begin →", page)
+        self.assertIn(">Begin<", page)
 
 
 class PendingPlaceholderTest(WizardFixture):
@@ -1546,7 +1546,7 @@ class NoApiKeyBuildFaceTest(WizardFixture):
         self.assertIn("local/anthropic-key", page)
         # The button's verb, in the sentence as well as on the button.
         self.assertIn("carry on", worded)
-        self.assertIn("Carry on →", page)
+        self.assertIn("Carry on", page)
         self.assertNotIn("no_api_key", page)
 
 
@@ -2229,8 +2229,8 @@ class MastheadTest(WizardFixture):
     def test_the_crumb_reads_forward_and_the_slug_is_not_in_it(self):
         page = self.screen()
         masthead = page.split('<header class="masthead">')[1].split("</header>")[0]
-        self.assertIn("setting up curricle", masthead)
-        self.assertIn('<a href="/profile">your profile page</a>', masthead)
+        self.assertIn("Setting up curricle", masthead)
+        self.assertIn('<a href="/profile">Your profile page</a>', masthead)
         # "tenant stranger" was infrastructure on the most hospitable screen
         # in the product. The footer is where an account says its name.
         self.assertNotIn(self.slug, masthead)
@@ -2511,7 +2511,7 @@ class OneForwardActionTest(WizardFixture):
 
     def test_the_only_forward_link_is_the_submit_button(self):
         page = self.screen("?screen=2")
-        self.assertIn("Save this screen →", page)
+        self.assertIn("Save this screen", page)
         self.assertIn('<a class="back" href="/onboarding/?screen=1">', page)
         self.assertNotIn('href="/onboarding/?screen=3"', page)
 
@@ -2528,7 +2528,7 @@ class ScreenFourForwardActionTest(WizardFixture):
     """F4's worst case, on its own tenant because it needs a met gate.
 
     Screen 4 carried three ways to the review at once: the Save button, a
-    "Review and publish →" pill in the nav row, and a second copy of the
+    "Review and publish" pill in the nav row, and a second copy of the
     same link trailing the gate sentence. Save is the whole of it now.
     """
 
@@ -2537,7 +2537,7 @@ class ScreenFourForwardActionTest(WizardFixture):
         self.assertEqual(
             onboarding.profile_gate_missing(self.profile_state()), ())
         page = self.screen("?screen=4")
-        self.assertIn("Save this screen →", page)
+        self.assertIn("Save this screen", page)
         self.assertIn('<a class="back" href="/onboarding/?screen=3">', page)
         self.assertNotIn('href="/onboarding/?screen=review"', page)
         self.assertNotIn("Review and publish", page)
@@ -2714,7 +2714,7 @@ class GateDisplayTest(WizardFixture):
                 page = self.screen(f"?screen={number}")
                 self.assertNotIn(wizard.GATE_LEAD, page)
                 # A satisfied gate says so and stops there. It used to trail
-                # a second "Review and publish →" link, which was a third
+                # a second "Review and publish" link, which was a third
                 # forward route on a screen whose one forward action is Save
                 # (F4); the sentence is the whole of what this line says now.
                 self.assertIn("has a claim on the record", page)

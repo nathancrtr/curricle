@@ -412,16 +412,16 @@ def create_app(course_roots: list[str], tenant_slug: str,
                     cls += " here"
                 spans.append(f'<span class="{cls}"></span>')
             if done == 0:
-                meta = f"<b>{total} steps</b>, ready when you are"
+                meta = f"<b>{total} steps</b>"
                 if nxt:
                     meta += f" · begin with <b>{e(nxt)}</b>"
-                go = "Begin →"
+                go = "Begin"
             elif nxt:
                 meta = f"<b>{done} of {total}</b> done · next up: <b>{e(nxt)}</b>"
-                go = "Continue →"
+                go = "Continue"
             else:
                 meta = f"<b>Complete.</b> All {total} steps walked."
-                go = "Revisit →"
+                go = "Revisit"
             desc = (f'<p class="desc">{e(h.manifest.course.description)}</p>'
                     if h.manifest.course.description else "")
             cards.append(
@@ -431,7 +431,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
                 f'<p class="meta"><span>{meta}</span>'
                 f'<span class="go">{go}</span></p></a>')
         hello = theme.greeting(datetime.datetime.now().hour)
-        lede = ("Your course is ready when you are."
+        lede = ("Your course, and where you are on it."
                 if len(cards) == 1 else "Pick up where you left off.")
         if not cards:
             cards.append('<p class="lede">No courses are configured yet — '
@@ -459,8 +459,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
   <h1>{hello}, {e(tenant_slug)}.</h1>
   {f'<p class="lede">{lede}</p>' if lede else ""}
   {"".join(cards)}
-  <footer>curricle · courses written for you, progress kept for you ·
-  signed in as {e(tenant_slug)}</footer>
+  <footer>curricle · signed in as {e(tenant_slug)}</footer>
 </div>
 </body>
 </html>

@@ -218,13 +218,13 @@ _STYLE = theme.style("""\
   .claim .foot, .proposal .text .foot { margin-top:-3px; }
   .claim .foot .tier, .proposal .text .foot .tier { margin-left:0; }
   .tier { display:inline-block; font-size:11px; font-weight:700; letter-spacing:.03em;
-          border-radius:999px; padding:2px 9px; background:var(--chip);
+          border-radius:var(--r-ctl); padding:2px 9px; background:var(--chip);
           color:var(--muted); margin-left:8px; vertical-align:1px; white-space:nowrap; }
   .tier.demonstrated { background:var(--good-soft); color:var(--good-text); }
   .tier.thin { background:var(--warn-soft); color:var(--warn-text); }
   .src { font-size:12px; font-weight:500; color:var(--muted); margin-top:5px; }
   .pendingbox { background:var(--panel); border:1.5px solid var(--accent);
-                border-radius:18px; box-shadow:var(--shadow); padding:18px 22px;
+                border-radius:var(--r-card); box-shadow:var(--shadow); padding:18px 22px;
                 margin:26px 0; }
   .pendingbox h2 { margin:0 0 4px; font-size:18px; }
   .pendingbox .note { font-size:13.5px; color:var(--muted); margin:0 0 8px; }
@@ -234,7 +234,7 @@ _STYLE = theme.style("""\
   .proposal .text { flex:1 1 24rem; line-height:1.6; }
   button { display:inline-flex; align-items:center; min-height:36px;
            font-size:13.5px; font-weight:600; background:var(--panel);
-           border:1.5px solid var(--line); border-radius:999px; padding:5px 16px;
+           border:1.5px solid var(--line); border-radius:var(--r-ctl); padding:5px 16px;
            color:var(--muted); cursor:pointer;
            transition:border-color .2s, color .2s, background .2s; }
   button.yes { color:var(--good-text); border-color:var(--good); }
@@ -350,10 +350,10 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="/">← your courses</a>
-    <span class="sep">·</span> the learner profile
-    <span class="sep">·</span> tenant {e(tenant_slug)}</p>
+    <p class="eyebrow"><a href="/">Your courses</a>
+    <span class="sep">/</span> Learner profile</p>
     <h1>What the record says about you</h1>
+    <p class="pagefacts">Tenant {e(tenant_slug)}</p>
     <p class="lede">Every course is calibrated from this ledger — the better it
     knows you, the less time you spend on things you already know.</p>
   </header>

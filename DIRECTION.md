@@ -554,6 +554,40 @@ stack of link dumps. Decisions taken:
   a dead end. The reader's dialogue banner retargets the course's trigger
   phrase to the unit at hand ("Teach me Unit 6 interactively", not the
   phrase's hard-coded example unit).
+- **The unit page is a walk, not a dossier** (structural round, 2026-09).
+  The first shape of the page printed the curriculum's rows in authoring
+  order and then a card grid, so the one word saying what to do first
+  ("first", inside the Read row) had no more weight than anything else, and
+  the chapter — the unit's own text — sat in a grid beside the lesson guide
+  at equal size. Now the rows are placed by *role*, which is what the
+  enumerated labels always were: masthead; **Start here** (the chapter as
+  the one filled panel with the page's one primary pill, or the Read row
+  with its first reading as the action when there is no chapter); **The
+  work** (Build, Exercise, with the exercise material and its grader
+  command attached to the row); **Read**, framed as deeper than the
+  chapter; **Concepts** as the list the author wrote, split on the corpus's
+  own semicolons; each track row as its own field headed by the track's
+  name and cadence; **With your assistant**; **Try it** (widgets and
+  trainers, still cards — genuine peers); **Done means** (Milestone, Key
+  insight, check-yourself, steps, the mark, the checkpoint, any milestone
+  the phase places after this unit, then the way on). A label outside the
+  vocabulary keeps its authoring order as its own field, so a course's own
+  rows are honored, not dropped.
+- **The lesson guide is offered as the sentence that runs it.** Its own
+  first line says it is for the model, not the learner, and the old card
+  said "Read the lesson guide" — an invitation to do the thing the document
+  forbids. The assistant section leads with the course's trigger phrase,
+  retargeted to this unit; "See the script" is the secondary link, because
+  a learner may want to see what the tutor is working from, and a unit with
+  no guide still gets the row, saying the assistant improvises. The quiz
+  phrase sits beside it, retargeted to the phase.
+- **Mark done moved to the bottom, and stays a secondary pill.** It sat at
+  the top, before the page had said what done means. The accent means
+  "your next action" and finishing is the last one; the chapter keeps the
+  page's single primary pill.
+- **The Read row does not mention the chapter.** Once the page leads with
+  it, a Read row opening "this unit's chapter first" says it twice. The
+  compiler warns; `docs/chapter-pattern.md` records the convention.
 - **`repo/` serves exactly what the manifest names.** Repo-level documents
   (REVIEW.md, a `repo:` target) are served through the themed reader — but
   only paths the compiler blessed. The course repo holds more than the

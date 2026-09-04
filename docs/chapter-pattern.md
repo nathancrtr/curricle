@@ -134,7 +134,11 @@ materials:
   blurb: The unit's text — read this first; the readings go deeper.
 ```
 
-Then link it from the unit's **Read** row in `curriculum.md` (`[this
-unit's chapter](mat:c-u01)`) so the standalone curriculum page reaches it
-too. The unit page lists the chapter first among the unit's materials and
-the hub shows a `chapter` chip; both derive from the registry.
+Do **not** also link it from the unit's **Read** row in `curriculum.md`.
+The unit page leads with the chapter — it is the "Start here" panel and the
+page's one primary action — and the curriculum page's derived Interactive
+row and the hub's `chapter` chip both come from the registry, so a Read row
+that opens with "[this unit's chapter](mat:c-u01) first" says the same thing
+a second time, without hierarchy. The compiler warns on it. The Read row
+holds the readings, in the order to take them; the unit page frames them as
+"deeper than the chapter".

@@ -135,6 +135,30 @@ class TestCompile(unittest.TestCase):
         self.assertIsNotNone(mf)
         self.assertFalse(any("figures" in i.message for i in issues), [str(i) for i in issues])
 
+    def test_read_row_linking_the_units_chapter_warns(self):
+        # The unit page leads with the chapter; a Read row that also points
+        # at it says the same thing twice (docs/chapter-pattern.md).
+        ch = os.path.join(self.root, "learning", "interactive", "chapters")
+        os.makedirs(ch)
+        with open(os.path.join(ch, "u1.md"), "w") as f:
+            f.write("# Chapter\n")
+        cur = os.path.join(self.root, "learning", "curriculum.md")
+        with open(cur) as f:
+            text = f.read()
+        text = text.replace("- **Build:** the thing.",
+                            "- **Build:** the thing.\n"
+                            "- **Read:** [this unit's chapter](mat:c-u1) first, then the readme.", 1)
+        with open(cur, "w") as f:
+            f.write(text)
+        mats = base_sidecar().materials + (
+            SidecarMaterial(id="c-u1", kind="chapter", title="C1",
+                            path="interactive/chapters/u1.md", unit="u1"),)
+        mf, issues = compile_course(self.root, base_sidecar(materials=mats))
+        self.assertIsNotNone(mf, [str(i) for i in issues])
+        hits = [i for i in issues if "own chapter" in i.message]
+        self.assertEqual(len(hits), 1, [str(i) for i in issues])
+        self.assertEqual(hits[0].where, "unit u1 [Read]")
+
     def test_unregistered_file_warns(self):
         extra = os.path.join(self.root, "learning", "interactive", "lessons", "stray.md")
         with open(extra, "w") as f:

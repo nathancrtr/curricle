@@ -72,6 +72,12 @@ with a summary that says it is an answer so nobody opens it by accident.
   `[Wasserman & Gurry](res:wg)` — in the footnote's first use, so the compiler
   validates it and the reader lands on the verified URL. Never paste a bare URL
   in prose; the compiler refuses.
+- Reference links inside a chapter are resolved by the reader but **not
+  validated by the compiler** (it walks manifest content, not material files).
+  So check them by rendering: a `res:` key must exist, and a `repo:` path must
+  be one the served app blesses — the `docs:` pointers in `course.yaml` or a
+  `repo:` link in manifest content — or it 404s when served. Cite anything
+  else by name without a link.
 - For data claims, the locator is the file and the element: *open-cbgm
   `examples/3_john_collation.xml`, `<app n="B25K1V15U18">`, at commit `…`*.
   Data files change; the commit or date is part of the citation.

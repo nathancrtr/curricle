@@ -9,8 +9,7 @@ renders the same on GitHub, because the dialect extensions were chosen for
 that (footnotes, `<details>`, `> [!NOTE]` alerts — see `curricle/blockmd.py`).
 
 This document is the authoring contract. It exists so that chapter two reads
-like chapter one, and so that a reader's trust in one chapter transfers to the
-next. The pattern draws on settled practice from textbook and technical-
+like chapter one and a reader's trust in one carries over to the next. The pattern draws on settled practice from textbook and technical-
 writing design — stated objectives, worked examples before formalism,
 retrieval practice at the point of learning, and citation with locators — and
 adds one thing those genres rarely do: a visible account of how the chapter
@@ -19,7 +18,7 @@ was checked.
 ## What a chapter promises
 
 1. **Self-contained.** A learner who reads only the chapter can do the unit's
-   Build and Exercise. Readings deepen; they are not required to follow.
+   Build and Exercise. The readings go deeper; none is required.
 2. **Sourced.** Every substantive claim — a definition, a number, an
    attribution of a position, a convention of a tool or edition — carries a
    footnote naming its source and a locator (page, section, file and element,
@@ -98,8 +97,8 @@ A pipe table, one row per checked claim or claim-family:
 | W&G define pregenealogical coherence as … | W&G ch. 3 | **unverified against the text** — cited from memory |
 
 Results are one of: *verified*, *verified with caveat* (say which),
-*unverified against the text*, *inferred* (say from what). A chapter with no
-unverified rows is the goal; a chapter that hides them is a failure.
+*unverified against the text*, *inferred* (say from what). Aim for no
+unverified rows, and never hide one.
 
 ## Voice and format
 
@@ -120,8 +119,8 @@ white plate so a Graphviz SVG survives dark mode; GitHub shows the image with
 the alt on hover. Put the files in a `figures/` directory beside the chapter
 (`learning/interactive/chapters/figures/`); the compiler treats that
 directory as the chapters' assets and does not ask for it to be registered.
-Prefer SVG for graphs (crisp, small, greppable). A figure is evidence like a
-number: say in the ledger what produced it and when.
+Prefer SVG for graphs (crisp, small, greppable). Treat a figure as evidence, like a
+number: the ledger says what produced it and when.
 
 ## Registering a chapter
 

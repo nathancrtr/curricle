@@ -38,7 +38,7 @@ The comment vanished; so did every space. The parser never sees either. A **lexe
 
 ## 2. Maximal munch
 
-Given `<=`, a lexer could emit `<` then `=`. Every real lexer instead takes the longest lexeme that matches at the current position — the rule Nystrom calls maximal munch.[^crafting-scanning] The consequence for you: check two-character operators before one-character ones, or `<=` becomes two tokens and `a <= b` parses as `a < (= b)`, which is nonsense the parser will report a long way from the actual bug.
+Given `<=`, a lexer could emit `<` then `=`. Every real lexer instead takes the longest lexeme that matches at the current position — the rule Nystrom calls maximal munch.[^crafting-scanning] Check two-character operators before one-character ones, or `<=` becomes two tokens and `a <= b` parses as `a < (= b)`, which is nonsense the parser will report a long way from the actual bug.
 
 <details>
 <summary>Check yourself: why are keywords recognised after identifiers, not before?</summary>
@@ -49,10 +49,10 @@ Because `letter` starts with `let`. Scan the whole identifier first, then ask wh
 
 ## 3. How far ahead to look
 
-The scanner in this course peeks at most one character beyond the current one. That is enough because every tinylang token is decided by its first character plus at most one more (`<` vs `<=`, `!` vs `!=`, `/` vs a comment marker). Python's production tokenizer works the same way for operators; run `python -m tokenize` on any file and look at how much it emits that you never think about — `NEWLINE`, `INDENT`, `NL`.[^py-tokenize]
+The scanner in this course peeks at most one character beyond the current one. One is enough because every tinylang token is decided by its first character plus at most one more (`<` vs `<=`, `!` vs `!=`, `/` vs a comment marker). Python's production tokenizer works the same way for operators; run `python -m tokenize` on any file and look at how much it emits that you never think about — `NEWLINE`, `INDENT`, `NL`.[^py-tokenize]
 
 > [!TIP]
-> An unterminated string is an error that names its line. It is not an exception that escapes the lexer.
+> An unterminated string is an error that names its line, not an exception that escapes the lexer.
 
 ## What this sets up
 

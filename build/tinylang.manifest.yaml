@@ -294,10 +294,10 @@ units:
       and `#` comments by skipping them. Report an unterminated string as an error that names the line,
       not as a crash.'
   - label: Read
-    content: '[this unit''s chapter](mat:chapter-u1) first. Then [Crafting Interpreters](res:crafting),
-      the "Scanning" chapter, all of it — it is the closest thing to a canonical treatment. Then look
-      at [Python''s `tokenize` module](res:tokenize) output for a small Python file (`python -m tokenize
-      somefile.py`) to see what a production lexer emits and how much more of it there is than you expected.'
+    content: '[Crafting Interpreters](res:crafting), the "Scanning" chapter, all of it — it is the closest
+      thing to a canonical treatment. Then look at [Python''s `tokenize` module](res:tokenize) output
+      for a small Python file (`python -m tokenize somefile.py`) to see what a production lexer emits
+      and how much more of it there is than you expected.'
   - label: Concepts
     content: lexeme vs. token vs. token kind; maximal munch, and why `<=` must be one token rather than
       two; why keywords are recognised *after* identifiers rather than during; the lookahead question

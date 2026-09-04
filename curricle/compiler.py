@@ -20,6 +20,7 @@ from .schema import (
 from .sidecar import Sidecar, SidecarUnit
 
 URL_RE = re.compile(r"https?://\S+")
+_MAT_LINK_RE = re.compile(r"\]\(mat:([^)]+)\)")
 INTERACTIVE_PATH_RE = re.compile(r"(interactive/[A-Za-z0-9_./\-]+[A-Za-z0-9_\-/])")
 
 
@@ -335,6 +336,10 @@ def _validate(mf: Manifest, content_root: str, issues: Issues, *,
 
     # Content hygiene: bare URLs belong in resources, not prose (warn for now —
     # ml-ai has two dozen; ref-scheme links are the sanctioned path).
+    chapter_ids: dict[str, set[str]] = {}
+    for m in mf.materials:
+        if m.kind == "chapter" and m.unit:
+            chapter_ids.setdefault(m.unit, set()).add(m.id)
     for u in mf.units:
         for r in u.rows:
             urls = URL_RE.findall(r.content)
@@ -343,6 +348,18 @@ def _validate(mf: Manifest, content_root: str, issues: Issues, *,
                             f"{len(urls)} bare URL(s) in content: {urls[0]}…"
                             if len(urls) > 1 else
                             f"bare URL in content: {urls[0]}")
+            if r.label == "Read" and chapter_ids.get(u.id):
+                # The unit page leads with the chapter — it is the start
+                # panel and the page's one primary action — so a Read row
+                # that opens by pointing at it says the same thing twice,
+                # the second time without hierarchy. The row holds the
+                # readings; the registry holds the chapter.
+                linked = {m for m in _MAT_LINK_RE.findall(r.content)}
+                if linked & chapter_ids[u.id]:
+                    issues.warn(f"unit {u.id} [Read]",
+                                "links the unit's own chapter; the unit page "
+                                "leads with the chapter itself — keep the "
+                                "readings in this row and drop the link")
             if r.label == "Interactive":
                 # The Interactive row is derived from material attachments
                 # (spec rule 2); an authored one is duplication that will

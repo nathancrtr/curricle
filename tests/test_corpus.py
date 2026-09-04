@@ -45,8 +45,8 @@ class TestTextualFlow(unittest.TestCase):
     def test_shape(self):
         self.assertEqual(len(self.manifest.phases), 7)
         self.assertEqual(len(self.manifest.units), 23)
-        self.assertEqual(len(self.manifest.materials), 18)
-        self.assertEqual(len(self.manifest.resources), 43)
+        self.assertEqual(len(self.manifest.materials), 23)   # + the Phase 0 and Unit 1–4 chapters
+        self.assertEqual(len(self.manifest.resources), 44)    # + Head 2010
 
     def test_every_phase_after_p0_has_goal_and_units(self):
         for p in self.manifest.phases:
@@ -116,10 +116,12 @@ class TestHubParity(unittest.TestCase):
         self.assertEqual(gen_ids, TF_HUB_IDS)
         self.assertEqual(gen_greek, TF_GREEK_IDS)
         self.assertIn('const KEY = "tf-progress"', gen)
-        # The p0 milestone step carries the phase-quiz chip, as the original does.
+        # The p0 milestone step carries the phase-quiz chip, as the original
+        # does — and, since the orientation chapter, the chapter chip.
         p0_rows = phases[0]["units"]
         self.assertEqual(p0_rows[-1], ["p0-para",
-                         "Milestone paragraph: in, out, where the humans sit", ["quiz"]])
+                         "Milestone paragraph: in, out, where the humans sit",
+                         ["chapter", "quiz"]])
 
 
 @unittest.skipUnless(HAVE_TF, "textual-flow repo not present")
@@ -194,7 +196,7 @@ class TestResourcesViewParity(unittest.TestCase):
 
     def test_tier_shapes(self):
         counts = [sum(len(g["entries"]) for g in t["groups"]) for t in self.tiers]
-        self.assertEqual(counts, [10, 13, 16, 4])
+        self.assertEqual(counts, [10, 14, 16, 4])
         self.assertTrue(self.tiers[2]["compact"])       # tier 3 is the dense one
 
     def test_urn_url_renders_linkless(self):

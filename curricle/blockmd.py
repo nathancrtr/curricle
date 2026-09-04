@@ -112,7 +112,12 @@ def block_html(text: str, resolver: RefResolver | None = None) -> str:
             # described in words that GitHub shows only on hover.
             caption = (f"<figcaption>{inline_html(m.group(1))}</figcaption>"
                        if m.group(1).strip() else "")
-            out.append(f"<figure>{inline_html(text)}{caption}</figure>")
+            # The image links to itself: a wide graph shrunk to the column
+            # is a thumbnail, and the full-size file is one click away.
+            img = inline_html(text)
+            src = re.search(r'src="([^"]+)"', img).group(1)
+            out.append(f'<figure><a href="{src}" target="_blank" rel="noopener">'
+                       f"{img}</a>{caption}</figure>")
         else:
             out.append(f"<p>{inline_html(text)}</p>")
         para.clear()

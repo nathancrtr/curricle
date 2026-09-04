@@ -133,7 +133,8 @@ class TestFigures(unittest.TestCase):
     def test_image_alone_on_a_line_is_a_figure_with_its_alt_as_caption(self):
         out = block_html("Intro.\n\n![The local stemma for *one* unit](figures/ls.svg)\n\nAfter.")
         # alt text is plain (an attribute); the caption carries the markup
-        self.assertIn('<figure><img src="figures/ls.svg" alt="The local stemma for one unit">'
+        self.assertIn('<figure><a href="figures/ls.svg" target="_blank" rel="noopener">'
+                      '<img src="figures/ls.svg" alt="The local stemma for one unit"></a>'
                       "<figcaption>The local stemma for <i>one</i> unit</figcaption></figure>", out)
 
     def test_image_inside_prose_stays_inline(self):

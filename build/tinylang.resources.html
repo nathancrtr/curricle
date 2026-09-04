@@ -6,59 +6,66 @@
 <title>Interpreters, end to end — the resources</title>
 <style>
   :root {
-  --bg:#F4F6F4; --panel:#FFFFFF; --ink:#1B2124; --muted:#5C6568; --faint:#828B8E;
-  --line:#E1E6E3; --line-soft:#ECF0ED; --edge:#849091;
-  --accent:#1B8577; --accent-text:#0F6B5F; --accent-strong:#126E62;
-  --accent-soft:#DFF0EC; --on-accent:#FFFFFF;
-  --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
-  --warn-text:#8A5A00; --warn-soft:#F8EFD8;
-  --chip:#E9EDEA; --stone:#D3DAD6;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(20,28,26,.05);
-  --shadow-lift:0 2px 6px rgba(20,28,26,.09);
+  --bg:#F4F2F1; --panel:#EAE6E3; --ink:#241C1C; --muted:#665D57; --faint:#958A83;
+  --line:#D8D0CB; --line-soft:#E7E2DF; --edge:#8F7C70;
+  --accent:#2D455D; --accent-text:#2D455D; --accent-strong:#213345;
+  --accent-soft:#E4EBF1; --on-accent:#EAE6E3;
+  --good:#7A894D; --good-text:#606C3D; --good-soft:#E5EAD7;
+  --warn-text:#8A5F15; --warn-soft:#F6E6CB;
+  --chip:#E1DAD6; --stone:#6D8FB0;
+  --measure:552px;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme=light]) {
-  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
-  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
-  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
-  --accent-soft:#153531; --on-accent:#0B1615;
-  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
-  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
-  --chip:#232A2B; --stone:#343D3D;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#AFA7A1; --faint:#6E645E;
+  --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
+  --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
+  --accent-soft:#243342; --on-accent:#1C1917;
+  --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
+  --warn-text:#CD9637; --warn-soft:#3B2E16;
+  --chip:#423C38; --stone:#4D6984;
+  --measure:552px;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:dark;
     }
   }
   :root[data-theme=dark] {
-  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
-  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
-  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
-  --accent-soft:#153531; --on-accent:#0B1615;
-  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
-  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
-  --chip:#232A2B; --stone:#343D3D;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#AFA7A1; --faint:#6E645E;
+  --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
+  --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
+  --accent-soft:#243342; --on-accent:#1C1917;
+  --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
+  --warn-text:#CD9637; --warn-soft:#3B2E16;
+  --chip:#423C38; --stone:#4D6984;
+  --measure:552px;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:dark;
   }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; }
   [hidden] { display:none !important; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+         font:16px/1.6 "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
   a { color:var(--accent-text); }
   :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
                    border-radius:var(--r-ctl); }
   button { font:inherit; color:inherit; background:none; border:none; padding:0;
            cursor:pointer; }
+  /* A command that wraps mid-token is a command nobody can read or copy:
+     `python -m curricle profile assert` broke after the hyphen and the next
+     line opened with a bare "m". Inline code is an atom. */
   code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
-         padding:1px 5px; border-radius:var(--r-chip); }
-  h1, h2, h3, .display { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+         padding:1px 5px; border-radius:var(--r-chip);
+         white-space:nowrap; }
+  h1, h2, h3, .display { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
 
   /* ---- the shared shell ---- */
   .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
@@ -130,21 +137,28 @@
      is worse than none). A second copy of these four declarations beside a
      second copy of the drawing is how a mark drifts. */
   .wordmark { display:inline-flex; align-items:center; gap:10px;
-              font:700 22px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+              font:700 22px "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; color:var(--ink);
               text-decoration:none; letter-spacing:-.01em; }
   .wordmark svg { display:block; }
 
   /* ---- the waypath (the signature gesture) ---- */
   .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);
-              transition:background .35s ease, box-shadow .35s ease; }
-  .wp-stone.lit { background:var(--accent-strong); }
-  .wp-stone.here { background:transparent;
-                   box-shadow:inset 0 0 0 2px var(--accent-strong); }
-  .wp-stone.pop { animation:wp-pop .45s ease; }
+  .wp-stone { width:14px; height:14px; border:1px solid var(--stone);
+              background:transparent;
+              transition:background .3s ease, border-color .3s ease; }
+  .wp-stone.lit { background:var(--accent-strong);
+                  border-color:var(--accent-strong); }
+  .wp-stone.here { background:transparent; border-color:var(--accent-strong);
+                   box-shadow:inset 0 0 0 1px var(--accent-strong); }
+  /* Completion fills a block; it does not bounce. A stone that grows and
+     springs back is the friendly-app reflex, and it was the last piece of
+     the old direction still moving. The mark still announces itself — the
+     fill arrives through a held outline — but in the register of a form
+     being stamped rather than a toy responding. */
+  .wp-stone.pop { animation:wp-pop .5s steps(1, end) 2; }
   @keyframes wp-pop {
-    0% { transform:scale(1); } 45% { transform:scale(1.55); }
-    100% { transform:scale(1); }
+    0%, 49% { box-shadow:inset 0 0 0 3px var(--bg); }
+    50%, 100% { box-shadow:none; }
   }
   .wp-count { font-size:14px; font-weight:600; color:var(--muted);
               white-space:nowrap; }
@@ -166,7 +180,7 @@
   .masthead { padding:40px 0 26px; }
   h1 { font-weight:700; font-size:clamp(30px,5.5vw,42px); line-height:1.12;
        letter-spacing:-.01em; margin:14px 0 0; }
-  .standfirst { max-width:58ch; margin:14px 0 0; color:var(--muted); font-size:16.5px; }
+  .standfirst { max-width:var(--measure); margin:14px 0 0; color:var(--muted); font-size:16.5px; }
   .standfirst b { color:var(--ink); }
   .controls { margin:26px 0 0; padding:16px 20px; }
   .controls .waypath { margin:2px 0 14px; }
@@ -177,10 +191,10 @@
   .tier-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
               border-radius:var(--r-ctl); background:var(--bg);
               border:1px solid var(--line);
-              color:var(--muted); font:700 17px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
-  .tier-name { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+              color:var(--muted); font:700 17px "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
+  .tier-name { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; font-size:21px;
                font-weight:700; margin:4px 0 0; }
-  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .tier-role { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:var(--measure); }
   .subhead { font-size:14px; font-weight:700; color:var(--ink); margin:26px 0 0; }
   .entry { border-bottom:1px solid var(--line-soft); padding:18px 0 16px; }
   .entry.hidden { display:none; }
@@ -195,7 +209,7 @@
   .cite { font-size:12.5px; font-weight:500; color:var(--muted); margin:5px 0 0;
           line-height:1.5; }
   .why { position:relative; margin:9px 0 0; font-size:14.5px; line-height:1.55;
-         max-width:64ch; }
+         max-width:var(--measure); }
   .why-mark { position:absolute; z-index:0; inset:-.1em -.4em -.05em -.3em;
               background:var(--accent-soft); border-radius:.6em .3em .5em .4em;
               transform:scaleX(0); transform-origin:0 50%;
@@ -217,15 +231,15 @@
          border-radius:var(--r-ctl); padding:4px 10px; margin-left:-10px;
          transition:color .2s, background .2s; }
   .act:hover { color:var(--ink); background:var(--chip); }
-  .dot { width:11px; height:11px; border-radius:50%; border:2px solid var(--faint);
+  .dot { width:11px; height:11px; border-radius:0; border:2px solid var(--faint);
          background:transparent; transition:.3s; }
   .entry.inhand .dot { background:var(--good); border-color:var(--good); }
   .entry.inhand .mlabel { color:var(--good-text); }
   .notewrap { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
   .entry.noting .notewrap { grid-template-rows:1fr; }
   .notewrap > div { overflow:hidden; }
-  textarea { width:100%; max-width:64ch; min-height:52px; resize:vertical; margin-top:10px;
-             font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+  textarea { width:100%; max-width:var(--measure); min-height:52px; resize:vertical; margin-top:10px;
+             font:14px/1.55 "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; color:var(--ink);
              background:var(--panel); border:1.5px solid var(--line);
              border-radius:var(--r-card); padding:9px 12px; }
   textarea::placeholder { color:var(--muted); }
@@ -235,15 +249,15 @@
   .section > h2 { font-size:22px; font-weight:700; margin:0 0 10px; }
   .section ol { font-size:14.5px; padding-left:22px; }
   .section li { margin:0 0 6px; }
-  .tier-intro { margin:6px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
+  .tier-intro { margin:6px 0 0; font-size:14.5px; color:var(--muted); max-width:var(--measure); }
   .empty { display:none; padding:44px 0; text-align:center;
            font-size:17px; color:var(--muted); }
   .empty.show { display:block; }
   .no-shelf { margin:34px 0 0; padding:24px 26px; font-size:15.5px;
-              line-height:1.65; max-width:64ch; }
+              line-height:1.65; max-width:var(--measure); }
   .no-shelf p { margin:0 0 12px; }
   .no-shelf p:last-child { margin-bottom:0; }
-  .no-shelf b { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  .no-shelf b { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
 </style>
 </head>
 <body>

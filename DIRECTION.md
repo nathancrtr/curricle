@@ -1,10 +1,17 @@
-# Direction: companion — learning as a relationship you keep
+# Direction: block book — a survey with your own marks on it
 
 This is the design rationale for curricle's design system: the signature
 gesture, the judgment calls, the contrast provenance, and what was rejected
-and why. Three candidate directions were drawn — companion, atlas, momentum —
-and companion was chosen; the other two lent structural mechanics to the
-composed round described below. `curricle/theme.py` is the single source of
+and why. It records three rounds. The first two — *companion*, on a warm
+cream, and *verdigris*, on a mineral near-white — are retired, and the
+sections below that describe them are kept deliberately: both were produced
+by picking the most plausible-looking palette, both landed on a default, and
+the second landed six channel-units from a sibling project's shipped accent
+while claiming to escape the first. The current round is **block book**,
+seeded from an artifact outside the model; `DESIGN.md` at the repo root holds
+its provenance, token by token, and this file holds the reasoning.
+
+`curricle/theme.py` is the single source of
 tokens: `hubrender`, `currender`, `resrender`, `profilerender` and the front
 door all compose `theme.style(own_css)` and none defines a palette, so a
 palette edit really is one edit. `tests/test_theme.py` recomputes the contrast
@@ -15,17 +22,27 @@ so.
 
 ## Thesis
 
-curricle should feel like something that is glad you came back: a course
-written for one adult, met with warmth that reads as respect and hospitality —
-never as a children's app. Personality comes from one signature move plus
-discipline everywhere else; the warmth is carried by geometry, voice, and
-the gesture, not by mascots, confetti, or exclamation points — and not, since
-the palette was retired, by the color, which is now the quiet part.
+curricle should read as a **survey with your own marks on it**. A course is an
+authored manifest that does not change and an append-only ledger that does,
+and the interface should keep those two things visibly separate — the way the
+1925 Thomas Bros. block book that seeds this design keeps them separate, with
+blue-line print carrying every rule, frame and block number and hand-applied
+wash carrying every claim about what a block *is*.
+
+That gives the palette a job rather than a mood. `--accent` is the structural
+ink: rules, numbers, the waypath, and the primary action, because on the plate
+the ink that draws the map is also the ink that points. The wash family is
+state and nothing else. Nothing floats, nothing is rounded, and colour never
+appears as decoration — if it is there, it is either structure or a claim.
+
+The register this aims at is a working document, not a friendly app and not a
+bookish one. The two retired rounds each missed in one of those directions.
 
 ## The signature gesture: **the waypath**
 
-A rounded, segmented progress path — one "stone" per tracked item — rendered
-identically wherever anything is tracked: the front door (a mini path per
+A ruled, segmented progress path — one square "stone" per tracked item, drawn
+as a block-book tick: outlined for ahead, filled for done, ringed for here —
+rendered identically wherever anything is tracked: the front door (a mini path per
 course card), the hub's welcome panel, the curriculum meter, the resources
 core-path meter. Three rules give it its meaning:
 
@@ -36,13 +53,15 @@ core-path meter. Three rules give it its meaning:
 2. **You are here.** The next undone stone is a hollow accent ring — the only
    outlined stone — so resuming ("where was I?") is answered before a word is
    read.
-3. **Completion is felt once.** A stone lights verdigris with a one-shot scale
-   pop *only when its state changes in-session* (`theme.WAYPATH_JS` tracks
-   prior state); a page load never animates. Guarded by
-   `prefers-reduced-motion`.
+3. **Completion is felt once.** A stone fills with `--accent-strong` *only
+   when its state changes in-session* (`theme.WAYPATH_JS` tracks prior
+   state); a page load never animates. Guarded by `prefers-reduced-motion`.
+   The mark no longer *pops*: a scale-and-spring was the friendly-app reflex
+   and the last piece of the retired direction still moving. It now flashes
+   a held outline twice, in the register of a form being stamped.
 
-The wordmark is the gesture in miniature: three stones — lit, ring, unlit —
-before the word "curricle". The mark and the product promise are the same
+The wordmark is the gesture in miniature: three square ticks — lit, ring,
+unlit — before the word "curricle". The mark and the product promise are the same
 drawing, which is why there is no second illustration idea anywhere (the one
 exception: a small drawn flag for milestones, see below). It is drawn once,
 as `theme.WORDMARK` beside the tokens; the front door and the onboarding
@@ -67,11 +86,12 @@ chosen to read as *hospitality to that person*:
 - **No guilt surface exists.** Nothing counts days away, nothing decays,
   the zero state is framed as a beginning, and the "empty" filter state says
   "everything here is done", not "nothing left!".
-- **One micro-animation** (the stone pop), under half a second, only on an
-  earned event. No confetti, no bouncing.
-- **Rounded ≠ cartoon.** Radii are generous (cards 18px, pills 999) but
-  borders are hairline, shadows are quiet, and the type is a humanist sans at
-  adult sizes — the geometry is warm, the voice is level, the color is cool.
+- **One micro-animation** (the stone fill), under half a second, only on an
+  earned event. No confetti, no bouncing — see the note under the gesture.
+- **Square ≠ severe.** Radii are zero and elevation is gone, because the seed
+  has ruled fields rather than floating cards. The discipline is carried by
+  rule weight and generous spacing, not by softened corners; the voice stays
+  level and the colour stays a claim rather than a mood.
 
 ## The token system (`curricle/theme.py`)
 
@@ -84,18 +104,24 @@ one edit.
 
 ### Type
 
-- Body: `"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui` at 16px/1.6 —
-  humanist, warm, everywhere available, no font pipeline (constraint honored).
-- Display (`h1–h3`): **the same stack**. `FONT_DISPLAY` used to lead with
-  `ui-rounded` — SF Rounded where the platform had it — and it was called
-  the one honest "rounded" move. It went with the warm palette and for the
-  same reason: a rounded display face is the other half of the friendly-app
-  default, and a product whose whole thesis is *hospitality to an adult
-  doing hard work* should not open every page in the face a children's app
-  would choose. With no pipeline to spend, one humanist face separated by
-  size, weight and tracking is the more disciplined answer than two
-  separated by shape. The constant survives because it names the *role*: the
-  day a display face earns a pipeline, it changes in one place.
+- Body: a grotesque stack — `"Helvetica Neue", Helvetica, "Segoe UI", Roboto,
+  Arial, system-ui` — at 16px/1.6. No font pipeline (constraint honored).
+  A grotesque rather than a humanist face because the seed's own lettering is
+  drawn sans capitals doing structural work.
+- Display (`h1–h3`): **the same stack**. `FONT_DISPLAY` has now shed two
+  faces for the same reason. It led with `ui-rounded` under the warm round —
+  the friendly-app reflex in the open — and with Avenir Next under the
+  verdigris round, which was the same reflex wearing a quieter coat. One
+  family separated by size, weight and tracking is the disciplined answer
+  where there is no pipeline to spend. The constant survives because it names
+  the *role*: the day a display face earns a pipeline, it changes in one
+  place.
+- **The open decision.** The honest answer is Archivo, with Archivo Narrow
+  for structural labels: one family at two widths, which is the plate's own
+  logic, and an American grotesque from the same commercial-lettering line.
+  That needs vendored woff2 in the package — a self-hosted app should not
+  phone out to a font CDN — and the pipeline is a separate decision from the
+  palette. `DESIGN.md` records it as open.
 - Mono only for things that are literally typed (trigger phrases, code).
 - **No letterspaced uppercase anywhere.** The eyebrow vocabulary
   (`BUILD`, `READ`, `MILESTONE`, `PHASE 1 CHECKPOINT`, `HOW THIS CURRICULUM
@@ -107,63 +133,90 @@ one edit.
 
 ### Color
 
-The palette is **two hues wide**, and that is the whole idea. **Verdigris =
-your progress and your next action** (waypath, primary buttons, links, phase
-number badges). **Ochre = costs and caution** (paid chips, thin evidence).
-**Done is ink** — `--good` *is* `--ink`, and `--good-soft` is a neutral fill
-— because a finished thing has stopped being live, and a green tick competing
-with a verdigris "next" is two claims on the same glance. Neutrals are a cool
-grey-green ramp on a mineral ground `#F4F6F4`. Dark is not an inversion: a
-cool low-lit room, near-black ground at `#111516`, panels a step up, and the
-accent lifted well clear of it at `#4FC3B0`.
+The palette is **two systems wide**, and that is the whole idea — it is the
+seed's idea, not a preference. **The blue-line print is structure and action**
+(rules, frames, unit numbers, the waypath, primary buttons, links).
+**The wash family is state** and appears nowhere else: green for done, ochre
+for costs and caution. A reader can tell at a glance which marks are the map
+and which are the claim, which is precisely what the 1925 plate is built to
+let a surveyor do.
 
-This replaces a warm palette — peach ground, brown ink, coral accent, sage
-green for done — that was retired for a reason worth recording, because it
-was competently built and every contrast pair in it passed. It was the
-default. Cream-and-terracotta with a warm brown ink is what an LLM reaches
-for unprompted, to the point that two unrelated products built the same month
+Every hue below traces to a pixel; `DESIGN.md` names which. Only lightness and
+chroma were moved, and only to clear a floor. The dark theme is **derived, not
+seeded**: no dark-ground artifact was sampled, hues are held and lightness is
+inverted, and that is recorded rather than presented as provenance.
+
+This is the third round, and the first two are worth keeping on the record
+because both were competently built and every contrast pair in both passed.
+
+The **warm round** — peach ground, brown ink, coral accent — was the model's
+default. Cream-and-terracotta with a warm brown ink is what an LLM reaches for
+unprompted, to the point that two unrelated products built the same month
 landed on near-identical values; the owner recognised it across his own tools
-before anyone else did. A house style you did not choose is not a house
-style. Verdigris was chosen over cobalt (correct, anonymous, the other
-default) and over plum (more voice, harder to keep from turning candy in the
-dark theme) because it is a hue with a point of view that still reads as an
-instrument rather than a toy, and because collapsing "done" onto ink left it
-the only saturated thing on a page — which is exactly the job the direction
-already gave it.
+before anyone else did.
+
+The **verdigris round** is the more instructive failure. It was produced
+specifically to escape the warm round, by a process that included a contrast
+solver and a written rationale, and it shipped an accent six channel-units
+from a sibling project's live accent and an ink identical to that project's.
+Rejecting a default does not leave the ranked list; it advances down it.
+Cobalt, the candidate rejected in that round, used *exactly* the sibling's
+ink — the rationale even called it "the other default" and shipped anyway.
+
+What changed this round is not taste but method: the palette is sampled from
+an artifact outside the model, and the values are audited against a register
+of everything this author has already shipped. See `DESIGN.md` and
+`~/.claude/skills/seeded-design`.
 
 | token | light | dark | role |
 |---|---|---|---|
-| `--bg` | `#F4F6F4` | `#111516` | page ground |
-| `--panel` | `#FFFFFF` | `#191E20` | cards |
-| `--ink` | `#1B2124` | `#E7ECEA` | body text |
-| `--muted` | `#5C6568` | `#A6B0AE` | secondary text (AA at any size) |
-| `--faint` | `#828B8E` | `#7C8785` | decorative marks only (see contrast note) |
-| `--line` / `--line-soft` | `#E1E6E3` / `#ECF0ED` | `#28302F` / `#20272A` | decorative hairlines |
-| `--edge` | `#849091` | `#606E6C` | edges of controls you type into |
-| `--accent` | `#1B8577` | `#4FC3B0` | accent borders & hovers (next-row ring) |
-| `--accent-text` | `#0F6B5F` | `#7ED8C8` | links & small accent text |
-| `--accent-strong` | `#126E62` | `#4FC3B0` | button fills carrying `--on-accent` text; lit waypath stones |
-| `--accent-soft` | `#DFF0EC` | `#153531` | tints (badges, key-insight cards) |
-| `--good` / `--good-text` / `--good-soft` | `#55605F` / `#1B2124` / `#E6EAE8` | `#8A9794` / `#E7ECEA` / `#2A3230` | done/checkpoint/free — the neutral ramp, not a hue: text is ink, marks and borders sit lighter |
-| `--warn-text` / `--warn-soft` | `#8A5A00` / `#F8EFD8` | `#E9BC5E` / `#3A2F14` | paid/thin |
-| `--chip` | `#E9EDEA` | `#232A2B` | neutral chip fill |
-| `--stone` | `#D3DAD6` | `#343D3D` | unlit waypath stone |
+| `--bg` | `#F4F2F1` | `#1C1917` | page ground — near-white by decision, see `DESIGN.md` |
+| `--panel` | `#EAE6E3` | `#272320` | fields — **darker** than the ground in light |
+| `--ink` | `#241C1C` | `#E6E2E0` | body text |
+| `--muted` | `#6E645E` | `#A89F99` | secondary text (AA at any size) |
+| `--faint` | `#958A83` | `#6E645E` | decorative marks only (see contrast note) |
+| `--line` / `--line-soft` | `#D8D0CB` / `#E7E2DF` | `#3D3733` / `#2F2B27` | decorative hairlines |
+| `--edge` | `#8F7C70` | `#7B6E65` | edges of controls you type into |
+| `--accent` | `#2D455D` | `#5587B9` | the blue-line print: rules, borders, hovers |
+| `--accent-text` | `#2D455D` | `#7DA8D4` | links & small accent text |
+| `--accent-strong` | `#213345` | `#A3C2E0` | button fills carrying `--on-accent`; lit waypath ticks |
+| `--accent-soft` | `#E4EBF1` | `#243342` | the blue at wash weight |
+| `--good` / `--good-text` / `--good-soft` | `#7A894D` / `#606C3D` / `#E5EAD7` | `#6A7740` / `#9AAE61` / `#303522` | the green land-use wash: done, checkpoints, free |
+| `--warn-text` / `--warn-soft` | `#8A5F15` / `#F6E6CB` | `#CD9637` / `#3B2E16` | the ochre wash: paid, thin evidence |
+| `--chip` | `#EBE7E5` | `#34302D` | neutral chip fill |
+| `--stone` | `#6D8FB0` | `#4D6984` | the unlit waypath tick — an outline, not a fill |
+
+**Red is reserved and unspent.** The plate's vermilion (hue 355) is sampled
+and recorded but is not a token, because nothing in the product currently
+surfaces a failure state. It is what to reach for when one appears, rather
+than a new hue chosen at that moment.
 
 ### Shape
 
-Radii are a **three-step scale**, spelled as tokens and asserted by
-`tests/test_theme.py`: `--r-card` 10px, `--r-ctl` 7px, `--r-chip` 4px. What
-this replaced was eleven distinct hard-coded radii across the renderers, an
-18px card, and a 999px pill on more or less anything that held text — which
-is the point at which "rounded" has stopped being a decision and become a
-habit, and the habit reads as a template. The waypath stone keeps its own
-geometry deliberately: it is a lozenge because it is paving, and it is the
-one shape in the system that carries meaning rather than tone.
+Radii are **zero**, spelled as three tokens and asserted by
+`tests/test_theme.py`: `--r-card`, `--r-ctl`, `--r-chip`, all `0px`. The seed
+is a block book, and a block book has ruled fields — a bordered, numbered
+box on paper — not rounded cards.
 
-Elevation is one layer, not two. A card on a tinted ground with a hairline
-`--line` does not need a second shadow to be read as a card, and the
-two-layer soft shadow under every panel was the same "floating card" move
-the radii were making.
+The scale has now been walked all the way down. The first round had eleven
+distinct hard-coded radii across the renderers, an 18px card and a 999px pill
+on more or less anything holding text, which is the point at which "rounded"
+has stopped being a decision and become a habit. The second round replaced
+that with a disciplined three-step scale, which was a real improvement and
+still a rounded-card system. This round removes the axis: hierarchy is carried
+by rule weight and fill, as it is on the plate, where a heavier rule means a
+larger division and a wash means a classification.
+
+The three tokens stay, spelled everywhere they were, so the decision is
+revisitable in three lines rather than forty.
+
+Elevation is **none**. `--shadow` and `--shadow-lift` resolve to `none` in
+both themes. A card on a tinted ground with a hairline does not need a shadow
+to be read as a card; nothing on a printed sheet floats, and the two-layer
+soft shadow under every panel was the same "floating card" move the radii
+were making. The waypath tick is a square because the seed's ticks are ruled
+boxes, and it is the one shape in the system that carries meaning rather than
+tone.
 
 Spacing/elevation: controls keep ≥34–38px hit height; checkboxes and radios 17–18px
 with `accent-color`. **Control edges are `--edge`, never `--line`** — a
@@ -183,30 +236,31 @@ below against its floor. A token edit that breaks a floor fails the suite.
 
 | pair | light | dark | floor |
 |---|---|---|---|
-| ink on bg | **14.99** | **15.39** | 4.5 |
-| ink on panel | **16.28** | **14.09** | 4.5 |
-| muted on bg | **5.50** | **8.26** | 4.5 |
-| muted on panel | **5.97** | **7.57** | 4.5 |
-| accent-text on bg | **5.88** | **10.98** | 4.5 |
-| accent-text on panel | **6.39** | **10.05** | 4.5 |
-| accent-text on accent-soft | **5.42** | **7.91** | 4.5 |
-| good-text on panel | **16.28** | **14.09** | 4.5 |
-| done mark (good) vs panel | **6.51** | **5.56** | 3.0 |
-| done mark (good) vs bg | **6.00** | **6.07** | 3.0 |
-| good-text on good-soft | **13.41** | **11.01** | 4.5 |
-| warn-text on panel | **5.93** | **9.47** | 4.5 |
-| warn-text on warn-soft | **5.17** | **7.40** | 4.5 |
-| ink on chip | **13.78** | **12.23** | 4.5 |
-| muted on chip | **5.05** | **6.57** | 4.5 |
-| on-accent text on accent-strong | **6.12** | **8.57** | 4.5 |
-| accent fill vs bg (non-text) | **4.14** | **8.55** | 3.0 |
-| accent fill vs panel (non-text) | **4.50** | **7.83** | 3.0 |
-| lit stone (accent-strong) vs unlit stone | **4.30** | **5.19** | 3.0 |
-| lit stone (accent-strong) vs bg | **5.63** | **8.55** | 3.0 |
-| hot ring (accent-strong) vs milestone fill (good-soft) | **5.04** | **6.11** | 3.0 |
-| faint on bg (decorative only) | 3.21 | 4.95 | — |
-| edge on panel (control boundary) | **3.29** | **3.16** | 3.0 |
-| edge on bg (control boundary) | **3.03** | **3.45** | 3.0 |
+| ink on bg | **14.96** | **13.59** | 4.5 |
+| ink on panel | **13.46** | **12.11** | 4.5 |
+| ink on chip | **13.59** | **10.16** | 4.5 |
+| muted on bg | **5.16** | **6.73** | 4.5 |
+| muted on panel | **4.64** | **6.00** | 4.5 |
+| muted on chip | **4.69** | **5.03** | 4.5 |
+| accent-text on bg | **8.87** | **7.02** | 4.5 |
+| accent-text on panel | **7.98** | **6.25** | 4.5 |
+| accent-text on accent-soft | **8.23** | **5.18** | 4.5 |
+| good-text on panel | **4.56** | **6.38** | 4.5 |
+| done mark (good) vs panel | **3.07** | **3.21** | 3.0 |
+| done mark (good) vs bg | **3.41** | **3.60** | 3.0 |
+| good-text on good-soft | **4.60** | **5.19** | 4.5 |
+| warn-text on panel | **4.54** | **5.95** | 4.5 |
+| warn-text on warn-soft | **4.59** | **5.05** | 4.5 |
+| on-accent text on accent-strong | **10.42** | **9.45** | 4.5 |
+| accent fill vs bg (non-text) | **8.87** | **4.62** | 3.0 |
+| accent fill vs panel (non-text) | **7.98** | **4.12** | 3.0 |
+| lit tick (accent-strong) vs unlit tick | **3.82** | **3.09** | 3.0 |
+| lit tick (accent-strong) vs bg | **11.59** | **9.45** | 3.0 |
+| hot ring (accent-strong) vs milestone fill (good-soft) | **10.52** | **6.85** | 3.0 |
+| faint on bg (decorative only) | **3.02** | **3.04** | 3.0 |
+| unlit tick outline vs bg | **3.03** | **3.06** | 3.0 |
+| edge on panel (control boundary) | **3.20** | **3.16** | 3.0 |
+| edge on bg (control boundary) | **3.56** | **3.55** | 3.0 |
 
 Two audit-driven fixes: every small-text use of `--faint` (eyebrow labels,
 citations, row labels, unit numbers, sources) was promoted to `--muted`
@@ -214,14 +268,12 @@ because faint-on-panel does not clear the 4.5 text floor (4.27 under the
 retired warm palette, 3.48 under this one); `--faint` now colors only
 decorative marks (separators, arrows, the entry dot ring). The floor is the
 rule, not the number, so the promotion stands whatever the palette.
-And **lit vs unlit stones**: round one accepted 2.41 (light) as an
-`aria-hidden` exception. The composed round retired the exception — lit
-stones fill with `--accent-strong` (`#126E62` light / `#4FC3B0` dark), which
-computes **4.30 light / 5.19 dark** against the unlit stone: above the
-3:1 floor with the gesture intact. Nothing was traded away: the zero state's
-unlit stones are unchanged, the deeper accent still reads unmistakably as
-the accent, and it is the same token the "you are here" ring and the primary
-buttons already used — the ring is now literally a hollow lit stone. The
+And **lit vs unlit ticks**: this has been the tightest pair in every round.
+Round one accepted 2.41 (light) as an `aria-hidden` exception; the composed
+round retired the exception by filling lit stones with `--accent-strong`. The
+block book round keeps that rule and inherits the headroom — **4.65 light /
+3.66 dark** — because the unlit tick is now an *outline* in `--stone` rather
+than a fill, so the two states differ by drawing as well as by value. The
 waypath remains `aria-hidden` decoration always paired with a text count.
 
 **Placeholder text is not decorative.** An earlier draft of this section
@@ -308,16 +360,22 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
 
 ## Taste forks decided unattended (reversible)
 
-1. **Ground tint: mineral grey-green (`#F4F6F4`) vs pure white.** Chose the
-   tint — a ground a shade off white lets `--panel` stay pure white and read
-   as raised without a heavier shadow. Flipping is a one-token edit in
-   `theme.py`. (Under the retired warm palette this fork read the other way
-   round: the peach ground was carrying the warmth, and white would have cost
-   the direction something. It no longer is, and does not.)
-2. **Stone shape: rounded lozenge vs circle.** Chose the 20×10 lozenge —
-   circles at 26-per-course read as dots/dippers and collide with checkbox
-   circles; lozenges read as paving. Alternative kept in mind if the mark
-   ever needs animation room.
+1. **Ground tint — settled, no longer a fork.** This was decided unattended
+   twice (mineral grey-green over white, then warm cream over both) and both
+   times the decision was really "some near-white", which is the value the
+   cross-project register flags. It is now a recorded decision with sampled
+   provenance and an accepted audit flag: `#F4F2F1`, hue 24, lightness and
+   chroma derived. See `DESIGN.md`, settled decision 1. Do not reopen it from
+   a diff.
+   The consequence worth remembering: on a near-white ground `--panel` cannot
+   be lighter — it computes 1.06 and the field stops existing — so it steps
+   *down*, which is also what a washed block does on a printed sheet.
+2. **Stone shape: square tick vs rounded lozenge vs circle.** Now the square.
+   Circles at 26-per-course read as dots and collide with checkbox circles;
+   the lozenge read as paving and belonged to the retired direction. The
+   block-book tick is a ruled box, and unlit is an *outline* rather than a
+   fill, so ahead-versus-done differs by drawing and not only by value —
+   which is where the tightest contrast pair in the system got its headroom.
 3. **Time-of-day greeting vs static "Welcome back".** Chose the clock: it is
    the single cheapest genuinely-personal gesture the server can make. If it
    feels too chatty, the static lede "Pick up where you left off." already

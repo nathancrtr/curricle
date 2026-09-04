@@ -92,6 +92,12 @@ CONTRAST_PAIRS = [
     # green fill, not on --panel, so it is its own pairing
     ("--accent-strong", "--good-soft", 3.0),
     ("--faint", "--bg", 3.0),
+    # The unlit waypath tick is an outline, not a fill, and an outline you
+    # cannot see is a path that starts at "you are here" instead of showing
+    # the whole way. Its visibility against the ground was never asserted
+    # while it was a filled lozenge, and the block book round is exactly when
+    # that would have gone unnoticed.
+    ("--stone", "--bg", 3.0),
     # The edge of a control a learner types into: WCAG 1.4.11 non-text
     # contrast, against the panel a box sits inside and against the ground
     # for the day a box sits directly on it. `--line` computed 1.30/1.31
@@ -238,7 +244,7 @@ class TestPalettes(unittest.TestCase):
         # only for whoever is running that theme — the failure a renderer
         # test would never see.
         self.assertEqual(sorted(LIGHT), sorted(DARK))
-        self.assertEqual(len(LIGHT), 25)   # grow deliberately; renderers know these
+        self.assertEqual(len(LIGHT), 26)   # grow deliberately; renderers know these
 
     def test_the_radius_scale_is_three_steps_and_no_more(self):
         # Radii are a scale, not a per-component opinion: card, control,

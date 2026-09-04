@@ -270,24 +270,35 @@ class WordmarkTest(unittest.TestCase):
         self.stone = dict(re.findall(
             r"([a-z-]+):([^;]+);",
             re.search(r"\.wp-stone \{([^}]*)\}", theme.BASE_CSS).group(1)))
+        # The path's unlit stone is an outline, so its colour lives in the
+        # `border` shorthand rather than in `background`.
+        self.stone_edge = re.search(r"var\((--[a-z-]+)\)",
+                                    self.stone["border"]).group(1)
 
     def test_the_lit_stone_takes_the_token_the_path_lights_with(self):
         lit_rule = re.search(r"\.wp-stone\.lit \{([^}]*)\}", theme.BASE_CSS).group(1)
         token = re.search(r"var\((--[a-z-]+)\)", lit_rule).group(1)
         self.assertEqual(self.lit["fill"], f"var({token})")
-        self.assertEqual(self.unlit["fill"], self.stone["background"].strip())
+        # The unlit stone is drawn, not filled: the mark strokes it in the
+        # same token the path outlines it with.
+        self.assertEqual(self.unlit["stroke"], f"var({self.stone_edge})")
+        self.assertEqual(self.unlit["fill"], "none")
+        self.assertEqual(self.stone["background"].strip(), "transparent")
 
-    def test_the_stones_are_the_path_s_lozenge_scaled(self):
-        # The chosen stone is a 2:1 lozenge with fully rounded ends. Circles
-        # were the rejected fork; a mark drawn in the rejected shape is a
-        # different drawing from the path it claims to miniaturize.
+    def test_the_stones_are_the_path_s_square_scaled(self):
+        # The stone is a square block with hard corners — the seed is a block
+        # book, and its ticks are ruled boxes, not lozenges. The lozenge was
+        # the previous direction's shape and it is the one this must not be:
+        # a mark drawn in the retired shape is a different drawing from the
+        # path it claims to miniaturize.
         ratio = float(self.stone["width"].removesuffix("px")) / float(
             self.stone["height"].removesuffix("px"))
+        self.assertEqual(ratio, 1.0)
         for name, stone in (("lit", self.lit), ("unlit", self.unlit)):
             with self.subTest(stone=name):
                 w, h = float(stone["width"]), float(stone["height"])
                 self.assertEqual(w / h, ratio)
-                self.assertEqual(float(stone["rx"]) * 2, h)
+                self.assertNotIn("rx", stone)
 
     def test_the_ring_is_a_hollow_lit_stone(self):
         # `.wp-stone.here` is an inset ring in the lit color: same footprint
@@ -300,9 +311,14 @@ class WordmarkTest(unittest.TestCase):
         self.assertEqual(float(self.ring["height"]) + stroke, float(self.lit["height"]))
 
     def test_the_mark_fits_its_viewbox(self):
+        # SVG strokes are centred on the path, so a stroked rect's visual
+        # edge is half a stroke outside its geometry. Two of the three stones
+        # are strokes now; measuring the geometry alone would let the mark
+        # overflow its own box by half a pixel and call it a fit.
         w, h = re.search(r'viewBox="0 0 (\d+) (\d+)"', theme.WORDMARK).groups()
-        right = float(self.unlit["x"]) + float(self.unlit["width"])
-        self.assertEqual(right, float(w))
+        edge = float(self.unlit["x"]) + float(self.unlit["width"]) \
+            + float(self.unlit.get("stroke-width", 0)) / 2
+        self.assertEqual(edge, float(w))
         self.assertEqual(float(self.lit["height"]), float(h))
 
 

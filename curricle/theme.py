@@ -1,50 +1,58 @@
 """The design system — one source of truth for every rendered surface.
 
-Direction: *companion* — learning as a relationship you keep. Hospitality for
-an adult doing hard work over a long time, never a children's app. The warmth
-is carried by the geometry, the copy, and the gesture below; the color is
-mineral and quiet, so that the one saturated thing on a page is the thing you
-are meant to do next. Concretely: a cool neutral scale on a faintly green-grey
-ground, one verdigris accent that always means "your progress / your next
-step", generous radii, soft elevation, humanist type, plain second-person copy.
+Direction: *block book*, seeded from the title page and colour key of the
+Thomas Bros. **New Block Book of Palo Alto and Vicinity**, 1925 (David Rumsey
+Map Collection, 13231.002), with one hue corroborated by the Sanborn Map
+Company endpaper of 1949 (16227.002). Full provenance, including what is
+sampled and what is derived, lives in DESIGN.md at the repo root. Nothing in
+the palette below was chosen; every value traces to a pixel or to a contrast
+floor.
 
-The signature gesture is **the waypath**: a rounded, segmented progress path —
-one stone per tracked item — rendered identically on every surface that
-tracks anything. At zero it is not an empty bar; it is the whole path laid
-out ahead of you, visibly, with a hollow "you are here" ring on the next
-stone. Completion lights a stone with a small pop. Everything else on the
-page practices restraint so this one move can carry the personality.
+The plate's structural idea is the one worth stealing: **two colour systems
+that never mix.** Blue-line print carries every piece of structure — the
+rules, the frames, the block numbers, the index. Hand-applied wash carries
+every piece of meaning — the land-use class. A reader can tell at a glance
+which marks are the map and which are the claim, and this system draws the
+same distinction between chrome and state.
 
-Both themes come from the same tokens, each tuned by hand (the dark values
-are not an inversion — they are a cool, low-lit room, and the accent lifts
-several steps to survive it). Every color pair below was validated against
-WCAG AA by computation; the table lives in DIRECTION.md at the repo root.
+The signature gesture is **the waypath**: one tick per tracked item, drawn as
+a ruled box in blue-line — filled for done, taller and ringed for here,
+outlined for ahead. At zero it is not an empty bar; it is the whole path laid
+out in front of you. It appears only where something is genuinely tracked.
+
+Both themes come from the same tokens. The light theme is the seed; **the
+dark theme is derived**, because no dark-ground artifact seeded this work —
+the hues are held and the lightness is inverted, which DESIGN.md records as a
+set of decisions nobody sourced. Every pair below was validated against WCAG
+AA by computation; the table lives in DIRECTION.md at the repo root.
 
 House rules encoded here:
-- Color is semantic or absent, and the palette is deliberately two hues wide.
-  Verdigris = your progress and primary action; ochre = costs/caution. Done
-  is not a third hue: the whole `--good` family is the neutral ramp, because
-  a finished thing has stopped being live and the page should quiet down
-  around it, leaving the accent as the only saturated mark on the screen.
-  (The tokens stay, spelled everywhere they were, so "done" keeps a name a
-  renderer can reason about and the decision can be revisited in three lines
-  rather than forty.) Within that family the split is by job, not by shade:
-  `--good-text` is `--ink`, because done *text* is still text; `--good` is
-  the non-text member — dots, checkbox fills, the border of a milestone or
-  checkpoint box — and sits at border weight rather than ink weight, because
-  those boxes are passive and a passive box drawn in full ink outweighs the
-  live row it shares a page with. That is not a contrast concession: it
-  clears the 3:1 non-text floor with room, and the floor is asserted.
-  Chips always carry their text label; tint is reinforcement, never the
-  message.
-- Radii are generous (cards 18px, controls a full pill) — the rounded
-  geometry *is* the warmth; borders stay hairline so it never turns toy.
-  A decorative hairline is `--line`; the edge of a control a learner types
+- Colour is semantic or absent, and the palette is two systems wide.
+  `--accent` is the blue-line print: structure, rules, and the primary
+  action, because on the plate the structural ink is also what points. The
+  wash family is state — `--good` is the green land-use wash, `--warn` the
+  ochre. Within the wash family the split is by job, not shade: `--good-text`
+  is text weight and clears 4.5; `--good` is the non-text member — dots,
+  fills, the border of a checkpoint box — and sits at the 3:1 floor, because
+  a passive box drawn at ink weight outdraws the live row beside it. Chips
+  always carry their text label; tint is reinforcement, never the message.
+- `--panel` is **darker** than `--bg`, which is the one token that surprises
+  people. On a near-white ground a lifted panel computes 1.06 and the field
+  stops existing. On a printed sheet a field is a tinted block *on* the
+  paper, never a lighter one — so the panel steps down, as the plate does.
+  The dark theme inverts this, because there the paper analogy does not hold.
+- The ground is `#F4F2F1`: hue sampled, lightness and chroma derived. It sits
+  inside the 94–98% band that this author's other products also occupy, and
+  that is a decision on the record rather than an oversight — see DESIGN.md.
+  What carries this direction's identity is the blue-line/wash split, the
+  square geometry and state-as-fill, none of which depend on the ground.
+- Radii are zero and elevation is `none`. A block book has ruled fields, not
+  floating cards; hierarchy is carried by rule weight and fill. The three
+  radius tokens stay, spelled everywhere they were, so the decision is
+  revisitable in three lines rather than forty.
+- A decorative hairline is `--line`; the edge of a control a learner types
   into is `--edge`, computed against the 3:1 non-text floor, because a box
   whose boundary cannot be seen is a box that is not there.
-- Type: a humanist sans stack (SF Rounded where the platform has it, then
-  Avenir Next, then the system face). No serif display, no letterspaced
-  mono eyebrows — that was the bookish status quo this direction replaces.
 """
 
 from __future__ import annotations
@@ -56,29 +64,29 @@ import re
 # --------------------------------------------------------------------------
 
 LIGHT_VARS = """\
-  --bg:#F4F6F4; --panel:#FFFFFF; --ink:#1B2124; --muted:#5C6568; --faint:#828B8E;
-  --line:#E1E6E3; --line-soft:#ECF0ED; --edge:#849091;
-  --accent:#1B8577; --accent-text:#0F6B5F; --accent-strong:#126E62;
-  --accent-soft:#DFF0EC; --on-accent:#FFFFFF;
-  --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
-  --warn-text:#8A5A00; --warn-soft:#F8EFD8;
-  --chip:#E9EDEA; --stone:#D3DAD6;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(20,28,26,.05);
-  --shadow-lift:0 2px 6px rgba(20,28,26,.09);
+  --bg:#F4F2F1; --panel:#EAE6E3; --ink:#241C1C; --muted:#6E645E; --faint:#958A83;
+  --line:#D8D0CB; --line-soft:#E7E2DF; --edge:#8F7C70;
+  --accent:#2D455D; --accent-text:#2D455D; --accent-strong:#213345;
+  --accent-soft:#E4EBF1; --on-accent:#EAE6E3;
+  --good:#7A894D; --good-text:#606C3D; --good-soft:#E5EAD7;
+  --warn-text:#8A5F15; --warn-soft:#F6E6CB;
+  --chip:#EBE7E5; --stone:#6D8FB0;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:light;"""
 
 DARK_VARS = """\
-  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
-  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
-  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
-  --accent-soft:#153531; --on-accent:#0B1615;
-  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
-  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
-  --chip:#232A2B; --stone:#343D3D;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#A89F99; --faint:#6E645E;
+  --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
+  --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
+  --accent-soft:#243342; --on-accent:#1C1917;
+  --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
+  --warn-text:#CD9637; --warn-soft:#3B2E16;
+  --chip:#34302D; --stone:#4D6984;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:dark;"""
 
 # The dark block is emitted twice: once behind the media query (system
@@ -98,18 +106,21 @@ TOKENS_CSS = f"""\
   }}
 """
 
-FONT_BODY = ('"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, '
-             '-apple-system, sans-serif')
-# Display and body are the same stack. `ui-rounded` used to lead this one —
-# SF Rounded where the platform had it — and it was the direction's one
-# honest "rounded" move. It went with the warm palette, for the same reason:
-# a rounded display face is the other half of the friendly-app default, and
-# a system that says "adult doing hard work" should not open every page in
-# the face a children's app would pick. With no font pipeline to spend
-# (that constraint stands), the professional move is one humanist face
-# separated by size, weight and tracking rather than two by shape. The
-# constant stays because renderers spell it: it names the *role*, and the
-# day a display face is worth a pipeline, it changes here alone.
+FONT_BODY = ('"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, '
+             'system-ui, sans-serif')
+# A grotesque, not a humanist face, and deliberately not a rounded one. The
+# seed's own lettering is drawn sans capitals doing structural work — block
+# numbers, street names, the border rules — and that is the register this
+# stack aims at. `ui-rounded` led this list two rounds ago and Avenir Next
+# one round ago; both were the friendly-app reflex wearing different clothes.
+#
+# The honest version of this decision is Archivo, an American grotesque in
+# the same commercial-lettering line as the plate, with Archivo Narrow for
+# the structural labels — one family at two widths, which is the plate's own
+# logic. That needs a font pipeline (vendored woff2 in the package, since a
+# self-hosted app should not phone out to a font CDN), and the pipeline is a
+# separate decision. Until it exists this stack is the nearest thing the
+# platform already has, and it changes here alone when the pipeline lands.
 FONT_DISPLAY = FONT_BODY
 FONT_MONO = 'ui-monospace, Menlo, Consolas, monospace'
 
@@ -212,15 +223,22 @@ BASE_CSS = f"""\
 
   /* ---- the waypath (the signature gesture) ---- */
   .waypath {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }}
-  .wp-stone {{ width:20px; height:10px; border-radius:5px; background:var(--stone);
-              transition:background .35s ease, box-shadow .35s ease; }}
-  .wp-stone.lit {{ background:var(--accent-strong); }}
-  .wp-stone.here {{ background:transparent;
-                   box-shadow:inset 0 0 0 2px var(--accent-strong); }}
-  .wp-stone.pop {{ animation:wp-pop .45s ease; }}
+  .wp-stone {{ width:14px; height:14px; border:1px solid var(--stone);
+              background:transparent;
+              transition:background .3s ease, border-color .3s ease; }}
+  .wp-stone.lit {{ background:var(--accent-strong);
+                  border-color:var(--accent-strong); }}
+  .wp-stone.here {{ background:transparent; border-color:var(--accent-strong);
+                   box-shadow:inset 0 0 0 1px var(--accent-strong); }}
+  /* Completion fills a block; it does not bounce. A stone that grows and
+     springs back is the friendly-app reflex, and it was the last piece of
+     the old direction still moving. The mark still announces itself — the
+     fill arrives through a held outline — but in the register of a form
+     being stamped rather than a toy responding. */
+  .wp-stone.pop {{ animation:wp-pop .5s steps(1, end) 2; }}
   @keyframes wp-pop {{
-    0% {{ transform:scale(1); }} 45% {{ transform:scale(1.55); }}
-    100% {{ transform:scale(1); }}
+    0%, 49% {{ box-shadow:inset 0 0 0 3px var(--bg); }}
+    50%, 100% {{ box-shadow:none; }}
   }}
   .wp-count {{ font-size:14px; font-weight:600; color:var(--muted);
               white-space:nowrap; }}
@@ -268,11 +286,12 @@ def style(extra: str = "") -> str:
 # too, and `webapp` imports the wizard: one drawing, in the module that owns
 # the drawing, is the only arrangement in which "reuse, never redraw" is
 # something the code enforces rather than something a reviewer remembers.
-WORDMARK = ('<svg width="56" height="8" viewBox="0 0 56 8" aria-hidden="true">'
-            '<rect x="0" y="0" width="16" height="8" rx="4" fill="var(--accent-strong)"/>'
-            '<rect x="21" y="1" width="14" height="6" rx="3" fill="none" '
+WORDMARK = ('<svg width="32" height="10" viewBox="0 0 32 10" aria-hidden="true">'
+            '<rect x="0" y="0" width="10" height="10" fill="var(--accent-strong)"/>'
+            '<rect x="12" y="1" width="8" height="8" fill="none" '
             'stroke="var(--accent-strong)" stroke-width="2"/>'
-            '<rect x="40" y="0" width="16" height="8" rx="4" fill="var(--stone)"/></svg>')
+            '<rect x="22.5" y="0.5" width="9" height="9" fill="none" '
+            'stroke="var(--stone)" stroke-width="1"/></svg>')
 
 
 # --------------------------------------------------------------------------

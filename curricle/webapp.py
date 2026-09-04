@@ -134,7 +134,7 @@ INDEX_STYLE = theme.style("""\
   .course .desc { font-size:14.5px; line-height:1.55; color:var(--muted);
                   margin:0 0 14px; max-width:58ch; }
   .course .waypath { margin:0 0 10px; gap:5px; }
-  .course .wp-stone { width:15px; height:8px; border-radius:4px; }
+  .course .wp-stone { width:11px; height:11px; }
   .course .meta { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px;
                   font-size:14px; font-weight:600; color:var(--muted); }
   .course .meta b { color:var(--ink); }

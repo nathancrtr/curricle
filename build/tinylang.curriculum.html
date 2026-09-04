@@ -6,51 +6,51 @@
 <title>Interpreters, end to end — curriculum</title>
 <style>
   :root {
-  --bg:#F4F6F4; --panel:#FFFFFF; --ink:#1B2124; --muted:#5C6568; --faint:#828B8E;
-  --line:#E1E6E3; --line-soft:#ECF0ED; --edge:#849091;
-  --accent:#1B8577; --accent-text:#0F6B5F; --accent-strong:#126E62;
-  --accent-soft:#DFF0EC; --on-accent:#FFFFFF;
-  --good:#55605F; --good-text:#1B2124; --good-soft:#E6EAE8;
-  --warn-text:#8A5A00; --warn-soft:#F8EFD8;
-  --chip:#E9EDEA; --stone:#D3DAD6;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(20,28,26,.05);
-  --shadow-lift:0 2px 6px rgba(20,28,26,.09);
+  --bg:#F4F2F1; --panel:#EAE6E3; --ink:#241C1C; --muted:#6E645E; --faint:#958A83;
+  --line:#D8D0CB; --line-soft:#E7E2DF; --edge:#8F7C70;
+  --accent:#2D455D; --accent-text:#2D455D; --accent-strong:#213345;
+  --accent-soft:#E4EBF1; --on-accent:#EAE6E3;
+  --good:#7A894D; --good-text:#606C3D; --good-soft:#E5EAD7;
+  --warn-text:#8A5F15; --warn-soft:#F6E6CB;
+  --chip:#EBE7E5; --stone:#6D8FB0;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme=light]) {
-  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
-  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
-  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
-  --accent-soft:#153531; --on-accent:#0B1615;
-  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
-  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
-  --chip:#232A2B; --stone:#343D3D;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#A89F99; --faint:#6E645E;
+  --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
+  --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
+  --accent-soft:#243342; --on-accent:#1C1917;
+  --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
+  --warn-text:#CD9637; --warn-soft:#3B2E16;
+  --chip:#34302D; --stone:#4D6984;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:dark;
     }
   }
   :root[data-theme=dark] {
-  --bg:#111516; --panel:#191E20; --ink:#E7ECEA; --muted:#A6B0AE; --faint:#7C8785;
-  --line:#28302F; --line-soft:#20272A; --edge:#606E6C;
-  --accent:#4FC3B0; --accent-text:#7ED8C8; --accent-strong:#4FC3B0;
-  --accent-soft:#153531; --on-accent:#0B1615;
-  --good:#8A9794; --good-text:#E7ECEA; --good-soft:#2A3230;
-  --warn-text:#E9BC5E; --warn-soft:#3A2F14;
-  --chip:#232A2B; --stone:#343D3D;
-  --r-card:10px; --r-ctl:7px; --r-chip:4px;
-  --shadow:0 1px 2px rgba(0,0,0,.30);
-  --shadow-lift:0 2px 6px rgba(0,0,0,.38);
+  --bg:#1C1917; --panel:#272320; --ink:#E6E2E0; --muted:#A89F99; --faint:#6E645E;
+  --line:#3D3733; --line-soft:#2F2B27; --edge:#7B6E65;
+  --accent:#5587B9; --accent-text:#7DA8D4; --accent-strong:#A3C2E0;
+  --accent-soft:#243342; --on-accent:#1C1917;
+  --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
+  --warn-text:#CD9637; --warn-soft:#3B2E16;
+  --chip:#34302D; --stone:#4D6984;
+  --r-card:0px; --r-ctl:0px; --r-chip:0px;
+  --shadow:none;
+  --shadow-lift:none;
   color-scheme:dark;
   }
   * { box-sizing:border-box; }
   html { -webkit-text-size-adjust:100%; }
   [hidden] { display:none !important; }
   body { margin:0; background:var(--bg); color:var(--ink);
-         font:16px/1.6 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+         font:16px/1.6 "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
   a { color:var(--accent-text); }
   :focus-visible { outline:2px solid var(--accent-strong); outline-offset:3px;
                    border-radius:var(--r-ctl); }
@@ -58,7 +58,7 @@
            cursor:pointer; }
   code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
          padding:1px 5px; border-radius:var(--r-chip); }
-  h1, h2, h3, .display { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  h1, h2, h3, .display { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
 
   /* ---- the shared shell ---- */
   .eyebrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px;
@@ -130,21 +130,28 @@
      is worse than none). A second copy of these four declarations beside a
      second copy of the drawing is how a mark drifts. */
   .wordmark { display:inline-flex; align-items:center; gap:10px;
-              font:700 22px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--ink);
+              font:700 22px "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; color:var(--ink);
               text-decoration:none; letter-spacing:-.01em; }
   .wordmark svg { display:block; }
 
   /* ---- the waypath (the signature gesture) ---- */
   .waypath { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .wp-stone { width:20px; height:10px; border-radius:5px; background:var(--stone);
-              transition:background .35s ease, box-shadow .35s ease; }
-  .wp-stone.lit { background:var(--accent-strong); }
-  .wp-stone.here { background:transparent;
-                   box-shadow:inset 0 0 0 2px var(--accent-strong); }
-  .wp-stone.pop { animation:wp-pop .45s ease; }
+  .wp-stone { width:14px; height:14px; border:1px solid var(--stone);
+              background:transparent;
+              transition:background .3s ease, border-color .3s ease; }
+  .wp-stone.lit { background:var(--accent-strong);
+                  border-color:var(--accent-strong); }
+  .wp-stone.here { background:transparent; border-color:var(--accent-strong);
+                   box-shadow:inset 0 0 0 1px var(--accent-strong); }
+  /* Completion fills a block; it does not bounce. A stone that grows and
+     springs back is the friendly-app reflex, and it was the last piece of
+     the old direction still moving. The mark still announces itself — the
+     fill arrives through a held outline — but in the register of a form
+     being stamped rather than a toy responding. */
+  .wp-stone.pop { animation:wp-pop .5s steps(1, end) 2; }
   @keyframes wp-pop {
-    0% { transform:scale(1); } 45% { transform:scale(1.55); }
-    100% { transform:scale(1); }
+    0%, 49% { box-shadow:inset 0 0 0 3px var(--bg); }
+    50%, 100% { box-shadow:none; }
   }
   .wp-count { font-size:14px; font-weight:600; color:var(--muted);
               white-space:nowrap; }
@@ -180,8 +187,8 @@
   .phase-num { flex:none; display:grid; place-items:center; width:36px; height:36px;
                border-radius:var(--r-ctl); background:var(--bg);
                border:1px solid var(--line);
-               color:var(--muted); font:700 17px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; }
-  .phase-name { font-family:"Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; font-size:21px;
+               color:var(--muted); font:700 17px "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
+  .phase-name { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; font-size:21px;
                 font-weight:700; margin:4px 0 0; }
   .phase-weeks { margin:8px 0 0 auto; }
   .phase-goal { margin:12px 0 0; font-size:14.5px; color:var(--muted); max-width:66ch; }
@@ -190,7 +197,7 @@
   .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
           text-align:left; padding:20px 0 4px; border-radius:var(--r-card); }
   .head:hover .title { color:var(--accent-text); }
-  .num { font:600 13px "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif; color:var(--muted);
+  .num { font:600 13px "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; color:var(--muted);
          padding-top:7px; }
   /* A milestone's gutter carries the flag instead of a number, in the green
      that means done/checkpoint everywhere else — the same glyph in the same
@@ -240,7 +247,7 @@
   .notes-label { display:block; font-size:14px; font-weight:700; color:var(--ink);
                  margin:18px 0 6px; }
   textarea { width:100%; min-height:64px; resize:vertical;
-             font:14px/1.55 "Avenir Next", Avenir, Seravek, "Segoe UI", system-ui, -apple-system, sans-serif;
+             font:14px/1.55 "Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif;
              color:var(--ink); background:var(--panel); border:1.5px solid var(--line);
              border-radius:var(--r-card); padding:10px 13px; }
   /* Placeholder copy is read to be acted on, so it is body text, not a

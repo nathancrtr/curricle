@@ -81,8 +81,11 @@ chosen to read as *hospitality to that person*:
 
 - **Copy is plain second person, no exclamation points, no praise-babble.**
   "Welcome back. 3 of 26 done · next up: …" / "Every step walked." / "Good
-  evening, sam." The greeting is computed from the actual clock — a real
-  courtesy, not a sticker.
+  evening." The greeting is computed from the actual clock — a real
+  courtesy, not a sticker. It carries no name: the only name the app has
+  is the tenant slug, and "Good afternoon, dev." is a joke the reader did
+  not make (issue #63). The slug says its one true thing in the footer,
+  "signed in as", and the vocative waits for a display name to exist.
 - **No guilt surface exists.** Nothing counts days away, nothing decays,
   the zero state is framed as a beginning, and the "empty" filter state says
   "everything here is done", not "nothing left!".

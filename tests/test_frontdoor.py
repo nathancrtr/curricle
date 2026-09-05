@@ -168,6 +168,10 @@ class FrontDoorShapeTest(unittest.TestCase):
         self.assertIn('class="wordmark"', page.text)
         self.assertIn('href="/profile"', page.text)
         self.assertIn(theme.greeting(0).split()[0], page.text)   # "Good …"
+        # …and no vocative: the slug is not a name, so it is not greeted
+        # with (issue #63). It still says its one true thing in the footer.
+        self.assertNotIn(", frontdoor-shell.", page.text)
+        self.assertIn("signed in as frontdoor-shell", page.text)
         # The index is server-rendered through and through; the ring below is
         # static HTML precisely so this stays true.
         self.assertNotIn("<script", page.text)

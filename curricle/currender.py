@@ -56,6 +56,37 @@ STYLE = theme.style("""\
                 max-width:var(--measure); }
   .entry { border-bottom:1px solid var(--line-soft); scroll-margin-top:18px; }
   .entry.hidden { display:none; }
+  /* "You are here", ported from the hub's hot row — the same accent ring
+     and the same worded chip, because a learner arriving on this page from
+     a bookmark or the back button used to get no answer at all: `nextId`
+     fed the meter's ring and nothing below it, so every undone entry looked
+     identical. This is the page the Continue pill lands on and the page a
+     learner works in for two years.
+
+     The hub's own numbers, -10px against 8.5px of padding, so the two hot
+     treatments are one object rather than two that resemble each other.
+     The bleed is exactly what the ring adds (8.5 + 1.5), so the number
+     gutter of the hot entry lands on the same vertical as every other
+     entry's and nothing shifts sideways when the ring moves. Two rows in
+     one list drawn to two different edges is the kind of miss that reads
+     as carelessness even when nobody can name it.
+
+     `--accent`, not `--accent-strong`. The hub needs the stronger token for
+     a row that is *both* a milestone and next, where the ring lands on the
+     `--good-soft` fill; here a milestone entry carries no fill at all (its
+     green is the flag in the gutter and the done-highlight behind a gloss,
+     which by definition is not drawn on the row that is next), so the ring
+     is always on the ground and `--accent` clears it. */
+  .entry.next { border:1.5px solid var(--accent); box-shadow:var(--shadow);
+                margin:0 -10px; padding:0 8.5px; }
+  .title .next-flag { display:none; }
+  .entry.next .title .next-flag { display:inline-block; }
+  /* The ring in the meter is the same gesture as the ring on the entry, so
+     it goes where the entry is. A link, not a scroll handler: it is an
+     address on this page, it belongs in the status bar on hover, and it
+     should open in a new tab if somebody wants that. */
+  a.wp-stone.here { cursor:pointer; }
+  a.wp-stone.here:hover { background:var(--accent-soft); }
   .head { display:grid; grid-template-columns:44px 1fr; gap:0 16px; width:100%;
           text-align:left; padding:20px 0 4px; border-radius:var(--r-card); }
   .head:hover .title { color:var(--accent-text); }
@@ -201,7 +232,8 @@ function render() {
           <button class="head" aria-expanded="false">
             <span class="num">${e.num}</span>
             <span class="body-col">
-              <h3 class="title">${e.title}${(e.tags || []).map(t =>
+              <h3 class="title">${e.title}<span
+                class="chip acc next-flag">next</span>${(e.tags || []).map(t =>
                 `<span class="chip${t === "widget" ? " acc" : ""}">${t}</span>`).join("")}</h3>
               ${e.gloss ? `<p class="gloss"><span class="gloss-mark"></span><span class="gloss-text">${e.gloss}</span></p>` : ""}
             </span>
@@ -237,7 +269,22 @@ function updateMeter() {
   $("count").textContent = done === 0
     ? `${HUB_IDS.length} steps ahead of you`
     : `${done} of ${HUB_IDS.length} done`;
-  waypath($("ticks"), HUB_IDS, i => !!progress[i], nextId);
+  // The path counts steps and the list shows entries, and the two are not
+  // the same sequence: a stepped unit is one entry standing for several
+  // stones. `isDone` already knows the difference, so the first entry it
+  // calls undone is the one to mark hot — and it is always the entry that
+  // owns `nextId`, which is what lets the ring point at it.
+  const hot = ALL.find(e => !isDone(e)) || null;
+  document.querySelectorAll(".entry").forEach(entry =>
+    entry.classList.toggle("next", !!hot && entry.dataset.id === hot.id));
+  const stone = waypath($("ticks"), HUB_IDS, i => !!progress[i], nextId,
+    () => hot ? "#u-" + encodeURIComponent(hot.id) : null);
+  if (stone && hot) {
+    // Set, never interpolated: an entry title reaches the page as markup
+    // and reaches an attribute as text, and this is the attribute path.
+    stone.setAttribute("aria-label", "Go to where you are: " + hot.title);
+    stone.setAttribute("title", "Where you are: " + hot.title);
+  }
 }
 
 function openEntry(entry, want) {
@@ -513,7 +560,12 @@ def render_curriculum(mf: Manifest, *, api: str | None = None,
     {standfirst}
     {how}
     <div class="controls panel">
-      <div class="waypath" id="ticks" aria-hidden="true"></div>
+      <!-- Not aria-hidden: one stone in this path is a link to the entry
+           the ring marks, and a focusable element inside an aria-hidden
+           subtree is reachable by keyboard and invisible to a screen
+           reader. The decorative stones hide themselves instead — see
+           theme.WAYPATH_JS. -->
+      <div class="waypath" id="ticks"></div>
       <div class="meta-row">
       <span class="wp-count" id="count"></span>
       <span class="spacer"></span>

@@ -126,6 +126,53 @@ HOUSE_EXEMPLARS = {
 }
 
 
+# Where a minted question bank goes, and what stands above its first
+# section. The path is the corpus convention (tinylang, textual-flow); the
+# preamble is house furniture, written here rather than asked of a model,
+# because it describes the tagging scheme the *validator* enforces and a
+# model that reworded it would be documenting a format nothing keeps.
+BANK_REL = "quizzes/question-bank.md"
+BANK_HEADER = """# {title} — Question Bank
+
+Pool for live quizzing ("quiz me on Phase 1"). A mix of recall, application and
+explain-why, tagged `N.M (R|A|W)` — N the unit, M the item within it; the
+*explain-why* answers reveal understanding best, so prefer them. Each entry
+carries the answer plus a note for what to do with a wrong one — the note is
+the point, because a bank that only marks is a bank that teaches nothing.
+"""
+BANK_BLURB = ("The pool live quizzing draws from — recall, application, and "
+              "explain-why, each with a teaching note.")
+
+
+def _free_id(stem: str, manifest: Manifest) -> str:
+    """`stem`, or the first `stem-N` nothing in the course has claimed.
+
+    The compiler enforces one id space across everything referenceable, and
+    a material it refuses is one `promote` would decline to register while
+    still moving its file — an unregistered file under `interactive/`, which
+    is a coverage warning and not the error it deserves to be. Cheaper to
+    pick an id that is free.
+    """
+    taken = {m.id for m in manifest.materials}
+    taken |= {p.id for p in manifest.phases}
+    taken |= {u.id for u in manifest.units}
+    taken |= {s.id for u in manifest.units for s in u.steps}
+    taken |= {m.id for m in manifest.milestones}
+    taken |= {t.id for t in manifest.tracks}
+    taken |= {s.id for t in manifest.tracks for s in t.stages}
+    if stem not in taken:
+        return stem
+    n = 2
+    while f"{stem}-{n}" in taken:
+        n += 1
+    return f"{stem}-{n}"
+
+
+def mint_bank(course_title: str, section: str) -> str:
+    """A whole question-bank file: the house preamble, then one section."""
+    return BANK_HEADER.format(title=course_title) + "\n" + section.lstrip("\n")
+
+
 def house_exemplar(kind: str) -> str:
     """The shipped exemplar of `kind` — refuse an unknown one, don't guess."""
     with open(os.path.join(EXEMPLARS_DIR, HOUSE_EXEMPLARS[kind]),
@@ -770,26 +817,27 @@ def default_build_plan(manifest: Manifest) -> dict:
     """What phase 1 gets built, derived from the outline rather than asked for.
 
     A lesson on the phase's first unit, a widget on its second, an exercise
-    on its last, the checkpoint quiz, and a bank section only if there is a
-    bank to append it to. Deterministic beats another model call: the learner
-    reads the plan at the gate and can regenerate the phase if it is wrong.
+    on its last, the checkpoint quiz, and a bank section. Deterministic beats
+    another model call: the learner reads the plan at the gate and can
+    regenerate the phase if it is wrong.
 
-    The bank is the one entry that asks a question about the course rather
-    than about the phase, and it is the same question `build_phase` asks to
-    find `bank_target`: a question-bank material in the manifest. A section
-    is not a file — it is text appended to somebody else's — so a course
-    with no bank has nowhere to put one, and `promote` silently drops it.
-    Planning it anyway would bill a learner for an artifact that cannot
-    survive publication, which is the honest reading of this being a *plan*:
-    it says what will be bought, so it may not name what cannot be kept.
-    (A brand-new wizard course has no bank yet, so it gets `False` here and
-    `estimate_build_cost` stops charging for it — the number at the gate and
-    what the build buys stay the same thing. Minting a bank file for a new
-    course is the proper fix and is its own issue.)
+    The bank is bought unconditionally again. It was not, for a while: a
+    bank section is text appended to a question bank, a course with none had
+    nowhere to put one, and `promote` passed it over in silence — so this
+    stopped planning what could not be kept, which is the honest reading of
+    a *plan*. That was the interim fix. Now `build_phase` mints the bank
+    when a course has none, at the corpus's conventional path, and the
+    section has somewhere to go in every case; the plan is a plan again
+    rather than a plan minus one thing for the courses that need it most.
+
+    The belt stays where it was. `worker._bank_would_be_lost` still refuses
+    to publish a `rel_path`-less bank section with no `bank_target` behind
+    it — unreachable on the mainline in both directions now, and kept for
+    the same reason it was written: the day something regresses, a learner
+    gets a refusal they can see rather than a loss nobody can.
 
     The keys are `BuildSpec`'s field names, so an approved plan reaches the
-    build as `BuildSpec(**plan)` with nothing in between to mistranslate —
-    which is why the bank's key stays and only its value moves.
+    build as `BuildSpec(**plan)` with nothing in between to mistranslate.
     """
     phase = next((p for p in manifest.phases if p.num == 1), None)
     if phase is None:
@@ -806,7 +854,7 @@ def default_build_plan(manifest: Manifest) -> dict:
         "widget_concept": widget_concept_for(widget) if widget else None,
         "exercise_unit": entries[-1].id,
         "quiz": True,
-        "bank": any(m.kind == "question-bank" for m in manifest.materials),
+        "bank": True,
     }
 
 
@@ -872,8 +920,21 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
     # checkpointed after every artifact so nothing finished is ever orphaned,
     # and a resumed run (re-invoke with only the missing artifacts' flags)
     # merges into the same draft.
-    bank_target = next((m.path for m in manifest.materials
-                        if m.kind == "question-bank"), None)
+    bank_material = next((m for m in manifest.materials
+                          if m.kind == "question-bank"), None)
+    bank_target = bank_material.path if bank_material else None
+    bank_id = ""
+    if spec.bank and bank_material is None:
+        # Minting. Refuse rather than clobber: a file sitting at the
+        # conventional path that no material registers is a course somebody
+        # half-wired, and overwriting a learner's own questions to fix a
+        # missing sidecar entry is not a trade this stage gets to make.
+        standing = os.path.join(content_root, "interactive", BANK_REL)
+        if os.path.exists(standing):
+            raise ValidationFailed(
+                f"interactive/{BANK_REL} exists but no question-bank material "
+                "registers it — register it in the sidecar, or move it aside")
+        bank_id = _free_id("bank", manifest)
     manifest_path = os.path.join(draft, "manifest.json")
     prior_artifacts: list[dict] = []
     prior_costs: dict[str, str] = {}
@@ -1009,8 +1070,6 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         landed("quiz")
 
     if spec.bank:
-        bank_material = next((m for m in manifest.materials
-                              if m.kind == "question-bank"), None)
         exemplar = ""
         if bank_material:
             with open(os.path.join(content_root, bank_material.path),
@@ -1021,12 +1080,35 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             ("phase", phase_context),
             ("existing_bank", exemplar or house_exemplar("bank")),
         ]))
-        rel = f"quizzes/bank-phase-{phase.num}.md"
-        save(rel, text)
-        report.artifacts.append(Artifact(
-            role="bank-author", rel_path="", content=text,
-            material={},
-            note=f"append to {bank_material.path if bank_material else 'question bank'}"))
+        if bank_material:
+            # A section, not a file: text appended to a bank that already
+            # exists, so it travels with no `rel_path` and promote finds its
+            # destination in the checkpoint's `bank_target`.
+            rel = f"quizzes/bank-phase-{phase.num}.md"
+            save(rel, text)
+            report.artifacts.append(Artifact(
+                role="bank-author", rel_path="", content=text, material={},
+                note=f"append to {bank_material.path}"))
+        else:
+            # Nothing to append to, so the build makes the thing itself. A
+            # minted bank is an ordinary file artifact — it moves, registers
+            # a material, and re-promotes idempotently by the same code every
+            # other artifact uses — which is why it does *not* set
+            # `bank_target`: that field means "an existing bank to append
+            # to", and the belt in `worker._bank_would_be_lost` reads its
+            # absence beside a `rel_path`-less artifact as the loss case.
+            # A minted bank has a `rel_path`, so the belt still guards
+            # exactly what it was put there to guard.
+            whole = mint_bank(manifest.course.title, text)
+            save(BANK_REL, whole)
+            report.artifacts.append(Artifact(
+                role="bank-author", rel_path=f"interactive/{BANK_REL}",
+                content=whole,
+                material={"id": bank_id, "kind": "question-bank",
+                          "title": "Question Bank",
+                          "path": f"interactive/{BANK_REL}",
+                          "blurb": BANK_BLURB},
+                note=f"new question bank at interactive/{BANK_REL}"))
         landed("bank")
 
     return report
@@ -1071,10 +1153,25 @@ def promote(course_root: str, content_root: str, sidecar_path: str,
             if bank_rel and os.path.exists(src):
                 with open(src, encoding="utf-8") as f:
                     section = f.read()
-                with open(os.path.join(content_root, bank_rel),
-                          "a", encoding="utf-8") as f:
-                    f.write("\n---\n\n" + section)
-                moved.append(f"{bank_rel} (appended)")
+                dest = os.path.join(content_root, bank_rel)
+                standing = ""
+                if os.path.exists(dest):
+                    with open(dest, encoding="utf-8") as f:
+                        standing = f.read()
+                # The append is the one step here that is not a move, and a
+                # move is idempotent where an append is not. Everything above
+                # this line — the compile gate and the `rmtree` — happens
+                # *after* it, so a promotion that dies in the gate leaves the
+                # draft intact and the section already appended, and the
+                # retry the wording promises is safe would append it twice.
+                # Guarded by its own text: what makes a second append wrong
+                # is that the questions are already there.
+                if section.strip() and section.strip() in standing:
+                    moved.append(f"{bank_rel} (already appended)")
+                else:
+                    with open(dest, "a", encoding="utf-8") as f:
+                        f.write("\n---\n\n" + section)
+                    moved.append(f"{bank_rel} (appended)")
             continue
         src = os.path.join(draft, os.path.relpath(art["rel_path"], "interactive"))
         dst = os.path.join(content_root, art["rel_path"])

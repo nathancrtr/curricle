@@ -955,9 +955,13 @@ class OutlineGateScreenTest(GateFixture):
             None)}
         self.assertFalse(items["the widget"].bought)
         self.assertEqual(items["the widget"].detail, wizard.UNPLANNED_REASON)
+        # The bank takes the same words now. Its own reason described a
+        # thing that no longer happens — a new course had no bank for a
+        # section to be appended to, so none was bought; the build mints one
+        # instead, and an unbought bank is an unbought artifact like the rest.
         self.assertFalse(items["the question bank"].bought)
-        self.assertEqual(items["the question bank"].detail, "not built for a "
-                                                            "new course")
+        self.assertEqual(items["the question bank"].detail,
+                         wizard.UNPLANNED_REASON)
         for item in items.values():
             with self.subTest(item=item.name):
                 self.assertNotIn("skipped", item.detail)
@@ -1297,8 +1301,9 @@ class PlanAgreementTest(GateFixture):
     def test_the_gate_names_the_bank_only_to_say_why_it_is_not_bought(self):
         page = self.screen()
         self.assertIn("Question bank", page)
-        self.assertIn("not built for a new course", page)
+        self.assertIn(wizard.UNPLANNED_REASON, page)
         self.assertNotIn("Question bank · a new section", page)
+        self.assertNotIn("Question bank · new, for this course", page)
 
     def test_then_the_build_screen_lists_exactly_what_the_gate_listed(self):
         self.client.post("/onboarding/outline/approve", follow_redirects=False)

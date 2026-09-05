@@ -17,6 +17,7 @@ from unittest import mock
 import sqlalchemy as sa
 
 from curricle import db, factory, llm, profile, scripted
+from curricle.compiler import Issue
 from curricle.llm import (
     BudgetExceeded, FactoryConfigMissing, Runner, load_models_config, load_role,
 )
@@ -1010,35 +1011,33 @@ class BuildPlanTest(unittest.TestCase):
         self.assertEqual(plan, {
             "phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
             "widget_concept": "refusal over guessing",
-            "exercise_unit": "u2", "quiz": True, "bank": False})
+            "exercise_unit": "u2", "quiz": True, "bank": True})
         # The keys are BuildSpec's fields: an approved plan reaches the build
         # with nothing in between to mistranslate it.
         self.assertEqual(factory.BuildSpec(**plan),
                          factory.BuildSpec(phase_id="p1", lesson_unit="u1",
                                            widget_unit="u2",
                                            widget_concept=plan["widget_concept"],
-                                           exercise_unit="u2", bank=False))
+                                           exercise_unit="u2", bank=True))
 
-    def test_a_course_with_no_question_bank_does_not_plan_a_bank_section(self):
-        # A bank section is text appended to an existing question bank, not a
-        # file of its own — so a course that has no bank has nowhere to put
-        # one, and promotion drops it in silence. The plan says what will be
-        # bought, so it may not name what cannot be kept.
+    def test_a_course_with_no_question_bank_still_plans_a_bank(self):
+        # A course with no bank is exactly the course that needs one, and it
+        # is what a brand-new wizard course always is. The plan used not to
+        # buy a section for it, because a section is text appended to a file
+        # that did not exist and promotion dropped it in silence; the build
+        # now mints the file, so the plan may name it again.
         plan = factory.default_build_plan(
             self.manifest_for(GOOD_CURRICULUM, GOOD_SIDECAR))
-        self.assertFalse(plan["bank"])
-        # The key stays and only the value moves: `BuildSpec(**plan)` is the
-        # whole contract between the gate and the build, and it still holds.
-        self.assertIn("bank", plan)
-        self.assertFalse(factory.BuildSpec(**plan).bank)
+        self.assertTrue(plan["bank"])
+        self.assertTrue(factory.BuildSpec(**plan).bank)
 
-        # And the estimate stops charging for it, so the number the learner
-        # approves stays the number of what will actually be bought.
+        # And the estimate charges for it, so the number the learner approves
+        # is the number of what will actually be bought.
         config = load_models_config()
         input_tokens, output_tokens = factory.ESTIMATE_TOKENS["bank-author"]
         self.assertEqual(
-            factory.estimate_build_cost(config, {**plan, "bank": True})
-            - factory.estimate_build_cost(config, plan),
+            factory.estimate_build_cost(config, plan)
+            - factory.estimate_build_cost(config, {**plan, "bank": False}),
             config.cost(config.model_for_role("bank-author"),
                         input_tokens, output_tokens))
 
@@ -1414,6 +1413,211 @@ class HouseFallbackBuildTest(unittest.TestCase):
             html = f.read()
         self.assertIn('curricle.checkpoint("q-phase-1",', html)
         self.assertNotIn("quiz-p1", html)
+
+
+class BankMintTest(unittest.TestCase):
+    """A course with no question bank gets one, rather than getting less.
+
+    A bank section is text appended to a question bank, and a brand-new
+    wizard course has none — so the section had nowhere to go, `promote`
+    passed it over in silence, and the interim fix was to stop planning one
+    at all. That kept the gate honest at the price of the product's promise:
+    `get_question_bank` over MCP and "quiz me on Phase 1" both want a bank,
+    and the courses that had none were exactly the ones this system builds.
+
+    So the build mints it. A minted bank is an ordinary file artifact — it
+    has a `rel_path`, it registers a material, `promote` moves it with
+    `copy2` like everything else — which is what makes re-promoting it safe
+    without a rule of its own.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = test_engine()
+
+    def setUp(self):
+        with self.engine.begin() as conn:
+            self.tenant = db.create_tenant(conn, f"mint-{self.id()}")
+        self.scope = db.for_tenant(self.tenant)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def course(self, sidecar, files=()):
+        root = os.path.join(self.tmp.name, "course")
+        os.makedirs(os.path.join(root, "learning"), exist_ok=True)
+        for rel, body in zip(factory.OUTLINE_FILES,
+                             (GOOD_CURRICULUM, sidecar, GOOD_SHELF)):
+            with open(os.path.join(root, rel), "w", encoding="utf-8") as f:
+                f.write(body)
+        for rel, body in dict(files).items():
+            path = os.path.join(root, "learning", "interactive", rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(body)
+        manifest, issues = compile_draft(root)
+        self.assertIsNotNone(manifest, [str(i) for i in issues])
+        return manifest, root, os.path.join(root, "learning")
+
+    def build(self, manifest, content_root, spec=None):
+        send = FakeBuildSend()
+        report = factory.build_phase(
+            Runner(self.engine, self.scope, send=send), manifest,
+            profile.ProfileState(), content_root, spec or FULL_SPEC)
+        return send, report
+
+    # ---- minting ---------------------------------------------------------
+
+    def test_a_bankless_course_gets_a_whole_bank_as_a_file(self):
+        manifest, _, content_root = self.course(GOOD_SIDECAR)
+        _, report = self.build(manifest, content_root)
+        bank = next(a for a in report.artifacts if a.role == "bank-author")
+
+        # A file, not a section: this is the difference the whole issue is
+        # about, and everything else here follows from it.
+        self.assertEqual(bank.rel_path, f"interactive/{factory.BANK_REL}")
+        self.assertEqual(bank.material["kind"], "question-bank")
+        self.assertEqual(bank.material["path"], bank.rel_path)
+        self.assertTrue(os.path.exists(
+            os.path.join(report.draft_dir, factory.BANK_REL)))
+
+        # The house preamble above the model's section. The preamble is
+        # written here rather than asked for because it documents the tagging
+        # scheme `validate_bank` enforces, and the course's own title names
+        # whose bank it is.
+        with open(os.path.join(report.draft_dir, factory.BANK_REL),
+                  encoding="utf-8") as f:
+            text = f.read()
+        self.assertTrue(text.startswith(f"# {manifest.course.title} — "))
+        self.assertIn("`N.M (R|A|W)`", text)
+        self.assertIn(GOOD_BANK.splitlines()[0], text)
+        self.assertLess(text.index("N.M (R|A|W)"), text.index(GOOD_BANK[:20]))
+
+    def test_a_course_that_has_a_bank_still_gets_a_section(self):
+        # Unchanged, and it has to be: a second phase appends to what the
+        # first one minted rather than minting over it.
+        manifest, _, content_root = self.course(
+            GOOD_SIDECAR + BANK_MATERIAL,
+            {"quizzes/question-bank.md": "# Bank\n\n## Unit 1\nEXISTING.\n"})
+        _, report = self.build(manifest, content_root)
+        bank = next(a for a in report.artifacts if a.role == "bank-author")
+        self.assertEqual(bank.rel_path, "")
+        self.assertEqual(bank.material, {})
+        self.assertIn("interactive/quizzes/question-bank.md", bank.note)
+
+    def test_the_checkpoint_records_a_bank_target_only_when_appending(self):
+        """`bank_target` means "an existing bank to append to", still.
+
+        `worker._bank_would_be_lost` reads its absence beside a
+        `rel_path`-less artifact as the silent-loss case. A minted bank has a
+        `rel_path`, so leaving `bank_target` None keeps that belt guarding
+        exactly what it was written to guard — where setting it would have
+        switched the belt off for every future build.
+        """
+        for sidecar, files, expected in (
+                (GOOD_SIDECAR, {}, None),
+                (GOOD_SIDECAR + BANK_MATERIAL,
+                 {"quizzes/question-bank.md": "# Bank\n\n## U\nX.\n"},
+                 "interactive/quizzes/question-bank.md")):
+            with self.subTest(bank=expected):
+                self.tmp.cleanup()
+                self.tmp = tempfile.TemporaryDirectory()
+                manifest, _, content_root = self.course(sidecar, files)
+                _, report = self.build(manifest, content_root)
+                with open(os.path.join(report.draft_dir, "manifest.json"),
+                          encoding="utf-8") as f:
+                    self.assertEqual(json.load(f)["bank_target"], expected)
+
+    def test_an_unregistered_bank_file_is_refused_not_overwritten(self):
+        # A file at the conventional path that no material registers is a
+        # course somebody half-wired. Minting over it would destroy a
+        # learner's own questions to paper over a missing sidecar entry.
+        manifest, _, content_root = self.course(
+            GOOD_SIDECAR,
+            {"quizzes/question-bank.md": "# Mine\n\nMY OWN QUESTIONS\n"})
+        with self.assertRaises(factory.ValidationFailed) as caught:
+            self.build(manifest, content_root)
+        self.assertIn(factory.BANK_REL, str(caught.exception))
+        with open(os.path.join(content_root, "interactive", factory.BANK_REL),
+                  encoding="utf-8") as f:
+            self.assertIn("MY OWN QUESTIONS", f.read())
+
+    def test_the_minted_id_steps_around_one_the_course_has_taken(self):
+        # The compiler keeps one id space over everything referenceable, and
+        # a material it refuses is one promote declines to register while
+        # still moving its file — an unregistered file under `interactive/`,
+        # which is a warning where it deserves to be an error.
+        manifest, _, _ = self.course(GOOD_SIDECAR)
+        self.assertEqual(factory._free_id("bank", manifest), "bank")
+        taken = manifest.units[0].id
+        self.assertNotEqual(factory._free_id(taken, manifest), taken)
+        self.assertEqual(factory._free_id(taken, manifest), f"{taken}-2")
+
+    # ---- promotion, twice ------------------------------------------------
+
+    def promote(self, root, content_root):
+        return factory.promote(root, content_root,
+                               os.path.join(root, factory.OUTLINE_FILES[1]),
+                               FULL_SPEC.phase_id)
+
+    def test_a_minted_bank_lands_in_the_course_and_registers_itself(self):
+        manifest, root, content_root = self.course(GOOD_SIDECAR)
+        self.build(manifest, content_root)
+        moved = self.promote(root, content_root)
+
+        self.assertIn(f"interactive/{factory.BANK_REL}", moved)
+        landed = os.path.join(content_root, "interactive", factory.BANK_REL)
+        self.assertTrue(os.path.exists(landed))
+        # And the compile that promote gates on saw it as a material, which
+        # is what `get_question_bank` will later look it up by.
+        after, issues = compile_draft(root)
+        self.assertIsNotNone(after, [str(i) for i in issues])
+        bank = next(m for m in after.materials if m.kind == "question-bank")
+        self.assertEqual(bank.path, f"interactive/{factory.BANK_REL}")
+
+    def test_a_retried_promotion_does_not_append_the_section_twice(self):
+        """The append is the one step here that is not a move.
+
+        Promotion appends the bank section *before* its compile gate and
+        before the `rmtree`, so a promotion that dies in the gate — or a
+        worker that dies between the two — leaves the draft intact and the
+        section already in the bank. The retry the wording calls safe then
+        appended the same questions a second time. Guarded by the section's
+        own text now, because what makes the second append wrong is that the
+        questions are already there.
+        """
+        manifest, root, content_root = self.course(
+            GOOD_SIDECAR + BANK_MATERIAL,
+            {"quizzes/question-bank.md": "# Bank\n\n## Unit 1\nEXISTING.\n"})
+        self.build(manifest, content_root)
+        bank_path = os.path.join(content_root, "interactive",
+                                 factory.BANK_REL)
+
+        # First attempt: the compile gate refuses, after the append has
+        # already happened. The draft survives, which is what makes a retry
+        # possible and what made it destructive.
+        # Patched at the source module: `promote` imports `compile_course`
+        # inside the function, so the name it calls is resolved from
+        # `curricle.compiler` at call time and not from factory's globals.
+        with mock.patch("curricle.compiler.compile_course",
+                        return_value=(None, [Issue("error", "x", "refused")])):
+            with self.assertRaises(factory.ValidationFailed):
+                self.promote(root, content_root)
+        with open(bank_path, encoding="utf-8") as f:
+            once = f.read()
+        self.assertEqual(once.count(GOOD_BANK.splitlines()[0]), 1)
+        self.assertTrue(os.path.isdir(
+            os.path.join(content_root, "interactive", ".draft-p1")))
+
+        # The retry. Same section, already there: appended once, not twice.
+        moved = self.promote(root, content_root)
+        with open(bank_path, encoding="utf-8") as f:
+            twice = f.read()
+        self.assertEqual(twice, once)
+        self.assertEqual(twice.count(GOOD_BANK.splitlines()[0]), 1)
+        self.assertIn("interactive/quizzes/question-bank.md (already appended)",
+                      moved)
+        # And the learner's own earlier questions are untouched by either run.
+        self.assertIn("EXISTING.", twice)
 
 
 if __name__ == "__main__":

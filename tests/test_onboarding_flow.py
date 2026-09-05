@@ -46,11 +46,13 @@ from pg import test_engine
 # fake runner's call log is the only spend" a claim about the ledger and not
 # about the fake.
 #
-# `bank-author` is deliberately not among them: a bank section is appended to
-# an existing question bank, a new course has none, so `default_build_plan`
-# does not buy one and the estimate at the gate does not charge for one.
-BUILD_ROLES = frozenset({"exercise-author", "lesson-writer", "quiz-author",
-                         "widget-builder"})
+# `bank-author` is among them, and the walk is where that is proved end to
+# end. A bank section used to be text appended to a question bank a new
+# course did not have, so the plan did not buy one; the build now mints the
+# bank when a course has none, which makes this walk — a brand-new course,
+# built once — the case that exercises the mint.
+BUILD_ROLES = frozenset({"bank-author", "exercise-author", "lesson-writer",
+                         "quiz-author", "widget-builder"})
 OUTLINE_ROLES = frozenset({"curriculum-designer", "resource-curator"})
 
 # The title the scope form is filled in with, and the id minting turns it
@@ -302,13 +304,12 @@ class OnboardingFlowTest(unittest.TestCase):
     def test_step_5_the_build_and_the_promotion_reach_promoted(self):
         self.assertEqual(self.kinds()[-1], "promoted")
         self.assertEqual(self.payload("promoted"), {"course_id": COURSE_ID})
-        # The roles a phase-1 build buys for a new course, and no bank
-        # section — the plan the learner approved did not name one, because
-        # this course has no question bank for it to be appended to.
+        # Every role a phase-1 build buys, the bank among them: the plan the
+        # learner approved named it, and a course with no bank to append to
+        # gets one minted rather than getting less than the plan promised.
         self.assertEqual(sorted(set(self.send.roles()) & BUILD_ROLES),
                          sorted(BUILD_ROLES))
-        self.assertNotIn("bank-author", self.send.roles())
-        self.assertFalse(self.payload("outline_ready")["plan"]["bank"])
+        self.assertTrue(self.payload("outline_ready")["plan"]["bank"])
         self.assertFalse(os.path.exists(
             os.path.join(self.tmp, COURSE_ID, worker.DRAFT_DIR)))
         with self.engine.begin() as conn:
@@ -336,10 +337,28 @@ class OnboardingFlowTest(unittest.TestCase):
         self.assertEqual(len(artifacts), len(BUILD_ROLES))
         for artifact in artifacts:
             with self.subTest(artifact=artifact["rel_path"] or artifact["note"]):
-                self.assertTrue(artifact["rel_path"])   # no bank in this plan
+                # Every artifact of this build is a file, the minted bank
+                # included — which is the point of minting rather than
+                # appending: a bank that is a file moves, registers and
+                # re-promotes by the same code as everything else.
+                self.assertTrue(artifact["rel_path"])
                 self.assertTrue(os.path.exists(
                     os.path.join(root, "learning", artifact["rel_path"])))
                 self.assertIn(artifact["material"]["id"], material_ids)
+
+        # And the bank in particular: a real question-bank material at the
+        # corpus's conventional path, carrying the house preamble above the
+        # section the model wrote. This is what `get_question_bank` over MCP
+        # and "quiz me on Phase 1" have to find, and before the mint a course
+        # built by the wizard had neither.
+        bank = next(m for m in manifest.materials if m.kind == "question-bank")
+        self.assertEqual(bank.path, f"interactive/{factory.BANK_REL}")
+        with open(os.path.join(root, "learning", bank.path),
+                  encoding="utf-8") as f:
+            text = f.read()
+        self.assertTrue(text.startswith("# "))
+        self.assertIn("recall, application and", text)
+        self.assertIn(scripted.BANK.splitlines()[0], text)
 
     def test_step_6_the_course_is_served_and_the_front_door_lists_it(self):
         # Registration is the pull path: nothing called into this process,

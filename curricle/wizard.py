@@ -1786,10 +1786,13 @@ PLAN_PARTS = (
 )
 
 # Why something in the plan is not bought, as a reason rather than a status.
-# "Skipped" reads as a thing that went wrong or got dropped; what actually
-# happened to the bank is that a bank section is appended to a question bank
-# and a brand-new course has none for it to be appended to.
-BANK_REASON = "not built for a new course"
+# "Skipped" reads as a thing that went wrong or got dropped.
+#
+# The bank used to have a reason of its own — "not built for a new course",
+# because a bank section is text appended to a question bank and a brand-new
+# course had none for it to be appended to. The build mints the bank now, so
+# that sentence describes nothing: an unbought bank is an unbought artifact
+# like any other, and it takes the ordinary words.
 UNPLANNED_REASON = "not part of this build"
 
 
@@ -1860,9 +1863,23 @@ def plan_items(plan: dict, manifest: Manifest | None) -> tuple[PlanItem, ...]:
                           "the checkpoint quiz",
                           "" if quiz else UNPLANNED_REASON, quiz, "quiz"))
     bank = bool(plan.get("bank"))
-    items.append(PlanItem(
-        "Question bank" + (" · a new section" if bank else ""),
-        "the question bank", "" if bank else BANK_REASON, bank, "bank"))
+    # What the bank purchase actually is depends on whether the course has
+    # one: a section appended to an existing bank, or the bank itself, minted
+    # at the corpus's conventional path because a course with none is exactly
+    # the course that needs one. The gate says which, since "a new section"
+    # over a course with no bank would name the wrong thing. With no manifest
+    # to ask there is no suffix — the build screen reads `name` and never
+    # this label, so a guess here would be a guess nobody needed.
+    if not bank:
+        bank_label = "Question bank"
+    elif manifest is None:
+        bank_label = "Question bank"
+    elif any(m.kind == "question-bank" for m in manifest.materials):
+        bank_label = "Question bank · a new section"
+    else:
+        bank_label = "Question bank · new, for this course"
+    items.append(PlanItem(bank_label, "the question bank",
+                          "" if bank else UNPLANNED_REASON, bank, "bank"))
     return tuple(items)
 
 

@@ -170,9 +170,15 @@ WORDING: dict[tuple[str, str], str] = {
     ("promote", "unknown_stage"):
         "The worker was handed a stage it doesn't know, so nothing was "
         "published. Your built course is safe; this one is worth reporting.",
+    # Two different moments wear this reason and the sentence has to be true
+    # of both: a worker that died partway through publishing, and one that
+    # found nothing to publish and stopped before starting. "Stopped while
+    # publishing" was false for the second — it says work was underway when
+    # none ever was — so the sentence names the outcome, which the two share,
+    # rather than the moment, which they do not.
     ("promote", "worker_error"):
-        "The worker stopped while publishing your course. Nothing partial "
-        "was left in place, so retrying is safe.",
+        "The worker stopped without publishing your course, and left nothing "
+        "partial behind. Retrying is safe.",
     ("promote", "interrupted"):
         "The worker was shut down while publishing your course, so the "
         "course was left unpublished and nothing partial was put in place. "

@@ -325,6 +325,24 @@ tree honest. Rejected: exemplar-free role variants — the calibration thesis
 says the exemplar *is* load-bearing; going without one on the highest-stakes
 build, the learner's first, is the wrong place to run that experiment.)
 
+One more change, for the same reason: **the question bank is minted, not
+skipped.** A bank section is text appended to a course's question bank, and
+a new course has none — so the section had nowhere to land, `promote` passed
+it over in silence, and the plan briefly stopped buying one at all to keep
+the gate honest about what it charged for. That traded the promise away:
+`get_question_bank` over MCP and "quiz me on Phase 1" both want a bank, and
+the courses that had none were exactly the ones this wizard builds. So a
+build against a bankless course writes the whole file —
+`interactive/quizzes/question-bank.md`, the corpus convention — with a house
+preamble above the generated section and a `question-bank` material
+registered at promotion. It is an ordinary file artifact from there on: it
+moves, it registers, and it re-promotes idempotently by the same code every
+other artifact uses. Phase 2 onward finds the material and appends, exactly
+as a course that always had one. (The preamble is written by curricle, not
+asked of the model: it documents the `N.M (R|A|W)` tagging that
+`validate_bank` enforces, and a model that reworded it would be documenting
+a format nothing keeps.)
+
 Build output lands in the draft tree's `interactive/.draft-p1/` with the
 existing checkpointing, resume-on-retry, budgets, and ledger rows.
 

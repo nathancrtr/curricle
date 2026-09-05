@@ -144,6 +144,12 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 - Role contracts live in `roles/*.md` (frontmatter + system prompt). The
   factory prompt = derived learner profile + manifest phase context +
   exemplars from the course's own earlier phases. Calibration is the point.
+- A course with no question bank gets one minted at
+  `interactive/quizzes/question-bank.md` (house preamble + the generated
+  section, registered as a `question-bank` material); a course that has one
+  gets a section appended. The append is the only step in `promote` that is
+  not a move, so it is guarded by its own text — it runs before the compile
+  gate, and a retry after a refused gate would otherwise append twice.
 - Outputs are refused, not reviewed: see the validators in `factory.py`.
   Generated exercise tests are executed against their stub — if they pass,
   the build fails. Drafts land in `interactive/.draft-pN/`; only

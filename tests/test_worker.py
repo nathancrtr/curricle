@@ -437,16 +437,16 @@ class OutlineStageTest(WorkerFixture):
 
         # The plan's keys are BuildSpec's field names, so the approved plan
         # reaches the build with nothing in between to mistranslate it. The
-        # bank is off because a brand-new course has no question bank for a
-        # section to be appended to — the plan does not name what promotion
-        # could not keep, and the estimate below is priced accordingly.
+        # bank is on, for a brand-new course with no question bank: the
+        # build mints one rather than skipping it, so the plan names it and
+        # the estimate below is priced with it in.
         plan = payload["plan"]
         self.assertEqual(
             factory.BuildSpec(**plan),
             factory.BuildSpec(
                 phase_id="p1", lesson_unit="u1", widget_unit="u2",
                 widget_concept="refusal over guessing",
-                exercise_unit="u2", quiz=True, bank=False))
+                exercise_unit="u2", quiz=True, bank=True))
         # Two numbers the gate can print and the approval row can carry:
         # what building this plan is expected to cost, and what these roles
         # have left to spend before one of them refuses. Both travel in the
@@ -457,19 +457,25 @@ class OutlineStageTest(WorkerFixture):
                 self.assertGreater(Decimal(payload[number]), 0)
                 self.assertRegex(payload[number], r"^\d+\.\d\d$")
         # This tenant has bought nothing on the build roles yet, so what is
-        # left of their budgets is the whole of them — and only theirs: the
-        # bank is off, so the bank author's budget is not in the figure.
-        # (What the number does when a tenant *has* spent is the next test;
-        # that is the whole point of it being headroom.)
+        # left of their budgets is the whole of them. The figure is summed
+        # over the roles the *plan* names, not over `PLAN_ROLES` — the two
+        # coincide on this course, which buys every artifact, and the day a
+        # plan drops one the headroom has to drop with it or it is a ceiling
+        # for a build nobody asked for. (What the number does when a tenant
+        # *has* spent is the next test; that is the point of it being
+        # headroom.)
         config = llm.load_models_config()
         planned = [role for key, role in factory.PLAN_ROLES if plan.get(key)]
+        self.assertEqual(sorted(planned),
+                         sorted(role for _, role in factory.PLAN_ROLES))
         self.assertEqual(
             Decimal(payload["headroom_usd"]),
             sum((config.budget_for_stage(role) for role in planned),
                 Decimal(0)))
-        self.assertLess(Decimal(payload["headroom_usd"]),
-                        sum((config.budget_for_stage(role)
-                             for _, role in factory.PLAN_ROLES), Decimal(0)))
+        self.assertEqual(
+            Decimal(payload["headroom_usd"]),
+            sum((config.budget_for_stage(role)
+                 for _, role in factory.PLAN_ROLES), Decimal(0)))
 
         # T1 where it matters: the stage was briefed with *this* tenant's two
         # folds, not with empty state that would have produced a generic
@@ -975,14 +981,15 @@ class BuildStageTest(WorkerFixture):
         progress = [pl["artifact"] for k, pl in self.ledger(self.tenant, self.COURSE)
                     if k == "build_progress"]
         self.assertEqual(progress, ["lesson", "widget", "exercise", "quiz", "bank"])
-        # The artifacts as the fold will read them: a path each, and the
-        # bank's own note, because a bank section is appended to somebody
-        # else's file rather than moved into place as one.
+        # The artifacts as the fold will read them: a path each, the bank
+        # included. This course carries no question bank, so the build minted
+        # one — a file, at the corpus's conventional path, which is what
+        # makes it a path here rather than the note a section travels under.
         self.assertIn("interactive/lessons/unit-01-lesson.md",
                       payload["artifacts"])
         self.assertIn("interactive/quizzes/phase-1-checkpoint.html",
                       payload["artifacts"])
-        self.assertIn("append to question bank", payload["artifacts"])
+        self.assertIn(f"interactive/{factory.BANK_REL}", payload["artifacts"])
         self.assertEqual(len(payload["artifacts"]), 5)
         self.assertEqual(sorted(payload["costs"]), BUILD_ROLES)
 
@@ -1165,7 +1172,7 @@ class BuildStageTest(WorkerFixture):
         self.assertEqual((second.status, second.reason), ("done", None))
         kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
         self.assertEqual((kind, payload["artifacts"]),
-                         ("build_ready", ["append to question bank"]))
+                         ("build_ready", [f"interactive/{factory.BANK_REL}"]))
         # The four kept artifacts were not bought again — the money, not the
         # files, is what the resume is for.
         self.assertEqual(self.token_rows().count("lesson-writer"), 1)
@@ -1438,18 +1445,29 @@ class PromoteStageTest(WorkerFixture):
     # ---- the refusals, and what each of them leaves behind ---------------
 
     def test_a_bank_section_with_nowhere_to_go_is_refused_not_dropped(self):
-        # The belt behind `default_build_plan`: a plan that buys a bank
-        # section for a course with no question bank is one nothing can now
-        # produce, and `factory.promote` would pass the section over in
-        # silence. Reached here by approving that plan by hand — the day a
-        # regression makes it reachable for real, the learner gets a refusal
-        # they can see rather than a loss nobody can.
+        # The belt, and nothing but the belt. A bank section with no
+        # `bank_target` is what `factory.promote` passes over in silence, and
+        # no route through the build produces one any more: a course with a
+        # question bank gets a section that has somewhere to go, and a course
+        # without one gets a bank minted as a file with a `rel_path`. So the
+        # checkpoint is written by hand here, which is the honest shape of
+        # the claim — the belt is for the day something upstream regresses,
+        # and a test that had to reach it through a working build would go
+        # green the moment the belt itself was deleted.
         self.APPROVAL = {"plan": dict(BUILD_PLAN, bank=True),
                          "estimate_usd": "1.40"}
         self.through_the_build()
-        self.assertIn("append to question bank",
-                      [a["rel_path"] or a["note"]
-                       for a in self.checkpoint["artifacts"]])
+        checkpoint_path = os.path.join(
+            self.draft_root(), "learning", "interactive",
+            f".draft-{worker.PHASE_ID}", "manifest.json")
+        with open(checkpoint_path, encoding="utf-8") as f:
+            build = json.load(f)
+        self.assertIsNone(build["bank_target"])
+        build["artifacts"].append({"rel_path": "", "material": {},
+                                   "note": "append to question bank"})
+        with open(checkpoint_path, "w", encoding="utf-8") as f:
+            json.dump(build, f)
+        self.checkpoint = build
         self.promote()
 
         row, = [r for r in self.runs(self.tenant) if r.stage == "promote"]

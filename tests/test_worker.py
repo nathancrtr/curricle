@@ -445,7 +445,7 @@ class OutlineStageTest(WorkerFixture):
             factory.BuildSpec(**plan),
             factory.BuildSpec(
                 phase_id="p1", lesson_unit="u1", widget_unit="u2",
-                widget_concept="The compiler refuses rather than guesses.",
+                widget_concept="refusal over guessing",
                 exercise_unit="u2", quiz=True, bank=False))
         # Two numbers the gate can print and the approval row can carry:
         # what building this plan is expected to cost, and what these roles

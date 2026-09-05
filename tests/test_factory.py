@@ -1009,7 +1009,7 @@ class BuildPlanTest(unittest.TestCase):
             self.manifest_for(GOOD_CURRICULUM, GOOD_SIDECAR))
         self.assertEqual(plan, {
             "phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
-            "widget_concept": "The compiler refuses rather than guesses.",
+            "widget_concept": "refusal over guessing",
             "exercise_unit": "u2", "quiz": True, "bank": False})
         # The keys are BuildSpec's fields: an approved plan reaches the build
         # with nothing in between to mistranslate it.
@@ -1051,6 +1051,24 @@ class BuildPlanTest(unittest.TestCase):
             files={"interactive/quizzes/question-bank.md":
                    "# Bank\n\n## Unit 1\nA question.\n"})
         self.assertTrue(factory.default_build_plan(manifest)["bank"])
+
+    def test_the_widget_concept_is_the_first_concept_never_the_gloss(self):
+        # Issue #64: the plan used to carry the widget unit's gloss as its
+        # concept, so the gate read the same sentence twice and the widget
+        # was briefed with a sentence about the unit rather than a thing to
+        # make manipulable. The Concepts row is the list of things.
+        manifest = self.manifest_for(GOOD_CURRICULUM, GOOD_SIDECAR)
+        u2 = next(u for u in manifest.units if u.id == "u2")
+        self.assertEqual(factory.widget_concept_for(u2), "refusal over guessing")
+        self.assertNotEqual(factory.widget_concept_for(u2), u2.gloss)
+        # A unit with no Concepts row plans no concept rather than the gloss.
+        u1 = next(u for u in manifest.units if u.id == "u1")
+        self.assertIsNone(factory.widget_concept_for(u1))
+        without = GOOD_CURRICULUM.replace(
+            "- **Concepts:** refusal over guessing; why every finding names a place.\n", "")
+        plan = factory.default_build_plan(self.manifest_for(without, GOOD_SIDECAR))
+        self.assertEqual(plan["widget_unit"], "u2")
+        self.assertIsNone(plan["widget_concept"])
 
     def test_one_unit_phase_gets_no_widget(self):
         curriculum = GOOD_CURRICULUM[:GOOD_CURRICULUM.index("### Unit 2")] + (

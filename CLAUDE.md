@@ -100,6 +100,14 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   or propose evidence, then `python -m curricle profile render --tenant
   you --out ~/.claude/skills/learner-profile/SKILL.md`. The hand-authored
   original is backed up beside it as `SKILL.md.pre-curricle`.
+- Every path that writes a profile event re-renders the projection, so
+  nobody has to remember to: `serve --profile-skill-out PATH` for the web
+  side, `--render-skill PATH` on `profile assert` and `profile import-seed`
+  for the CLI. Both are off unless named — where the path should live
+  persistently is onboarding-design.md §11's open question. All three
+  writers (and `render --out`) go through `profilerender.write_skill_md`,
+  which is atomic and 0600; a model reads this document, and a half-written
+  one is a lie told mid-sentence.
 - Evidence tiers come from provenance, never confidence: `attested` (the
   learner said it), `demonstrated` (course activity proved it), `thin`
   (claimed, uncorroborated). The agent proposes, the human publishes: only

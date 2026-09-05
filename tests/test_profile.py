@@ -1,12 +1,17 @@
 """The profile pipeline: evidence ledger, review discipline, projection."""
 
+import contextlib
+import io
 import os
 import re
+import tempfile
 import unittest
+from unittest import mock
 
 import yaml
 
 from curricle import db, profile
+from curricle.__main__ import main
 from curricle.profilerender import (render_profile_page, render_skill_md,
                                     skill_parts)
 
@@ -346,3 +351,114 @@ class CheckpointEvidenceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CliProjectionHookTest(unittest.TestCase):
+    """`--render-skill` on the CLI verbs that move the fold's claims.
+
+    Design §4 Stop 5 promises the projection re-render happens "for everyone,
+    wizard or CLI". It landed serve-process-only, so `profile assert` and
+    `profile import-seed` changed the ledger and left an installed SKILL.md
+    saying something the ledger no longer said — stale until the next
+    web-side profile write, with nothing on either end announcing the skew.
+
+    Everything here goes through `main` rather than a helper, because the
+    claim is about what `python -m curricle profile …` does; a test of an
+    extracted function would keep passing if the dispatch stopped calling it.
+    The target is a temp path in every case, for the reason the serve-side
+    hook's tests give: the real `~/.claude/skills/learner-profile/SKILL.md`
+    is a person's own file.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = test_engine()
+        cls.slug = "cli-hook"
+        with cls.engine.begin() as conn:
+            db.create_tenant(conn, cls.slug)
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="curricle-cli-skill-")
+        self.addCleanup(self.tmp.cleanup)
+        self.out = os.path.join(self.tmp.name, "SKILL.md")
+
+    def run_cli(self, *argv) -> str:
+        """`main(argv)` against the test cluster, returning what it printed."""
+        buf = io.StringIO()
+        with mock.patch("curricle.db.make_engine", return_value=self.engine), \
+             contextlib.redirect_stdout(buf):
+            code = main(["profile", *argv, "--tenant", self.slug])
+        self.assertEqual(code, 0, buf.getvalue())
+        return buf.getvalue()
+
+    def installed(self) -> str:
+        with open(self.out, encoding="utf-8") as f:
+            return f.read()
+
+    def test_assert_renders_the_claim_it_just_wrote(self):
+        out = self.run_cli("assert", "--field", "pacing", "--key", "cli-pacing",
+                           "--text", "four hours a week, two evenings",
+                           "--render-skill", self.out)
+        self.assertIn("asserted pacing/cli-pacing", out)
+        self.assertIn(self.out, out)
+        # The claim from *this* invocation, which is the whole point: the
+        # fold is re-read after the commit, so the projection is of the
+        # ledger including the row just written and not the one before it.
+        self.assertIn("four hours a week, two evenings", self.installed())
+
+    def test_import_seed_renders_every_claim_it_wrote(self):
+        seed = os.path.join(self.tmp.name, "seed.yaml")
+        with open(seed, "w", encoding="utf-8") as f:
+            yaml.safe_dump({"claims": SEED}, f)
+        self.run_cli("import-seed", seed, "--render-skill", self.out)
+        installed = self.installed()
+        for claim in SEED:
+            with self.subTest(claim=claim["key"]):
+                self.assertIn(claim["text"].replace("**", ""),
+                              installed.replace("**", ""))
+
+    def test_the_projection_is_written_whole_and_leaves_no_debris(self):
+        """`write_skill_md`, not an open-and-write.
+
+        The CLI used to write `render --out` itself, non-atomically and at
+        whatever the umask gave. Both verbs and the render go through the one
+        writer now, so all three are a complete document or the previous one,
+        and none of them leaves a half-written file for a model to read.
+        """
+        self.run_cli("assert", "--field", "style", "--key", "cli-style",
+                     "--text", "learns by implementing",
+                     "--render-skill", self.out)
+        installed = self.installed()
+        self.assertTrue(installed.startswith("---\nname: learner-profile"))
+        self.assertTrue(installed.rstrip().endswith("re-render.*"))
+        self.assertEqual(sorted(os.listdir(self.tmp.name)), ["SKILL.md"])
+        self.assertEqual(os.stat(self.out).st_mode & 0o777, 0o600)
+
+    def test_render_out_goes_through_the_same_writer(self):
+        """The issue-sanctioned asymmetry, closed.
+
+        `render --out` wrote non-atomically at umask permissions while every
+        other caller of the projection went through `write_skill_md`. Same
+        document, same reader, same hazard — so now, the same writer.
+        """
+        self.run_cli("assert", "--field", "style", "--key", "cli-style-2",
+                     "--text", "learns by implementing")
+        out = os.path.join(self.tmp.name, "nested", "deep", "SKILL.md")
+        printed = self.run_cli("render", "--out", out)
+        self.assertIn(out, printed)
+        # The directory is made, the same way the hook makes one.
+        with open(out, encoding="utf-8") as f:
+            self.assertIn("learns by implementing", f.read())
+        self.assertEqual(os.stat(out).st_mode & 0o777, 0o600)
+        self.assertEqual(os.listdir(os.path.dirname(out)), ["SKILL.md"])
+
+    def test_the_flag_is_off_by_default(self):
+        """No path, no file. The verbs still write the ledger."""
+        self.run_cli("assert", "--field", "pacing", "--key", "cli-quiet",
+                     "--text", "a quiet claim")
+        self.assertEqual(os.listdir(self.tmp.name), [])
+        self.assertIn("a quiet claim", self.run_cli("render"))
+
+    def test_the_target_is_a_temp_path_and_never_the_real_skill_file(self):
+        self.assertTrue(self.out.startswith(tempfile.gettempdir()))
+        self.assertFalse(self.out.startswith(os.path.expanduser("~/.claude")))

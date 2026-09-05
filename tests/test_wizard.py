@@ -2946,6 +2946,13 @@ class ReviewScreenTest(WizardFixture):
     def test_the_projection_is_the_page(self):
         self.satisfy_the_gate()
         page = self.screen("?screen=review")
+        # The sentence, spelled out. `assertIn(wizard.REVIEW_CAPTION, page)`
+        # is the constant compared with a page built from the constant: it
+        # holds for any rewording, including one that stopped saying the
+        # thing design §4 requires this caption to say — that the document
+        # on the screen is the one the model gets, not a summary of it.
+        self.assertIn("This exact document rides along on every model call "
+                      "that builds your course.", page)
         self.assertIn(wizard.REVIEW_CAPTION, page)
         # The exact document, not a second rendering of the same claims: what
         # is on the screen is `render_skill_md` and the escaping, and nothing
@@ -3096,10 +3103,20 @@ class ProjectionHookTest(unittest.TestCase):
             self.client.post(f"/onboarding/profile/{number}", data=boxes,
                              follow_redirects=False)
         before = self.installed()
+        # Identical content is exactly why the content cannot be the witness:
+        # a publish route that called no hook at all would leave the file
+        # equal to `before` and pass. The inode can tell the difference,
+        # because `write_skill_md` renames a fresh temp file over the target
+        # rather than truncating it — so a write that happened is a file that
+        # is not the same file, whatever it says. (mtime alone would not do:
+        # two writes inside one clock tick can share a timestamp.)
+        inode_before = os.stat(self.out).st_ino
         published = self.client.post("/onboarding/profile/publish",
                                      follow_redirects=False)
         self.assertEqual(published.status_code, 303, published.text)
         self.assertEqual(self.installed(), before)
+        self.assertNotEqual(os.stat(self.out).st_ino, inode_before,
+                            "publishing did not re-render the projection")
         self.assertEqual(os.listdir(self.tmp.name), ["SKILL.md"])
 
 

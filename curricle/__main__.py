@@ -135,6 +135,19 @@ def main(argv: list[str] | None = None) -> int:
     pa.add_argument("--text", required=True)
     pa.add_argument("--tier", default="attested")
     pa.add_argument("--source")
+    # The projection hook, for the two verbs that move the fold's claims.
+    # Stop 5 of the design promises the re-render happens "for everyone,
+    # wizard or CLI", and it landed serve-process-only: these two verbs
+    # changed the ledger and left an installed SKILL.md stale until the next
+    # web-side profile write. Where the path should live persistently is
+    # still §11's open question, so this matches `serve --profile-skill-out`
+    # — named per invocation, off when it is not named — rather than
+    # inventing a home for it.
+    for sub_parser in (pi, pa):
+        sub_parser.add_argument(
+            "--render-skill", metavar="PATH",
+            help="re-render the learner-profile SKILL.md projection here "
+                 "after the write (default: off)")
 
     f = sub.add_parser("factory", help="the course factory (metered LLM jobs)")
     fsub = f.add_subparsers(dest="factory_command", required=True)
@@ -266,7 +279,7 @@ def _tenant(args) -> int:
 
 
 def _profile(args) -> int:
-    from . import db, profile
+    from . import db, profile, profilerender
 
     engine = db.make_engine()
     with engine.begin() as conn:
@@ -276,17 +289,30 @@ def _profile(args) -> int:
             with open(args.seed, encoding="utf-8") as f:
                 seed = yaml.safe_load(f)
             n = profile.import_seed(conn, scope, seed["claims"])
-            print(f"asserted {n} claim(s) for tenant {args.tenant!r}")
-            return 0
-
-        if args.profile_command == "assert":
+            wrote = f"asserted {n} claim(s) for tenant {args.tenant!r}"
+        elif args.profile_command == "assert":
             profile.append_profile_event(
                 conn, scope, "assert", args.field, args.key,
                 {"text": args.text, "tier": args.tier, "source": args.source})
-            print(f"asserted {args.field}/{args.key}")
-            return 0
+            wrote = f"asserted {args.field}/{args.key}"
+        else:
+            wrote = None
+            state = profile.load_profile(conn, scope)
 
-        state = profile.load_profile(conn, scope)
+    if wrote is not None:
+        print(wrote)
+        # After the commit, never inside it — the serve-side hook's rule
+        # (webapp.render_projection), for the same reason: a file written
+        # beside an uncommitted row is a projection of a ledger that might
+        # yet roll back. The fold is re-read rather than carried out of the
+        # writing transaction, which held the profile as it was before its
+        # own rows.
+        if args.render_skill:
+            with engine.begin() as conn:
+                state = profile.load_profile(conn, scope)
+            profilerender.write_skill_md(state, args.render_skill)
+            print(f"rendered {args.render_skill}")
+        return 0
 
     if args.profile_command == "show":
         for field in profile.FIELDS:
@@ -303,15 +329,17 @@ def _profile(args) -> int:
         return 0
 
     if args.profile_command == "render":
-        from .profilerender import render_skill_md
-        text = render_skill_md(state)
         if args.out:
-            ensure_out_dir(args.out)
-            with open(args.out, "w", encoding="utf-8") as f:
-                f.write(text)
+            # `write_skill_md`, not an open-and-write: it is the one writer
+            # every other caller of the projection goes through, and it is
+            # atomic and 0600 where this used to be neither. A model reads
+            # this document, and a half-written one is a lie told in the
+            # middle of a sentence — which was as true of the verb a person
+            # runs by hand as of the hook that fires behind them.
+            profilerender.write_skill_md(state, args.out)
             print(f"wrote {args.out}")
         else:
-            print(text)
+            print(profilerender.render_skill_md(state))
         return 0
     return 1
 

@@ -1172,11 +1172,15 @@ class BuildPhaseTest(unittest.TestCase):
                 f.write(shell)
             spec = factory.BuildSpec(phase_id="p2", exercise_unit="u3",
                                      quiz=True, bank=False)
+            landed: list[str] = []
             report = factory.build_phase(
                 runner, self.manifest, profile.ProfileState(),
-                content_root, spec)
+                content_root, spec, progress=landed.append)
             roles = {a.role for a in report.artifacts}
             self.assertEqual(roles, {"quiz-author", "exercise-author"})
+            # Reported as each one is checkpointed, in writing order, and
+            # only the ones this spec bought.
+            self.assertEqual(landed, ["exercise", "quiz"])
             quiz_path = os.path.join(
                 report.draft_dir, "quizzes/phase-2-checkpoint.html")
             self.assertTrue(os.path.exists(quiz_path))

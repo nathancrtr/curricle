@@ -969,6 +969,12 @@ class BuildStageTest(WorkerFixture):
                          ("build", "done", None))
         kind, payload = self.ledger(self.tenant, self.COURSE)[-1]
         self.assertEqual(kind, "build_ready")
+        # Each artifact reported the moment it was checkpointed, in the
+        # order the factory writes them, before the outcome row: the count
+        # the build screen draws stones from (issue #59).
+        progress = [pl["artifact"] for k, pl in self.ledger(self.tenant, self.COURSE)
+                    if k == "build_progress"]
+        self.assertEqual(progress, ["lesson", "widget", "exercise", "quiz", "bank"])
         # The artifacts as the fold will read them: a path each, and the
         # bank's own note, because a bank section is appended to somebody
         # else's file rather than moved into place as one.

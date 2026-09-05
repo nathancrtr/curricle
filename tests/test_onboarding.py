@@ -78,6 +78,16 @@ class OnboardingLedgerTest(unittest.TestCase):
         self.assertEqual(kinds, ["promote_requested"])
         self.assertIn("promote_requested", db.ONBOARDING_EVENT_KINDS)
 
+    def test_the_progress_kind_migration_0006_adds_is_accepted(self):
+        scope = db.for_tenant(self.b)
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, scope, "build_progress",
+                                    "progress-course", {"artifact": "lesson"})
+            kinds = [r.kind for r in conn.execute(scope.onboarding_select())
+                     if r.course == "progress-course"]
+        self.assertEqual(kinds, ["build_progress"])
+        self.assertIn("build_progress", db.ONBOARDING_EVENT_KINDS)
+
     def test_unknown_kind_is_refused_by_the_database_too(self):
         # The CHECK constraint holds even if application validation is bypassed.
         with self.engine.connect() as conn:
@@ -398,6 +408,35 @@ class FoldTest(unittest.TestCase):
         self.assertFalse(onboarding.HUMAN_STAGES & onboarding.WORKER_STAGES)
 
 
+class LandedTest(unittest.TestCase):
+    """What the build has landed is a fold over progress rows (issue #59):
+    it accumulates, it survives a failure and the retry that resumes, and
+    a fresh approval — a fresh plan — starts it over."""
+
+    def flow(self, *rows):
+        return onboarding.fold(rows).flows["greek-101"]
+
+    def test_progress_rows_accumulate_in_order_without_repeats(self):
+        f = self.flow(ev("outline_approved", payload={"estimate_usd": "1"}),
+                      ev("build_requested"),
+                      ev("build_progress", payload={"artifact": "lesson"}),
+                      ev("build_progress", payload={"artifact": "widget"}),
+                      ev("build_progress", payload={"artifact": "lesson"}))
+        self.assertEqual(f.landed, ("lesson", "widget"))
+        self.assertEqual((f.stage, f.status), ("build", "pending"))
+
+    def test_a_retry_keeps_what_landed_and_an_approval_resets_it(self):
+        rows = [ev("outline_approved", payload={"estimate_usd": "1"}),
+                ev("build_requested"),
+                ev("build_progress", payload={"artifact": "lesson"}),
+                ev("build_failed", payload={"reason": "validation_failed"})]
+        self.assertEqual(self.flow(*rows).landed, ("lesson",))
+        rows.append(ev("build_requested"))                    # the retry
+        self.assertEqual(self.flow(*rows).landed, ("lesson",))
+        rows.append(ev("outline_approved", payload={"estimate_usd": "2"}))
+        self.assertEqual(self.flow(*rows).landed, ())
+
+
 class ValidateEventTest(unittest.TestCase):
     """Refuse, don't guess: no defaulting a missing reason to worker_error."""
 
@@ -434,6 +473,14 @@ class ValidateEventTest(unittest.TestCase):
         self.refuses("outline_rejected", "greek-101", {})
         onboarding.validate_event("outline_approved", "greek-101",
                                   {"estimate_usd": "4.20"})
+
+    def test_build_progress_names_an_artifact_from_the_vocabulary(self):
+        onboarding.validate_event("build_progress", "greek-101",
+                                  {"artifact": "quiz"})
+        for payload in ({}, {"artifact": "poem"}, {"artifact": None}):
+            with self.subTest(payload=payload), \
+                    self.assertRaises(onboarding.InvalidOnboardingEvent):
+                onboarding.validate_event("build_progress", "greek-101", payload)
 
     def test_promoted_names_the_course_it_made(self):
         self.refuses("promoted", "greek-101", {})

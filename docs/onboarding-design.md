@@ -350,7 +350,11 @@ A new tenant-scoped `onboarding_events` table (migration 0004), append-only,
 same discipline as the other two ledgers: `profile_published`,
 `scope_saved`, `outline_requested / outline_ready / outline_failed{reason}`,
 `outline_approved{estimate} / outline_rejected{note}`, `build_requested /
-build_ready / build_failed{reason}`, `promoted{course_id}`. A pure fold
+build_progress{artifact} / build_ready / build_failed{reason}`,
+`promoted{course_id}`. (`build_progress` arrived with migration 0006: one
+row per artifact as the build lands it — a count the worker holds, so a
+fact for the ledger and a stone on the build screen; the elapsed-never-
+forecast rule forbids estimates, not counts of finished things.) A pure fold
 (`onboarding.fold`) orders by row id and yields the current stop; the wizard
 route renders whatever the fold says. Stage classification follows
 job-radar's vocabulary:

@@ -192,19 +192,21 @@ def write_skill_md(state: ProfileState, out_path: str) -> None:
 # ---------------------------------------------------------------------------
 
 _FIELD_TITLES = {
-    "meta": "Skill description", "background": "Professional background",
+    "meta": "Who this profile is for", "background": "Professional background",
     "education": "Formal education", "tracks": "Prior tracks",
     "style": "Learning style", "domain_bias": "Domain preferences",
-    "pacing": "Pacing", "calibration": "Calibrating responses",
+    "pacing": "Pacing", "calibration": "How to explain things",
     "skip": "What to skip", "scaffold": "What to scaffold",
     "subject_adapters": "Adapting to subjects",
     "demonstrated": "Demonstrated in course work",
 }
 
 _STYLE = theme.style("""\
-  .wrap { max-width:840px; margin:0 auto; padding:0 24px 90px; }
+  /* 760 and a 34px h1, like the wizard and the front door (F17): the
+     three pages a new learner walks in a row used to be three widths. */
+  .wrap { max-width:760px; margin:0 auto; padding:0 24px 90px; }
   .masthead { padding:40px 0 10px; }
-  h1 { font-weight:700; font-size:clamp(28px,5vw,38px); letter-spacing:-.01em;
+  h1 { font-weight:700; font-size:clamp(26px,5vw,34px); letter-spacing:-.01em;
        margin:14px 0 0; }
   .lede { margin:12px 0 0; color:var(--muted); font-size:16px;
           max-width:var(--measure); }

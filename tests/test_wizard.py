@@ -2243,7 +2243,7 @@ class ClaimLabelTest(WizardFixture):
                      'aria-label="Professional background, add a claim"',
                      'aria-label="Formal education, add a claim"',
                      'aria-label="Prior courses and tracks, add a claim"',
-                     'aria-label="Skill description"'):
+                     'aria-label="Who this profile is for"'):
             with self.subTest(name=name):
                 self.assertEqual(page.count(name), 1)
 
@@ -2256,14 +2256,17 @@ class ClaimLabelTest(WizardFixture):
         self.assertIn('<span class="claimkey">Add a claim</span>', page)
         self.assertIn("<summary>For example</summary>", page)
         # Placement is the whole finding: each rule has to sit by the box it
-        # is true of, or the two sentences have simply swapped the lie. Three
-        # hints around two controls became two — everything the first one
-        # describes is above it, and the box it is not about is below it.
-        saved_rule = page.index("Each box is one claim: edit it to change "
-                                "it, empty it to delete it, and line breaks "
-                                "stay inside it.")
-        self.assertLess(page.index('name="claim__background__'), saved_rule)
-        self.assertLess(saved_rule, page.index('name="new__background"'))
+        # is true of, or the two sentences have simply swapped the lie. The
+        # saved-box rule sits above the saved boxes and says "below", so the
+        # Add box directly under the last saved one cannot be mistaken for
+        # its subject (F14); the Add box keeps its own rule under itself.
+        saved_rule = page.index("Each box below is one claim: edit it to "
+                                "change it, empty it to delete it, and line "
+                                "breaks stay inside it.")
+        self.assertLess(page.index('class="explain"'), saved_rule)
+        self.assertLess(saved_rule, page.index('name="claim__background__'))
+        self.assertLess(page.index('name="claim__background__'),
+                        page.index('name="new__background"'))
         self.assertLess(page.index('name="new__background"'),
                         page.index("Each line becomes its own claim."))
         self.assertEqual(page.count('class="hint"'), 5)   # 4 fields + meta

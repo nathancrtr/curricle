@@ -455,6 +455,38 @@ grey-and-orange. Specifically:
 - **The stone-contrast exception is retired**: lit stones moved from
   `--accent` to `--accent-strong`, 3.48/3.81 vs unlit (see the contrast
   section). This propagates to every waypath — wordmark, front door, meters.
+- **The curriculum answers "where am I" too** (issue #15, the fresh-eyes
+  review's highest-impact recommendation). The hub answered resuming three
+  ways and the curriculum — the page the Continue pill lands on, and the
+  page a learner works in for two years — marked nothing: `nextId` fed the
+  meter's ring and nothing below it, so past the meter every undone entry
+  looked identical. Arriving by deep link papered over that; arriving by
+  bookmark or back button did not. The hub's hot treatment is ported
+  verbatim — the worded `next` chip and the accent ring, on the hub's own
+  `-10px / 8.5px` arithmetic, so the two are one object and the hot entry's
+  number gutter still lands on every other entry's vertical. This invents
+  nothing; it serves the primary arrival state on the primary surface in
+  vocabulary the system already owns.
+  - **The mark goes on the first undone *entry*, not the first undone id.**
+    The path counts steps and the list shows entries, and a stepped unit is
+    one entry standing for several stones. `isDone` already knows the
+    difference, so `ALL.find(e => !isDone(e))` is the whole rule — and it is
+    always the entry that owns `nextId`, which is what lets the ring point
+    at it.
+  - **`--accent`, not `--accent-strong`.** The hub needs the stronger token
+    for a row that is both a milestone and next, where the ring lands on the
+    `--good-soft` fill (`CONTRAST_PAIRS` carries that pairing). A curriculum
+    milestone carries no fill — its green is the flag in the gutter and the
+    done-highlight behind a gloss, which by definition is not drawn on the
+    row that is next — so the ring is always on the ground and the ordinary
+    token clears it. Copying the exception would have guarded nothing.
+  - **The meter's ring is the link.** `theme.waypath` gained an optional
+    `hrefFor`, and the here-stone becomes an `<a>` when a surface can say
+    where "here" is; everywhere else it stays a span and nothing changes.
+    `openHash` was already the receiver. The stones now carry their own
+    `aria-hidden` rather than relying on the container's, because a
+    focusable link inside an `aria-hidden` subtree is an element a keyboard
+    user can reach and a screen-reader user cannot.
 
 **The payload is untouched.** The `PHASES`/`TRACKS` payload shape, storage
 keys, checkable ids, and progress-id pins are exactly as before; only the DOM

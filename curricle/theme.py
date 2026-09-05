@@ -321,15 +321,43 @@ WORDMARK = ('<svg width="32" height="10" viewBox="0 0 32 10" aria-hidden="true">
 # should feel settled, not showy).
 #
 # Keep this string `%`-free: it lands inside a `SCRIPT % {...}` template.
+# `hrefFor` is optional and turns the here-stone into a link. The ring is
+# the drawing of "you are here", and on a surface that can say where here
+# *is* — the curriculum, whose entries are on the same page — the mark a
+# reader's eye already goes to should be the thing that takes them there.
+# Everywhere else it stays a span and nothing changes.
+#
+# The stones carry their own `aria-hidden` rather than relying on the
+# container's, because a focusable link inside an `aria-hidden` subtree is
+# an element keyboard users can reach and screen-reader users cannot: the
+# path is a picture of what the count beside it says in words, so the stones
+# are hidden one by one and the one that navigates is left exposed. Callers
+# with no `hrefFor` may keep hiding the whole container; the per-stone
+# attribute is harmless underneath it.
+#
+# Returns the here-stone, so a caller that made it a link can name it.
 WAYPATH_JS = """\
-function waypath(el, ids, done, nextId) {
+function waypath(el, ids, done, nextId, hrefFor) {
   const had = el._wp || null;
   el._wp = {};
+  let here = null;
   ids.forEach((id, i) => {
+    const href = id === nextId && hrefFor ? hrefFor(id) : null;
+    const tag = href ? "a" : "span";
     let s = el.children[i];
-    if (!s) { s = document.createElement("span"); el.appendChild(s); }
+    // Replaced rather than reused when the tag has to change: the here-stone
+    // moves every time something is marked done, so the anchor and the span
+    // trade places over the life of the page.
+    if (!s || s.tagName.toLowerCase() !== tag) {
+      const fresh = document.createElement(tag);
+      if (s) el.replaceChild(fresh, s); else el.appendChild(fresh);
+      s = fresh;
+    }
     const lit = !!done(id);
     s.className = "wp-stone" + (lit ? " lit" : "") + (id === nextId ? " here" : "");
+    if (href) { s.href = href; s.removeAttribute("aria-hidden"); }
+    else s.setAttribute("aria-hidden", "true");
+    if (id === nextId) here = s;
     if (had && had[id] === false && lit) {
       s.classList.add("pop");
       s.addEventListener("animationend", () => s.classList.remove("pop"), { once: true });
@@ -337,6 +365,7 @@ function waypath(el, ids, done, nextId) {
     el._wp[id] = lit;
   });
   while (el.children.length > ids.length) el.lastChild.remove();
+  return here;
 }
 """
 

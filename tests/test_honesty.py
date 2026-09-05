@@ -274,6 +274,83 @@ class TestTheMilestoneGutter(unittest.TestCase):
                       js_function_body(self.page, "openEntry"))
 
 
+class TestTheCurriculumSaysWhereYouAre(unittest.TestCase):
+    """"You are here", on the page a learner works in for two years.
+
+    The hub answers *resuming* three ways — the ring stone, the raised next
+    row, the Continue pill. The curriculum, which is the page that pill lands
+    on, marked nothing: `nextId` fed the meter's ring and nothing below it,
+    so past the meter every undone entry looked identical. Arriving by deep
+    link papered over it; arriving by bookmark or back button did not.
+
+    Two things are pinned here. The mark goes on the first undone *entry*,
+    which is not the first undone progress id — the path counts steps and a
+    stepped unit is one entry standing for several stones. And the meter's
+    ring is a link to it, which is the reason `waypath` learned to take an
+    `hrefFor` at all.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.page = render_curriculum(make_manifest())
+        cls.meter = js_function_body(cls.page, "updateMeter")
+
+    def test_the_hot_entry_is_the_first_undone_entry_not_the_first_undone_id(self):
+        # `isDone` is what knows the difference: a stepped unit is done only
+        # when every step under it is. Selecting on `progress[nextId]` would
+        # put the ring on nothing for the whole of a stepped unit, because
+        # `nextId` there is a step id and no entry carries it.
+        self.assertIn("ALL.find(e => !isDone(e))", self.meter)
+
+    def test_exactly_one_entry_is_marked_and_the_rest_are_cleared(self):
+        # `toggle(name, cond)` over *every* entry, not `add` on one: the hot
+        # entry moves as things are marked done, and a mark that is only ever
+        # added leaves a trail of rings behind it.
+        self.assertRegex(
+            self.meter,
+            r'querySelectorAll\("\.entry"\)\.forEach\(\s*entry =>\s*'
+            r'entry\.classList\.toggle\("next",')
+
+    def test_the_treatment_is_the_hubs_worded_chip_and_accent_ring(self):
+        # The chip is worded, and it is in the page for every entry with CSS
+        # deciding which one shows it — the hub's own arrangement, and the
+        # reason the moving mark needs no DOM surgery.
+        self.assertIn('class="chip acc next-flag">next</span>', self.page)
+        self.assertIn(".title .next-flag { display:none; }", self.page)
+        self.assertIn(".entry.next .title .next-flag { display:inline-block; }",
+                      self.page)
+        self.assertIn("border:1.5px solid var(--accent)", self.page)
+
+    def test_the_ring_is_bled_by_exactly_what_it_adds(self):
+        # 8.5px of padding plus a 1.5px border against a -10px margin, which
+        # is the hub's own arithmetic: the hot entry's gutter has to land on
+        # the same vertical as every other entry's, or the mark arriving
+        # shunts the text sideways.
+        self.assertIn("margin:0 -10px; padding:0 8.5px;", self.page)
+
+    def test_the_meters_ring_links_to_the_entry_it_marks(self):
+        self.assertIn('"#u-" + encodeURIComponent(hot.id)', self.meter)
+        # `openHash` is already the receiver: it resolves an entry id or a
+        # step id, opens the entry and scrolls it in. The link is an address
+        # on this page rather than a scroll handler, so it lands in the
+        # status bar on hover and opens in a new tab if somebody asks.
+        self.assertIn('location.hash.match(/^#u-(.+)$/)',
+                      js_function_body(self.page, "openHash"))
+
+    def test_the_link_is_named_by_setting_never_by_interpolating(self):
+        # An entry title reaches the page as markup and an attribute as
+        # text. This is the attribute path.
+        self.assertIn('stone.setAttribute("aria-label"', self.meter)
+
+    def test_the_path_is_no_longer_hidden_wholesale_from_assistive_tech(self):
+        # A focusable link inside an `aria-hidden` subtree is an element a
+        # keyboard user can reach and a screen-reader user cannot. The
+        # decorative stones hide themselves one by one instead.
+        self.assertIn('<div class="waypath" id="ticks"></div>', self.page)
+        self.assertNotIn('id="ticks" aria-hidden', self.page)
+        self.assertIn('s.setAttribute("aria-hidden", "true")', self.page)
+
+
 class TestTheNotInHandFilterOnlyHidesWhatItShould(unittest.TestCase):
     """`classList.toggle(name, undefined)` toggles rather than sets — DOM spec.
 

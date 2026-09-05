@@ -118,6 +118,10 @@ REFUSALS = (RuntimeError, SchemaError)
 # The front door
 # --------------------------------------------------------------------------
 
+# The platform documents the app serves at /docs/<name>, and the page title
+# each gets. A name not in here is a 404 whatever is on disk.
+PLATFORM_DOCS = {"mcp-config.md": "Connecting the tutor"}
+
 INDEX_STYLE = theme.style("""\
   .wrap { max-width:760px; margin:0 auto; padding:48px 24px 80px; }
   .topbar { display:flex; align-items:center; gap:12px; margin:0 0 44px; }
@@ -509,6 +513,24 @@ def create_app(course_roots: list[str], tenant_slug: str,
             raise HTTPException(422, str(exc))
         render_projection(state)
         return JSONResponse({"ok": True, "pending": len(state.pending)})
+
+    # Platform documents: the checkout's own docs/, served through the
+    # themed reader from a short allowlist. Not the `repo/` route — that one
+    # is manifest-blessed per course by design — and not "whatever is under
+    # docs/": a page the landing card links to on a browser-only flow has
+    # to exist, and the list is how that is known (issue #60).
+    @app.get("/docs/{name}", response_class=HTMLResponse)
+    def platform_doc(name: str) -> str:
+        title = PLATFORM_DOCS.get(name)
+        if title is None:
+            raise HTTPException(404)
+        target = os.path.join(coursehome.checkout_home(), "docs", name)
+        if not os.path.isfile(target):
+            raise HTTPException(404)
+        with open(target, encoding="utf-8") as f:
+            text = f.read()
+        return render_reader(None, text, doc_title=title, depth=1,
+                             doc_dir="", platform_doc=f"docs/{name}")
 
     @app.get("/c/{slug}/")
     def course_root(slug: str) -> RedirectResponse:

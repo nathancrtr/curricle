@@ -128,8 +128,8 @@ class RefResolver:
     nearest thing instead of a dead route.
     """
 
-    mf: Manifest
-    to_root: str = ""
+    mf: Manifest | None          # None for a platform document: no course
+    to_root: str = ""            # to resolve against, every ref degrades
     served: bool = True
     doc_dir: str = ""     # content-root-relative directory of the document
                           # being rendered, for its relative assets (images)
@@ -193,7 +193,7 @@ class RefResolver:
         renderer was handed content the compiler never blessed; degrading
         to plain text beats emitting a dead link."""
         ref = split_ref(href)
-        if ref is None:
+        if ref is None or self.mf is None:
             return None
         scheme, target = ref
         if scheme == "res":

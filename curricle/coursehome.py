@@ -33,6 +33,17 @@ import re
 
 ENV_DIR = "CURRICLE_COURSES_DIR"
 
+# The checkout root — where models.yaml, roles/ and docs/ live. Resolved per
+# call (`CURRICLE_HOME` may be set late); `llm.home()` is this by another
+# name, kept there because that is where the factory's callers look. It
+# lives here so the web app can find the platform docs without importing
+# the model runner (L1).
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def checkout_home() -> str:
+    return os.environ.get("CURRICLE_HOME") or REPO_ROOT
+
 # The two places a course keeps its sidecar, in the order load_course looks:
 # `learning/course.yaml` by convention, `course.yaml` for courses whose
 # content lives at the repo root.

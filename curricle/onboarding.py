@@ -79,9 +79,17 @@ WORDING: dict[tuple[str, str], str] = {
         "Nothing partial was kept, so retrying is safe — and a draft that "
         "does come back can be sent round again with a note asking for "
         "something narrower.",
+    # "Start it again from the scope screen" was a route out of a stop that
+    # has no such door: by the time this stage can fail, the fold has closed
+    # the scope stop and the only affordance on the screen is the retry
+    # button. It is also one of the cross product's "can't happen today"
+    # rows — nothing in the outline stage asks for an approval, because the
+    # outline is the thing being approved — so it is worded like the others
+    # of that kind: what to press, and that arriving here at all is odd.
     ("outline", "unapproved"):
-        "The outline build ran without an approval on file and stopped "
-        "before spending anything. Start it again from the scope screen.",
+        "The outline build stopped looking for an approval that a drafting "
+        "stage should never need, and spent nothing. Retrying is safe, but "
+        "this one is a bug worth reporting.",
     ("outline", "unknown_stage"):
         "The worker was handed a stage it doesn't know, so the outline never "
         "started. Nothing was spent; this one is a bug worth reporting.",

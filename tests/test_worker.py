@@ -95,7 +95,7 @@ RUN_NOTE = "Start from the lexer, not from grammars."
 BUILD_PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
               "widget_concept": "The compiler refuses rather than guesses.",
               "exercise_unit": "u1", "quiz": True, "bank": True}
-APPROVAL = {"plan": BUILD_PLAN, "estimate_usd": "1.37"}
+APPROVAL = {"plan": BUILD_PLAN, "estimate_usd": "1.40"}
 
 # The five roles a full phase-1 build buys, in the order build_phase runs
 # them — the L2 assertion's expected value, read off the token ledger.
@@ -946,7 +946,7 @@ class BuildStageTest(WorkerFixture):
         self.at_the_gate(approved=False)
         with self.engine.begin() as conn:
             onboarding.append_event(conn, self.scope, "outline_approved",
-                                    self.COURSE, {"estimate_usd": "1.37"})
+                                    self.COURSE, {"estimate_usd": "1.40"})
         self.enqueue(self.tenant, self.COURSE, "build")
         with self.no_runner():
             self.assertTrue(worker.run_once(self.engine))
@@ -1254,7 +1254,7 @@ class PromoteStageTest(WorkerFixture):
     # has no question bank to append it to — so the phase's artifacts are
     # four files, every one of which promotion has to move somewhere.
     PLAN = dict(BUILD_PLAN, bank=False)
-    APPROVAL = {"plan": PLAN, "estimate_usd": "1.37"}
+    APPROVAL = {"plan": PLAN, "estimate_usd": "1.40"}
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="curricle-promote-")
@@ -1445,7 +1445,7 @@ class PromoteStageTest(WorkerFixture):
         # regression makes it reachable for real, the learner gets a refusal
         # they can see rather than a loss nobody can.
         self.APPROVAL = {"plan": dict(BUILD_PLAN, bank=True),
-                         "estimate_usd": "1.37"}
+                         "estimate_usd": "1.40"}
         self.through_the_build()
         self.assertIn("append to question bank",
                       [a["rel_path"] or a["note"]

@@ -742,7 +742,7 @@ class GateFixture(WizardFixture):
     PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
             "widget_concept": "precedence as a table of binding powers",
             "exercise_unit": "u2", "quiz": True, "bank": True}
-    ESTIMATE = "1.37"
+    ESTIMATE = "1.40"
     # The other half of what the learner is shown: what these roles have
     # left on their budgets, read by the worker when the outline became
     # ready and carried in the same payload as the estimate.
@@ -1128,37 +1128,174 @@ class OutlineGateEscapingTest(GateFixture):
     Two sources meet here and both are escaped where they are interpolated:
     the compiled draft, which a model wrote from a learner's own scope, and
     the plan out of the ledger.
+
+    Every field the screen interpolates gets its own poisoned string, not a
+    representative one. Escaping is per call site — `e()` is written out at
+    each interpolation rather than applied once to a bundle — so a test that
+    proved the unit title safe proved nothing at all about the phase goal
+    beside it. Covering four fields with one marker would be the same gap
+    wearing a bigger number: the markers are distinct so that a failure
+    names the call site that dropped its `e()`.
     """
 
+    # `widget_concept` becomes a plan item's detail. `lesson_unit` becomes
+    # its label, and only when the id resolves to no unit — the gate falls
+    # back to printing the raw id, which is the one path on which a plan key
+    # reaches the page as text rather than as a lookup.
     PLAN = dict(GateFixture.PLAN,
-                widget_concept="binding powers & <b>precedence</b>")
+                widget_concept="binding powers & <b>precedence</b>",
+                lesson_unit="u<b>1</b>&nope")
+
+    # (field, the fixture text to poison, what to poison it with, what the
+    # page must then carry). The fourth element is stated rather than derived
+    # from the third, because the two differ wherever the compiler keeps only
+    # part of what it parsed: a `## Phase N — Title (Weeks…)` header becomes a
+    # title *and* a week range, and a rule that guessed at the split would be
+    # a second parser to keep in step with the first.
+    POISON = (
+        ("course title", "title: Interpreters, end to end",
+         "title: Interpreters <b>&</b> ends", "Interpreters <b>&</b> ends"),
+        ("course description",
+         "Learn how interpreters work by building tinylang",
+         "Learn how <b>interpreters</b> & friends work by building tinylang",
+         "Learn how <b>interpreters</b> & friends work by building tinylang"),
+        ("unit gloss",
+         "Tokens become a tree, and precedence stops being a mystery",
+         "Tokens become a <b>tree</b> & precedence stops being a mystery",
+         "Tokens become a <b>tree</b> & precedence stops being a mystery"),
+        ("unit step label", "label: REPL echoes a line and exits cleanly",
+         "label: REPL <b>echoes</b> a line & exits cleanly",
+         "REPL <b>echoes</b> a line & exits cleanly"),
+        ("resource title", "title: Crafting Interpreters",
+         "title: Crafting <b>Interpreters</b> & Compilers",
+         "Crafting <b>Interpreters</b> & Compilers"),
+        ("resource why_this_one",
+         "The spine of this course, and the rare technical book",
+         "The <b>spine</b> & rib of this course, and the rare technical book",
+         "The <b>spine</b> & rib of this course, and the rare technical book"),
+        # An `href`, so a dropped escape breaks out of the attribute rather
+        # than into the text. The scheme stays `https:` because the compiler
+        # now refuses everything else, and a draft that will not compile is a
+        # different screen with none of these fields on it.
+        ("resource url", '"https://craftinginterpreters.com/"',
+         '"https://craftinginterpreters.com/?q=<b>x</b>&y"',
+         "https://craftinginterpreters.com/?q=<b>x</b>&y"),
+        ("track name", "name: Formal grammars", "name: Formal <b>grammars</b>",
+         "Formal <b>grammars</b>"),
+        ("track cadence", "cadence: ~30 min/wk, alongside the build",
+         "cadence: ~30 min/wk, <b>alongside</b> & during the build",
+         "~30 min/wk, <b>alongside</b> & during the build"),
+        ("track stage label", "label: regular languages",
+         "label: <b>regular</b> languages", "<b>regular</b> languages"),
+        ("track stage goal",
+         "goal: Recognise what a lexer can and cannot decide.",
+         "goal: Recognise what a <b>lexer</b> can & cannot decide.",
+         "Recognise what a <b>lexer</b> can & cannot decide."),
+        ("milestone label", "label: Error messages worth reading",
+         "label: <b>Error</b> messages & warnings worth reading",
+         "<b>Error</b> messages & warnings worth reading"),
+    )
+    # `milestone.kind` is interpolated beside the label and is deliberately
+    # absent from this table: it is a closed vocabulary the schema asserts
+    # against (`MILESTONE_KINDS`), so there is no draft that reaches this
+    # screen carrying markup in it. Every *open* field the gate interpolates
+    # is above.
+    # Three fields the compiler reads out of curriculum.md rather than the
+    # sidecar — the `**Goal:**` line and the two headers — so they are
+    # poisoned in their own file. The phase header is also where the stated
+    # expectation earns its keep: `(Week 0)` is parsed off into `weeks` and
+    # never reaches the title.
+    MD_POISON = (
+        ("phase goal", "Understand the shape of the pipeline",
+         "Understand the <b>shape</b> & size of the pipeline",
+         "Understand the <b>shape</b> & size of the pipeline"),
+        ("phase title", "## Phase 0 — Orientation (Week 0)",
+         "## Phase 0 — <b>Orientation</b> & onboarding (Week 0)",
+         "<b>Orientation</b> & onboarding"),
+        ("unit title", "### Unit 1 — Characters to tokens",
+         "### Unit 1 — <b>Characters</b> & bytes to tokens",
+         "<b>Characters</b> & bytes to tokens"),
+    )
 
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
         # Edited after planting, because the draft is compiled per request:
         # what the screen renders is whatever is on disk when it is drawn.
-        sidecar = os.path.join(cls.tmp, cls.COURSE, wizard.DRAFT_DIR,
-                               "learning", "course.yaml")
-        with open(sidecar, encoding="utf-8") as f:
+        learning = os.path.join(cls.tmp, cls.COURSE, wizard.DRAFT_DIR,
+                                "learning")
+        cls._poison(os.path.join(learning, "course.yaml"), cls.POISON)
+        cls._poison(os.path.join(learning, "curriculum.md"), cls.MD_POISON)
+
+    @classmethod
+    def _poison(cls, path: str, table) -> None:
+        with open(path, encoding="utf-8") as f:
             text = f.read()
-        text = text.replace("title: Interpreters, end to end",
-                            "title: Interpreters <b>&</b> ends")
-        text = text.replace("Unit 2's technique, in one sitting.",
-                            "Unit 2's <b>technique</b> & why.")
-        with open(sidecar, "w", encoding="utf-8") as f:
+        for what, old, new, _ in table:
+            # A replacement that matched nothing would leave the assertions
+            # below testing a string the page never had a chance to render —
+            # green, and proving the fixture rather than the escaping.
+            assert old in text, f"{what}: nothing to poison at {old!r}"
+            text = text.replace(old, new, 1)
+        with open(path, "w", encoding="utf-8") as f:
             f.write(text)
 
     def test_nothing_from_the_draft_or_the_plan_renders_as_markup(self):
         page = self.screen()
-        self.assertIn("Interpreters &lt;b&gt;&amp;&lt;/b&gt; ends", page)
-        self.assertIn("Unit 2&#x27;s &lt;b&gt;technique&lt;/b&gt; &amp; why.",
-                      page)
-        self.assertIn("binding powers &amp; &lt;b&gt;precedence&lt;/b&gt;",
-                      page)
-        for leak in ("<b>&</b>", "<b>technique</b>", "<b>precedence</b>"):
-            with self.subTest(leak=leak):
-                self.assertNotIn(leak, page)
+        expected = [(what, shown) for what, _, _, shown in self.POISON]
+        expected += [(what, shown) for what, _, _, shown in self.MD_POISON]
+        expected.append(("plan widget_concept", self.PLAN["widget_concept"]))
+        expected.append(("plan lesson_unit", self.PLAN["lesson_unit"]))
+        for what, shown in expected:
+            with self.subTest(field=what):
+                self.assertIn(html.escape(shown), page,
+                              f"{what} is not on the gate, escaped")
+                self.assertNotIn(shown, page,
+                                 f"{what} reaches the gate as markup")
+
+
+class OutlineGateUrnPostureTest(GateFixture):
+    """A `urn:` shelf entry is named, not linked — the served shelf's rule.
+
+    `resrender` filters `urn:` out of an entry's links because a urn is an
+    identifier and not a destination: the ISBN of a book with no online copy.
+    The gate used to link it anyway, which put a guaranteed dead link on the
+    one screen whose whole job is being trusted — and promised a door the
+    finished course does not have.
+
+    The title still has to be escaped on the way through, and that branch is
+    reached by no other fixture here, since every tinylang resource is https.
+    """
+
+    POISON = ('url: "https://craftinginterpreters.com/"\n',
+              'url: "urn:isbn:9780990582939"\n')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        sidecar = os.path.join(cls.tmp, cls.COURSE, wizard.DRAFT_DIR,
+                               "learning", "course.yaml")
+        with open(sidecar, encoding="utf-8") as f:
+            text = f.read()
+        # This resource carries `links:` and no `url:`, so the urn goes in as
+        # the primary and the compiler derives the rest — the shape a
+        # real ISBN-only entry has.
+        old = '  links:\n  - ["Read online", "https://craftinginterpreters.com/"]\n'
+        assert old in text, "the fixture's shape moved"
+        with open(sidecar, "w", encoding="utf-8") as f:
+            f.write(text.replace(
+                old, '  url: "urn:isbn:9780990582939"\n', 1).replace(
+                "title: Crafting Interpreters",
+                "title: Crafting <b>Interpreters</b>", 1))
+
+    def test_a_urn_entry_is_named_without_a_link(self):
+        page = self.screen()
+        # It is on the shelf, and its title is escaped there.
+        self.assertIn("Crafting &lt;b&gt;Interpreters&lt;/b&gt;", page)
+        self.assertNotIn("<b>Interpreters</b>", page)
+        # And nothing anywhere on the page links to it.
+        self.assertNotIn("urn:isbn:9780990582939", page)
+        self.assertNotIn('href="urn:', page)
 
 
 class OutlineApproveTest(GateFixture):
@@ -1345,9 +1482,9 @@ class BuildFailedTest(WizardFixture):
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_requested", {}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_requested", {}),
                     ("build_failed", {"reason": cls.REASON,
                                       "detail": "ValidationFailed: quiz "
@@ -1460,9 +1597,9 @@ class BuildFailedSpendTest(WizardFixture):
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_requested", {}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_requested", {}),
                     ("build_failed", {"reason": "validation_failed",
                                       "detail": "ValidationFailed: tests PASS "
@@ -1581,9 +1718,9 @@ class NoApiKeyBuildFaceTest(WizardFixture):
                     ("profile_published", None),
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_requested", {}),
                     ("build_failed", {"reason": "no_api_key",
                                       "detail": "no Anthropic API key"})):
@@ -1636,9 +1773,9 @@ class PromotePendingTest(WizardFixture):
                     ("profile_published", None),
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_requested", {}),
                     ("build_ready", {"artifacts": ["interactive/x"],
                                      "costs": {"lesson-writer": "$0.02"}})):
@@ -1687,9 +1824,9 @@ class PromoteFailedTest(WizardFixture):
                     ("profile_published", None),
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_requested", {}),
                     ("build_ready", {"artifacts": ["interactive/x"],
                                      "costs": {"lesson-writer": "$0.02"}}),
@@ -1785,9 +1922,9 @@ class LandingCardTest(WizardFixture):
                     ("profile_published", None),
                     ("scope_saved", {"title": "Greek"}),
                     ("outline_ready", {"plan": {"phase_id": "p1"},
-                                       "estimate_usd": "1.37"}),
+                                       "estimate_usd": "1.40"}),
                     ("outline_approved", {"plan": {"phase_id": "p1"},
-                                          "estimate_usd": "1.37"}),
+                                          "estimate_usd": "1.40"}),
                     ("build_ready", {"artifacts": [], "costs": {}}),
                     ("promoted", {"course_id": cls.COURSE})):
                 onboarding.append_event(

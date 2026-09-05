@@ -214,10 +214,10 @@ class FacesTest(unittest.TestCase):
     def test_the_gate_compiles_the_example_course_and_prints_the_number(self):
         gate = self.page("outline-gate")
         self.assertIn("Interpreters, end to end", gate)
-        self.assertIn("1.37", gate)
+        self.assertIn("1.40", gate)
         broken = self.page("outline-gate-broken")
         self.assertIn("cannot be read back", broken)
-        self.assertNotIn("1.37", broken)       # no number to approve on a refused draft
+        self.assertNotIn("1.40", broken)       # no number to approve on a refused draft
 
     def test_the_landing_names_the_course_and_the_tenant(self):
         landing = self.page("landing")

@@ -1606,6 +1606,10 @@ class PromotePendingTest(WizardFixture):
         # Nothing from the build's payload is on it: this stop reports
         # position, and the artifacts are the next screen's business.
         self.assertNotIn("interactive/x", page)
+        # And not the build face's paragraph about the wait: this stage
+        # takes seconds, and copy about minutes on it is copy about a
+        # different screen (issue #61).
+        self.assertNotIn("no progress bar", page)
 
 
 class PromoteFailedTest(WizardFixture):
@@ -1655,6 +1659,10 @@ class PromoteFailedTest(WizardFixture):
         self.assertIn(onboarding.WORDING[("promote", self.REASON)], page)
         self.assertIn('action="/onboarding/promote/retry"', page)
         self.assertIn(wizard.PROMOTE_RETRY_ASIDE, page)
+        # One line's worth: the button's whole message is "this costs
+        # nothing", and the wording sentence above it already covers the
+        # built materials (issue #61).
+        self.assertLess(len(wizard.PROMOTE_RETRY_ASIDE), 80)
         self.assertIn(wizard.FAILED_WORD, page)
         # O2: neither the machine's word for what happened nor the exception
         # behind it reaches the page. Both are in the row, for an operator.

@@ -466,11 +466,12 @@ BUILD_RETRY_SPENT = " This build has spent {spent} so far."
 
 # And what the publication's retry says under it. Publishing calls no model
 # at all — it moves finished files and compiles them — so the one thing this
-# button has to promise is that pressing it costs nothing.
-PROMOTE_RETRY_ASIDE = ("Publishing moves files and compiles them; it calls no "
-                       "model and spends nothing, so this costs you nothing "
-                       "and your built materials are exactly where the build "
-                       "left them.")
+# button has to promise is that pressing it costs nothing, and one line is
+# the length of that promise. The first draft of this aside was three lines
+# at phone width (issue #61): it explained the mechanism, said "nothing"
+# twice, and reassured about the built materials, which the wording table's
+# own sentence for every promote failure already does.
+PROMOTE_RETRY_ASIDE = "Publishing calls no model and spends nothing — try it again."
 
 # The committed page the landing card points at, and the tutor's config
 # block with this course and this tenant filled in. The repo has never
@@ -2221,7 +2222,10 @@ def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
     gate, and this stop is the system keeping to it. So the copy says what
     is being done rather than what is being asked, and it names the one rule
     that could still stop it: a course that does not compile is not served,
-    and this is where that is checked for the last time.
+    and this is where that is checked for the last time. It does not carry
+    the build face's second paragraph — the one about there being no
+    progress bar — because that paragraph is about a wait of minutes, and
+    this stage moves files and compiles them in seconds (issue #61).
 
     The failed face says the one thing that is true of every way this stage
     can stop, and is the reason the sequence is ordered the way it is: the
@@ -2261,9 +2265,6 @@ def promote_screen(flow: onboarding.CourseFlow | None) -> Screen:
     and registered, and the whole thing is compiled one last time. A course
     that does not compile is never served, so nothing is put in place until
     that check has passed.</p>
-    <p>There is no progress bar here and no estimate of how much longer it
-    will be, because this system would have to invent both. Leave the tab
-    open or close it — the ledger keeps your place either way.</p>
   </div>
 """, refresh=status == "pending")
 

@@ -745,6 +745,27 @@ def build_outline(runner: Runner, profile: ProfileState, course_id: str,
 # The build plan and what it will cost
 # ---------------------------------------------------------------------------
 
+def widget_concept_for(unit) -> str | None:
+    """The concept a unit's widget should make manipulable, or None.
+
+    The first entry of the unit's **Concepts** row — the list the curriculum
+    already keeps of what the unit teaches, in the author's own words. It
+    used to be the unit's gloss, which is a sentence *about* the unit rather
+    than a thing a learner can drag: the gate read "unit 2 gets a widget
+    (Tokens become a tree, and precedence stops being a mystery…)" and the
+    widget-builder was briefed with the same sentence as its concept (issue
+    #64). A unit with no Concepts row yields None, and the plan says so
+    rather than falling back to the gloss; the build's own fallback is the
+    gloss, because a widget still has to be briefed with something, but the
+    plan the learner approves never carries a concept that is not one.
+    """
+    row = next((r for r in unit.rows if r.label == "Concepts"), None)
+    if row is None:
+        return None
+    first = row.content.split(";")[0].strip().rstrip(".").strip()
+    return first or None
+
+
 def default_build_plan(manifest: Manifest) -> dict:
     """What phase 1 gets built, derived from the outline rather than asked for.
 
@@ -782,7 +803,7 @@ def default_build_plan(manifest: Manifest) -> dict:
         "phase_id": phase.id,
         "lesson_unit": entries[0].id,
         "widget_unit": widget.id if widget else None,
-        "widget_concept": (widget.gloss or widget.title) if widget else None,
+        "widget_concept": widget_concept_for(widget) if widget else None,
         "exercise_unit": entries[-1].id,
         "quiz": True,
         "bank": any(m.kind == "question-bank" for m in manifest.materials),
@@ -913,7 +934,8 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
         unit = units[spec.widget_unit]
         exemplar = (read_exemplar(content_root, manifest, "widget")
                     or house_exemplar("widget"))
-        concept = spec.widget_concept or unit.gloss or unit.title
+        concept = (spec.widget_concept or widget_concept_for(unit)
+                   or unit.gloss or unit.title)
         text = validate_widget(run("widget-builder", [
             ("course", course_line),
             ("unit", unit_md(unit)),

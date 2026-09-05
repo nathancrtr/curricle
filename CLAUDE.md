@@ -145,6 +145,13 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
   `local/anthropic-key`. Never commit, print, or read the key's value.
 - Two curriculum dialects exist: `bullets` (textual-flow, rhyme-schemer)
   and `headings` (ml-ai) — sidecar `dialect:` field selects.
+- Looking at the onboarding wizard never needs a key: `python -m curricle
+  work --scripted` runs the real worker with the canned model in
+  `scripted.py` (dials `--linger`, `--fail stage:reason`), and `python -m
+  curricle faces --out build/wizard` renders every screen from synthetic
+  state with no database at all (`faces.py`; output is gitignored). The
+  scripted module is the one place the canned course lives — the factory
+  and flow suites import it rather than keeping a copy.
 
 ## The design system
 

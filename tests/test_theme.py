@@ -151,6 +151,10 @@ SHEETS = [
     # The onboarding wizard, which is a page the same way the front door is:
     # drawn by the module that serves it, spending the same tokens.
     Sheet("curricle.wizard", "WIZARD_CSS", ".gatebox", themed=True),
+    # The wizard-faces gallery: a reviewer's tool, but a page in the theme
+    # all the same, and a page that spent an undefined token would review
+    # nothing.
+    Sheet("curricle.faces", "_GALLERY_CSS", ".frames", themed=True),
 ]
 
 SHARED_PREFIX = theme.TOKENS_CSS + theme.BASE_CSS

@@ -11,7 +11,9 @@ of the class.
 The one seam is `worker.RUNNER_FACTORY`, and it is the seam the whole design
 put there: L1 says no model on a request path, so the stages that call one
 run in the other process, and a scripted transport is what the other process
-takes instead of a key. `llm._anthropic_send` is replaced by a tripwire for
+takes instead of a key. The transport is `curricle.scripted`'s own — the
+same one `python -m curricle work --scripted` hands the worker — so this
+walk is also the proof that the scripted worker reaches a served course. `llm._anthropic_send` is replaced by a tripwire for
 the length of the walk, so a path that somehow reached the real transport
 would fail this suite rather than reach the network.
 
@@ -31,17 +33,12 @@ from unittest import mock
 
 import sqlalchemy as sa
 
-from curricle import (coursehome, db, factory, llm, onboarding, webapp,
-                      wizard, worker)
+from curricle import (coursehome, db, factory, llm, onboarding, scripted,
+                      webapp, wizard, worker)
 from curricle.compiler import compile_course
 from curricle.sidecar import load_sidecar
 
 from pg import test_engine
-# The scripted transports and the artifacts they answer with, reused rather
-# than re-canned: what a clean outline and a valid lesson look like is the
-# factory suite's to define, and this walk buys exactly those.
-from test_factory import (GOOD_SHELF, FakeBuildSend, FakeOutlineSend,
-                          designer_json)
 
 # The roles a phase-1 build buys for a brand-new course, and the two the
 # outline buys. Every one of them is a real contract under roles/ — the audit
@@ -57,12 +54,13 @@ BUILD_ROLES = frozenset({"exercise-author", "lesson-writer", "quiz-author",
 OUTLINE_ROLES = frozenset({"curriculum-designer", "resource-curator"})
 
 # The title the scope form is filled in with, and the id minting turns it
-# into. They have to agree with the sidecar the scripted designer answers
-# with (`tiny-demo`): the outline stage treats a sidecar declaring some other
-# id as a compiler finding, and promotion refuses to publish a course into a
-# directory that does not carry its name.
-TITLE = "Tiny demo"
-COURSE_ID = "tiny-demo"
+# into. Not the script's own name: the scripted designer answers under the
+# id and title its prompt carries, and this walk is what proves it — the
+# outline stage treats a sidecar declaring some other id as a compiler
+# finding, and promotion refuses to publish a course into a directory that
+# does not carry its name.
+TITLE = "Manifests, gently"
+COURSE_ID = "manifests-gently"
 
 # One claim per required profile field, in the learner's own voice. The
 # minimum the publish gate accepts, which is deliberately what this walks:
@@ -91,33 +89,6 @@ SCOPE_FORM = {
     "out_of_scope": "writing a compiler of my own",
     "prior_exposure": "I have read one manifest and nothing else.",
 }
-
-
-class FlowSend:
-    """One scripted transport for both metered stages.
-
-    Routed by prompt tag, like the two transports it delegates to: the build
-    roles each carry an exemplar section of their own, and everything else in
-    this walk is an outline role. Every call is logged here as well as in the
-    delegate, so "these seven calls are the whole of what was bought" is an
-    assertion against one list.
-    """
-
-    def __init__(self):
-        self.calls: list[tuple[str, str]] = []
-        self.outline = FakeOutlineSend(designer_json(), GOOD_SHELF)
-        self.build = FakeBuildSend()
-
-    def __call__(self, model, system, prompt, max_tokens):
-        building = any(tag in prompt for tag, _ in FakeBuildSend.TAGS)
-        which = self.build if building else self.outline
-        before = len(which.calls)
-        text, usage = which(model, system, prompt, max_tokens)
-        self.calls.append((which.calls[before][0], prompt))
-        return text, usage
-
-    def roles(self) -> list[str]:
-        return [role for role, _ in self.calls]
 
 
 def no_network(*args, **kwargs):
@@ -155,7 +126,7 @@ class OnboardingFlowTest(unittest.TestCase):
         cls.client = TestClient(webapp.create_app(
             [], tenant_slug=cls.slug, database_url=str(cls.engine.url),
             courses_dir=cls.tmp))
-        cls.send = FlowSend()
+        cls.send = scripted.ScriptedSend()
         with mock.patch.object(llm, "_anthropic_send", no_network):
             cls.walk()
 
@@ -265,7 +236,7 @@ class OnboardingFlowTest(unittest.TestCase):
     def test_step_4_the_gate_shows_the_outline_and_the_numbers(self):
         # Compiled off the draft on disk, not read back out of a row: the
         # course's own title and unit headings are on the page.
-        self.assertIn("Tiny demo", self.gate_page)
+        self.assertIn(TITLE, self.gate_page)
         self.assertIn("Unit 1 — What a manifest is", self.gate_page)
         outline = self.payload("outline_ready")
         # Both numbers, both out of the payload the worker wrote: what the
@@ -374,7 +345,7 @@ class OnboardingFlowTest(unittest.TestCase):
         # Registration is the pull path: nothing called into this process,
         # and the course was picked up off the filesystem by the routes.
         self.assertEqual(self.hub.status_code, 200, self.hub.text)
-        self.assertIn("Tiny demo", self.hub.text)
+        self.assertIn(TITLE, self.hub.text)
         self.assertEqual(self.front_door.status_code, 200,
                          self.front_door.text)
         self.assertIn(f'href="/c/{COURSE_ID}/"', self.front_door.text)

@@ -787,13 +787,18 @@ def _reason_of(exc: Exception) -> str:
     return reason if reason in onboarding.REASONS else "worker_error"
 
 
-def main(engine: sa.Engine, poll: float = 2.0, once: bool = False) -> int:
+def main(engine: sa.Engine, poll: float = 2.0, once: bool = False,
+         handlers: dict[str, Handler] | None = None) -> int:
     """Hold the worker lock, clear the last worker's wreckage, and drain.
 
     One worker per database, enforced by the advisory lock rather than by
     hoping: a second `work` process refuses to start rather than racing the
     first for claims it would mostly skip anyway. Holding the lock is also
     what makes the startup sweep safe to do — see sweep_interrupted.
+
+    `handlers` is `run_once`'s: the production table by default, or the
+    scripted module's wrapped copy of it when a person is walking the wizard
+    without a key (`python -m curricle work --scripted`).
     """
     # Detached from the pool on purpose. The lock is session-scoped, so this
     # has to be a session that ends when the worker does — a connection
@@ -819,7 +824,7 @@ def main(engine: sa.Engine, poll: float = 2.0, once: bool = False) -> int:
                   "worker", file=sys.stderr)
 
         while True:
-            worked = run_once(engine)
+            worked = run_once(engine, handlers)
             if once:
                 return 0
             if not worked:

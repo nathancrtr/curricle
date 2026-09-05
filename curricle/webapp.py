@@ -460,7 +460,7 @@ def create_app(course_roots: list[str], tenant_slug: str,
     <span class="spacer"></span>
     <a class="pill" href="/profile">Your profile</a>
   </div>
-  <h1>{hello}, {e(tenant_slug)}.</h1>
+  <h1>{hello}.</h1>
   {f'<p class="lede">{lede}</p>' if lede else ""}
   {"".join(cards)}
   <footer>curricle · signed in as {e(tenant_slug)}</footer>

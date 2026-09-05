@@ -259,8 +259,22 @@ class ReviewPageTest(unittest.TestCase):
                             "source": "a guess"})])
         self.assertIn("Awaiting your review", page)
         self.assertIn('<div class="src">a guess</div>', page)
-        self.assertIn("act('accept','style','diagrams')", page)
-        self.assertIn("act('reject','style','diagrams')", page)
+        self.assertIn('data-act="accept" data-field="style" data-key="diagrams"', page)
+        self.assertIn('data-act="reject" data-field="style" data-key="diagrams"', page)
+        self.assertNotIn("onclick", page)
+
+    def test_a_hostile_key_stays_data_and_never_becomes_script(self):
+        # A key is unconstrained beyond being non-empty, and wire proposals
+        # supply their own; the old onclick interpolation let one close the
+        # JS string literal (issue #10). Now it is an attribute value, and
+        # the attribute escaper keeps it one.
+        key = "x\"),alert(1),(\""
+        page = self.page([("propose", "style", key,
+                           {"text": "Prefers diagrams.", "tier": "thin",
+                            "source": "a guess"})])
+        self.assertNotIn("onclick", page)
+        self.assertNotIn(key, page)                       # never verbatim
+        self.assertIn('data-key="x&quot;),alert(1),(&quot;"', page)
 
 
 class LedgerTest(unittest.TestCase):

@@ -314,8 +314,17 @@ def render_profile_page(state: ProfileState, tenant_slug: str) -> str:
             rows.append(
                 f'<div class="proposal"><div class="text">'
                 f'{_claim_body(p.text, trailer)}{src}</div>'
-                f'<button class="yes" onclick="act(\'accept\',\'{e(p.field)}\',\'{e(p.key)}\')">Accept</button>'
-                f'<button class="no" onclick="act(\'reject\',\'{e(p.field)}\',\'{e(p.key)}\')">Reject</button>'
+                # The identifiers ride as data attributes, never inside a
+                # script: an attribute is HTML, so html.escape is the right
+                # escaper for it, and the one listener below reads them back
+                # through `dataset`. Interpolating them into an onclick was
+                # a JS-string boundary behind an HTML one, and a claim key
+                # (unconstrained, and caller-supplied over the wire) could
+                # close the literal and run on click (issue #10).
+                f'<button class="yes" data-act="accept" data-field="{e(p.field)}" '
+                f'data-key="{e(p.key)}">Accept</button>'
+                f'<button class="no" data-act="reject" data-field="{e(p.field)}" '
+                f'data-key="{e(p.key)}">Reject</button>'
                 "</div>")
         parts.append('<div class="pendingbox"><h2>Awaiting your review</h2>'
                      '<p class="note">'
@@ -373,6 +382,9 @@ function act(kind, field, key) {{
     body: JSON.stringify({{ kind, field, key }}) }})
     .then(() => location.reload());
 }}
+document.querySelectorAll(".proposal button[data-act]").forEach(b =>
+  b.addEventListener("click", () =>
+    act(b.dataset.act, b.dataset.field, b.dataset.key)));
 </script>
 </body>
 </html>

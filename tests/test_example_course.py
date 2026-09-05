@@ -12,6 +12,7 @@ willing to grumble about should not be in it.
 """
 
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -100,6 +101,92 @@ class ExampleCourseTest(unittest.TestCase):
             text = f.read()
         for scheme in ("res:", "unit:", "mat:", "repo:"):
             self.assertIn(f"]({scheme}", text, f"no {scheme} link in the example")
+
+
+class ExampleBankTest(unittest.TestCase):
+    """The shipped bank must meet the contract its own author role states.
+
+    `roles/bank-author.md` asks for "5–7 items per unit, all three tags
+    represented per unit", and `factory.validate_bank` checks none of that —
+    it checks the shape of an item, not the shape of a section, because a
+    validator that refused a thin section would be refusing a model's output
+    on a house rule the model can only approximate.
+
+    So the bar is kept here instead, where it belongs. This bank is the
+    example people copy, and its Phase 0 section is literally the exemplar
+    every first build is shown (`curricle/exemplars/bank-section.md`) — a
+    thin section here does not merely set a bad example, it teaches one, to
+    every course this factory ever writes. It was thin: one application item
+    in the whole bank, and none at all in three of the five sections.
+    """
+
+    BANK = os.path.join(COURSE_ROOT, "learning", "interactive", "quizzes",
+                        "question-bank.md")
+    ITEM = re.compile(r"^\*\*(\d+)\.(\d+) \(([RAW])\)\*\* ")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.sections = {}
+        heading = None
+        with open(cls.BANK, encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("## "):
+                    heading = line[3:].strip()
+                    cls.sections[heading] = []
+                match = cls.ITEM.match(line)
+                if match:
+                    cls.sections[heading].append(match.groups())
+
+    def test_the_bank_has_a_section_per_unit_and_the_phase_body(self):
+        manifest, _ = compile_course(COURSE_ROOT, load_sidecar(SIDECAR))
+        self.assertEqual(len(self.sections), len(manifest.units))
+
+    def test_every_section_carries_five_to_seven_items(self):
+        for heading, items in self.sections.items():
+            with self.subTest(section=heading):
+                self.assertGreaterEqual(len(items), 5)
+                self.assertLessEqual(len(items), 7)
+
+    def test_every_section_represents_all_three_tags(self):
+        # Application is the one that goes missing, because it is the one
+        # that takes work: a scenario with real numbers in it, not a
+        # question about the material.
+        for heading, items in self.sections.items():
+            with self.subTest(section=heading):
+                self.assertEqual({tag for _, _, tag in items}, {"R", "A", "W"})
+
+    def test_items_are_numbered_within_their_section_from_one(self):
+        for heading, items in self.sections.items():
+            with self.subTest(section=heading):
+                self.assertEqual([m for _, m, _ in items],
+                                 [str(n) for n in range(1, len(items) + 1)])
+                self.assertEqual(len({n for n, _, _ in items}), 1)
+
+    def test_every_item_carries_its_answer_and_its_teaching_note(self):
+        # The bank is drawn from live by a tutor that has to teach a miss,
+        # so an item without a note is an item that can only mark.
+        with open(self.BANK, encoding="utf-8") as f:
+            blocks = f.read().split("\n\n")
+        items = [b for b in blocks if self.ITEM.match(b)]
+        self.assertEqual(len(items), sum(len(v) for v in self.sections.values()))
+        for block in items:
+            with self.subTest(item=block.split("**")[1]):
+                self.assertIn("\n**Answer:** ", block)
+                self.assertIn("\n**Note:** ", block)
+
+    def test_the_shipped_exemplar_is_this_bank_first_section(self):
+        # The other direction from `test_nothing_has_drifted_from_tinylang`:
+        # that one asks whether the exemplar still matches the bank, this one
+        # asks whether the section it was cut from is still the first one —
+        # so re-curating from a *different* section, which would quietly
+        # change what every first build is taught, has to be deliberate.
+        with open(os.path.join(REPO_ROOT, "curricle", "exemplars",
+                               "bank-section.md"), encoding="utf-8") as f:
+            exemplar = f.read()
+        with open(self.BANK, encoding="utf-8") as f:
+            body = f.read()
+        first = body.index("## ")
+        self.assertTrue(body[first:].startswith(exemplar.rstrip()))
 
 
 class ExampleExerciseTest(unittest.TestCase):

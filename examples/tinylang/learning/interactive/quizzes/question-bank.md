@@ -16,6 +16,22 @@ the point, because a bank that only marks is a bank that teaches nothing.
 **Answer:** Because the tree *is* the program's structure, so the evaluator reads as a direct statement of what each construct means. A VM adds a compilation step and an instruction set between you and that meaning — worth it for speed, not for learning what the semantics are.
 **Note:** engineer's framing — this is the interpreted-vs-compiled trade in miniature, and the reasons are the familiar ones.
 
+**0.3 (A)** Someone else's interpreter rejects `print("hi")` with `unexpected character '"'`. Which stage wrote that message, and how do you know before opening any file?
+**Answer:** The lexer. It is the only stage that sees characters at all — by the time the parser runs, that quote is either inside a STRING token or the lexer already failed. The word *character* in an error message names its author.
+**Note:** the transferable habit is reading an error for which layer's vocabulary it speaks. If they guess the parser, ask what a parser would even call that quote.
+
+**0.4 (A)** You want to add a `%` operator. Name every stage you must edit, in order, and what each edit is.
+**Answer:** Lexer: recognise `%` as a token kind. Parser: give it a binding power so `1 + 2 % 3` groups correctly. Evaluator: compute it, and decide what it does to non-numbers. Three stages, three small local edits — which is the payoff the split was bought for.
+**Note:** if they name only two, ask which one they skipped and what would happen: a missing lexer case is an "unexpected character", a missing binding power is a parse error, a missing eval case is a crash on a valid program.
+
+**0.5 (A)** Walk `let x = 1 # two` through the pipeline: what does each stage hand on?
+**Answer:** Lexer: `LET`, `IDENT(x)`, `EQUAL`, `NUMBER(1)`, `EOF` — the comment is gone, and gone this early. Parser: a let-binding node with the name `x` and a literal `1` under it. Evaluator: binds `x` to `1` in the environment and produces no value worth printing.
+**Note:** the comment vanishing at stage one is the thing to notice — every later stage is *simpler* because of what the lexer threw away, and that is what "separable stages" buys in practice.
+
+**0.6 (W)** Phase 0 builds a REPL that only echoes. Why build it before there is anything to run?
+**Answer:** Because it is the harness every later unit lands in. Its middle gets replaced once per phase — echo, then tokens, then a tree, then a value — so each unit ends in something you can type at rather than in a green test suite you have to take on trust.
+**Note:** the instinct to skip this is the same one that defers wiring up a deployment until the code is "ready". Worth naming, because the answer is the same in both cases.
+
 ## Unit 1 — Characters to tokens
 
 **1.1 (W)** Why is `1+2` three tokens rather than one?
@@ -33,6 +49,10 @@ the point, because a bank that only marks is a bank that teaches nothing.
 **1.4 (R)** What does the lexer guarantee to the parser?
 **Answer:** A flat list of classified lexemes with positions — no whitespace, no comments, no nesting.
 **Note:** the word to listen for is *flat*. Nesting is precisely what the parser is for, and hearing that distinction is the unit landing.
+
+**1.5 (A)** Your lexer handles `# comment` by skipping to the end of the line. A test feeds it `# note\nlet x = 1` and every token comes back with `line` 1. What did you miss?
+**Answer:** Skipping the comment consumed the newline without counting it. Whitespace and comments are discarded, but the position bookkeeping they carry is not — it is the other half of what the lexer owes the parser, and the only reason a syntax error can name a line.
+**Note:** if they say the line number does not matter yet, point at Unit 2's milestone: "a syntax error names the line and the offending token" is unachievable from here if this is wrong, and it will look like a parser bug.
 
 ## Unit 2 — Tokens to a tree
 
@@ -52,6 +72,10 @@ the point, because a bank that only marks is a bank that teaches nothing.
 **Answer:** Because it makes grouping visible. A tree that prints back as what you typed can hide a wrong shape indefinitely.
 **Note:** worth connecting to their own debugging habits — this is the same instinct as logging a parsed structure rather than the raw request.
 
+**2.5 (A)** Add `^` to your table: tighter than `*`, and right-associative. Give the two binding powers relative to `*` at (5, 6), and say how the printed tree tells you if you got associativity backwards.
+**Answer:** Something like (8, 7): the left power above `*`'s so `2 * 3 ^ 2` groups as `(* 2 (^ 3 2))`, and the right power *below* its own left so a second `^` at equal precedence is captured by the recursion rather than ending it. `2 ^ 3 ^ 2` prints `(^ 2 (^ 3 2))` when right, `(^ (^ 2 3) 2)` when backwards.
+**Note:** the exact numbers do not matter and the asymmetry does — if they give equal powers, have them run `2 ^ 3 ^ 2` and read the tree. This is 2.1 made concrete and 2.4 earning its keep.
+
 ## Unit 3 — Walking the tree
 
 **3.1 (W)** Why is an environment a chain of scopes rather than one flat dictionary?
@@ -65,6 +89,14 @@ the point, because a bank that only marks is a bank that teaches nothing.
 **3.3 (R)** Truthiness — is that a discovery or a decision?
 **Answer:** A decision. Whether `0` or `""` is falsy is a choice the language designer makes, and reasonable languages disagree.
 **Note:** this is often the first moment a learner feels like a language *designer* rather than an implementer. Let that land.
+
+**3.4 (A)** The three-line shadowing program should print `1`, `2`, `1`. Yours prints `1`, `2`, `2`. Which line of your `Environment` is wrong?
+**Answer:** The one that leaves the inner scope. Either the inner binding was written into the outer environment instead of a fresh child, or the child was never discarded on exit — both make the outer `x` unrecoverable, which is precisely what a chain exists to prevent.
+**Note:** have them print the chain's depth at each of the three lines. A depth that never goes back down is the bug in one line of output.
+
+**3.5 (A)** `let x = y + 1` with no `y` bound gives them `KeyError: 'y'` and a traceback. What should happen instead, and where does the fix go?
+**Answer:** A runtime error naming `y` and the line, caught by the REPL so the session survives. The fix belongs in the environment's lookup, not in the binary-operation case — the failure is a failed lookup, and putting it in the operator would leave every other reader of a name still crashing.
+**Note:** "where does the fix go" is the half worth pressing on. A learner who patches the call site has fixed one program; a learner who patches the lookup has fixed the language.
 
 ## Unit 4 — Functions and closures
 
@@ -83,3 +115,7 @@ the point, because a bank that only marks is a bank that teaches nothing.
 **4.4 (W)** Recursion works as soon as functions can see their own name. Why does that fall out for free?
 **Answer:** Because the name is bound in the environment the function captures, so the body's lookup finds it. Nothing recursion-specific is implemented.
 **Note:** a satisfying moment — worth pausing on rather than moving straight to the capstone.
+
+**4.5 (A)** Write the smallest tinylang program that proves your functions capture at definition time rather than at call time, and say what it would print under dynamic scope.
+**Answer:** Bind a name, define a function that reads it, then call that function from inside a scope that rebinds the same name — four lines. Lexical scope prints the outer value, because the function captured the environment it was defined in; dynamic scope prints the inner one, because it would look the name up in whatever environment happened to be live at the call.
+**Note:** the two-line difference in output is the whole of the closure decision, which is why this is the test to write before the counter and not after. If their program has the rebinding in the same scope as the definition, it cannot tell the two apart — that is the thing to catch.

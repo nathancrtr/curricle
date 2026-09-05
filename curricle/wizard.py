@@ -176,14 +176,18 @@ SCREEN_INTROS = {
 # rather than `/profile`'s section titles: that page titles a section of a
 # document, and this one asks a person a question.
 FIELD_LABELS = {
-    "meta": "Skill description",
+    # Not "Skill description": that names the file format the line lands
+    # in, and the explanation under it already says what it is (F18).
+    "meta": "Who this profile is for",
     "background": "Professional background",
     "education": "Formal education",
     "tracks": "Prior courses and tracks",
     "style": "Learning style",
     "domain_bias": "Domain preferences",
     "pacing": "Pacing",
-    "calibration": "Calibrating an explanation",
+    # The explanation calls this "the procedure a tutor follows", so the
+    # heading asks the question that procedure answers (F18).
+    "calibration": "How to explain things to you",
     "skip": "What to skip",
     "scaffold": "What to scaffold",
     "subject_adapters": "Adapting to other subjects",
@@ -307,9 +311,8 @@ SCOPE_LABELS = {
              "The three shapes ask different things of the same subject. "
              "Pick the one that matches why you want it."),
     "title": ("Working title",
-              "What you would call this course today. The course's id and "
-              "the folder it lives in are minted from this, once, and never "
-              "change afterwards — the words themselves you can change."),
+              "What you would call it today. Its id and folder are minted "
+              "from this once and never change; the words you can edit later."),
     "subject": ("Subject",
                 "The territory, in a phrase or two. Narrower is better: a "
                 "course that covers everything covers it in one paragraph "
@@ -602,7 +605,12 @@ STEP_LABELS = {
 # --------------------------------------------------------------------------
 
 WIZARD_CSS = theme.style("""\
-  .wizard { max-width:720px; margin:0 auto; padding:0 24px 90px; }
+  /* 760, like the front door and the profile page: three consecutive
+     pages had three column widths (720, 840, 760) and two h1 sizes, which
+     a reader feels as the page shifting under them between clicks (F17).
+     The unit page stays at 600 on purpose — it is a text page set to the
+     measure, see unitrender. */
+  .wizard { max-width:760px; margin:0 auto; padding:0 24px 90px; }
   .masthead { padding:40px 0 6px; }
   .masthead .wordmark { margin:0; }
   .masthead .eyebrow { margin:12px 0 0; }
@@ -713,6 +721,10 @@ WIZARD_CSS = theme.style("""\
   .hours { display:flex; flex-wrap:wrap; align-items:center; gap:10px;
            margin:0 0 13px; }
   .hours span { font-size:14px; color:var(--muted); }
+  /* Each number travels with its word: at 400px the line used to wrap
+     "hours" onto a line of its own, under nothing (F15). */
+  .hours .pair { display:inline-flex; align-items:center; gap:10px;
+                 white-space:nowrap; }
   .choice { display:block; border:1.5px solid var(--edge); border-radius:var(--r-card);
             padding:11px 14px; margin:0 0 10px; }
   .choice b { font-size:14.5px; }
@@ -728,6 +740,7 @@ WIZARD_CSS = theme.style("""\
      panels the forms use, so the review of a course reads in the same
      rhythm as the questions that produced it. */
   ol.units, ul.shelf { margin:0; padding:0; list-style:none; }
+  ul.shelf .arr { font-size:.8em; margin-left:3px; text-decoration:none; }
   .units li, .shelf li { margin:0 0 15px; max-width:var(--measure); }
   .units li:last-child, .shelf li:last-child { margin-bottom:0; }
   .units b, .shelf b { font-size:14.5px; }
@@ -1267,25 +1280,28 @@ def _field_block(field: str, claims: list[profile.Claim]) -> str:
 
     Two sentences, not four. The first pass at that rule printed one line
     above the saved boxes, a second under them and a third under the Add
-    box, which is three instructions around two controls: the two about the
-    saved boxes are now one line sitting between them and the Add box, where
-    everything it describes is directly above it and the box it is *not*
-    about is directly below.
+    box, which is three instructions around two controls. The second pass
+    put the two about the saved boxes on one line *between* them and the
+    Add box — and the live review found that line reading as an
+    instruction about Add, the box directly under it (F14). So it sits
+    above the saved boxes now, once per field, and says "below" so there
+    is no box it could be mistaken for; the Add box keeps its own rule
+    under itself.
     """
     explanation, _ = FIELD_COPY[field]
     boxes = "".join(
         _claim_box(field, c.key, c.text, f"Claim {n}",
                    f"{FIELD_LABELS[field]}, claim {n}")
         for n, c in enumerate(claims, 1))
-    rule = ('<p class="hint">Each box is one claim: edit it to change it, '
-            "empty it to delete it, and line breaks stay inside it.</p>"
+    rule = ('<p class="hint">Each box below is one claim: edit it to change '
+            "it, empty it to delete it, and line breaks stay inside it.</p>"
             if claims else "")
     return f"""
     <div class="panel field">
       <h3>{FIELD_LABELS[field]}</h3>
       <p class="explain">{explanation}</p>
       {_examples(field, unanswered=not claims)}
-      {boxes}{rule}
+      {rule}{boxes}
       <label class="claim"><span class="claimkey">Add a claim</span>
       <textarea name="new__{html_mod.escape(field)}"
       aria-label="{html_mod.escape(FIELD_LABELS[field])}, add a claim"
@@ -1510,16 +1526,16 @@ def scope_screen() -> Screen:
     <div class="panel field">
       <h3>{SCOPE_HOURS_LEAD}</h3>
       <p class="explain">{SCOPE_HOURS_HINT}</p>
-      <p class="hours"><span>between</span>
+      <p class="hours"><span class="pair"><span>between</span>
         <input type="number" name="hours_lo" min="1" max="80" required
-               aria-label="Fewest hours a week">
-        <span>and</span>
+               aria-label="Fewest hours a week"></span>
+        <span class="pair"><span>and</span>
         <input type="number" name="hours_hi" min="1" max="80" required
                aria-label="Most hours a week">
-        <span>hours</span></p>
-      <p class="hint">{SCOPE_CADENCE_HINT}</p>
+        <span>hours</span></span></p>
       <label class="claim"><span class="claimkey">When, roughly</span>
       <input type="text" name="cadence"></label>
+      <p class="hint">{SCOPE_CADENCE_HINT}</p>
     </div>"""
     return Screen(f"""
   <h1>{STOP_TITLES["scope"]}</h1>
@@ -1531,8 +1547,8 @@ def scope_screen() -> Screen:
     {hours}
     {_scope_panel("done_looks_like",
                   _scope_box("done_looks_like",
-                             "I can read a paper in this field and say what "
-                             "it claims.", True))}
+                             "I can …, without help, and know it worked.",
+                             True))}
     {_scope_panel("out_of_scope",
                   _scope_box("out_of_scope", "One line per thing to leave out",
                              False))}
@@ -2025,7 +2041,14 @@ def _shelf_block(manifest: Manifest) -> str:
     items = []
     for res in manifest.resources:
         essay = (f"<p>{e(res.why_this_one)}</p>" if res.why_this_one else "")
-        items.append(f'<li><b><a href="{e(res.url)}">{e(res.title)}</a></b>'
+        # Beside the decision, never over it: a title that navigated this
+        # tab away mid-approval lost the gate. External links carry the
+        # hub's ↗, the one glyph that says a link leaves the page.
+        ext = res.url.startswith(("http://", "https://"))
+        target = ' target="_blank" rel="noopener"' if ext else ""
+        arrow = '<span class="arr">↗</span>' if ext else ""
+        items.append(f'<li><b><a href="{e(res.url)}"{target}>{e(res.title)}'
+                     f'{arrow}</a></b>'
                      f"{essay}</li>")
     return f"""
     <div class="panel field">
@@ -2456,15 +2479,9 @@ def landing_screen(flow: onboarding.CourseFlow, courses_dir: str | None,
     <a class="pill primary" href="/c/{e(course_id)}/index.html">Open your
     course</a>
     <span class="aside">The hub is the front of it: the path, what comes
-    next, and the materials as you reach them.</span>
+    next, the materials as you reach them, and every mark you make kept
+    in your own database rather than in this tab.</span>
   </p>
-  <div class="gatebox">
-    <h2>Work in the browser</h2>
-    <p>Read the curriculum, walk the units, and mark what you finish. The
-    lessons, the widget, the exercise and the checkpoint quiz are served
-    from the same place, and every mark you make is written to your own
-    database rather than to this tab.</p>
-  </div>
   <div class="gatebox">
     <h2>Or connect the tutor to your assistant</h2>
     <p>{MCP_LEDE}</p>

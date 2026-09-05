@@ -325,6 +325,12 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
   arrow said the direction and the ellipsis ate the destination. They are
   now two bordered cards labelled "Previous" and "Next" in words, with the
   title free to wrap — which a screen reader can also read.
+- **One column for the three pages a new learner walks in a row.** The
+  wizard, the profile page and the front door were 720, 840 and 760 wide
+  with two h1 sizes, which a reader feels as the page shifting between
+  clicks without being able to say why (live review, F17). All three are
+  760 with a 34px h1 now. The unit page keeps its 600, deliberately: it is
+  a text page set to the measure, and its reasoning is in `unitrender`.
 - **Chips live under the unit title, never beside it** (hub). Chips beside the
   title crowded it out of its own line; the title owns the full column width
   and chips are a second line of metadata. In the curriculum's single wide column they stay

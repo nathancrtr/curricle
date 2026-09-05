@@ -78,6 +78,30 @@ def main(argv: list[str] | None = None) -> int:
     w.add_argument("--poll", type=float, default=2.0)
     w.add_argument("--once", action="store_true",
                    help="process at most one run, then exit")
+    # The scripted worker: the same process over the same queue, with the
+    # model's answers canned so a person can walk the wizard in a browser
+    # for nothing and without a key. The two dials exist so the pending and
+    # failed faces — the ones a real run hurries past or never reaches —
+    # can be held on screen and provoked on request. Both are refused
+    # without --scripted: they are properties of a pretend model, and a
+    # real one that lingered or failed on request would be a real bill.
+    w.add_argument("--scripted", action="store_true",
+                   help="answer every model call from curricle/scripted.py: "
+                        "no key, no network, no spend")
+    w.add_argument("--linger", type=float, default=0.0, metavar="SECONDS",
+                   help="(with --scripted) hold each stage this long so its "
+                        "pending screen can be looked at")
+    w.add_argument("--fail", action="append", default=[], metavar="STAGE:REASON",
+                   help="(with --scripted) make the first run of STAGE stop "
+                        "with REASON, so its failed screen and its retry can "
+                        "be looked at; repeatable")
+
+    # The wizard's every face as static files, from synthetic state: no
+    # database, no worker, no model. For looking at screens a real walk
+    # hurries past or never reaches, in both themes, without a walk at all.
+    fc = sub.add_parser("faces", help="render every onboarding screen from "
+                                      "synthetic state into a directory")
+    fc.add_argument("--out", required=True, help="directory to write into")
 
     m = sub.add_parser("mcp", help="the tutor export: an MCP server (stdio) "
                        "over manifest + profile + progress")
@@ -142,6 +166,8 @@ def main(argv: list[str] | None = None) -> int:
         return _serve(args)
     if args.command == "work":
         return _work(args)
+    if args.command == "faces":
+        return _faces(args)
     if args.command == "mcp":
         return _mcp(args)
     if args.command == "import-progress":
@@ -372,9 +398,38 @@ def _serve(args) -> int:
 
 def _work(args) -> int:
     from . import db, worker
+    handlers = None
+    if args.scripted:
+        from . import scripted
+        try:
+            fail = tuple(scripted.parse_fail(spec) for spec in args.fail)
+        except scripted.BadFailSpec as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+        # The one seam (test_onboarding_flow's, and the design's): every
+        # stage builds its runner through this name, so rebinding it here
+        # is the whole of what "scripted" changes about the worker.
+        worker.RUNNER_FACTORY = scripted.runner_factory
+        handlers = scripted.handlers(linger=args.linger, fail=fail)
+        print("curricle worker: SCRIPTED — every model call is answered from "
+              "curricle/scripted.py; no key is read and nothing is spent",
+              file=sys.stderr)
+    elif args.linger or args.fail:
+        print("--linger and --fail are dials on the scripted model; pass "
+              "--scripted with them", file=sys.stderr)
+        return 2
     engine = db.make_engine()
     print("curricle worker: polling for onboarding runs")
-    return worker.main(engine, poll=args.poll, once=args.once)
+    return worker.main(engine, poll=args.poll, once=args.once,
+                       handlers=handlers)
+
+
+def _faces(args) -> int:
+    from . import faces
+    written = faces.write_all(args.out)
+    print(f"wrote {len(written)} face(s) under {args.out} — open "
+          f"{os.path.join(args.out, 'index.html')}")
+    return 0
 
 
 def _mcp(args) -> int:

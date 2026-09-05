@@ -122,6 +122,34 @@ are read from `roles/` and `models.yaml` at the checkout root, so this is a
 checkout-mode feature: an installed package has the compiler and the app but
 must be told where those live (`CURRICLE_HOME`).
 
+### Walking the wizard without spending
+
+Two things exist for looking at the wizard's screens without a key and
+without a bill. Neither touches the network by construction.
+
+```bash
+python -m curricle work --scripted                      # the worker, with a canned model
+python -m curricle work --scripted --linger 20 \
+    --fail outline:compile_failed --fail build:validation_failed
+python -m curricle faces --out build/wizard             # every screen, no database at all
+```
+
+`work --scripted` is the real worker over the real queue: the only change
+is that every model call is answered from `curricle/scripted.py`, a two-unit
+demo course that compiles, builds and promotes. Serve as usual, walk the
+wizard in a browser, and you land on a served course having spent nothing.
+`--linger` holds each stage for that many seconds so its pending screen can
+be looked at; `--fail stage:reason` makes the first run of that stage stop
+with that reason so its failed screen — and the retry button — can be. The
+token ledger still fills, at real prices over pretend tokens, so use a
+tenant you do not mind carrying a pretend receipt.
+
+`faces` needs no database, worker or serve: it renders every screen the
+wizard has — every form empty and filled, every machine turn pending and
+failed for every reason the wording table knows, the gate, the landing —
+from synthetic state, in both themes, and writes an index and a viewer that
+shows a face at two widths side by side. Open `build/wizard/index.html`.
+
 `python -m curricle mcp --course <course_root> --tenant …` exports the same
 course to your own assistant as an MCP server over stdio — the manifest, the
 profile, progress, lesson guides and the question bank as tools it can call.

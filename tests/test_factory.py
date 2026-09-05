@@ -16,7 +16,7 @@ from unittest import mock
 
 import sqlalchemy as sa
 
-from curricle import db, factory, llm, profile
+from curricle import db, factory, llm, profile, scripted
 from curricle.llm import (
     BudgetExceeded, FactoryConfigMissing, Runner, load_models_config, load_role,
 )
@@ -25,17 +25,11 @@ from corpuspaths import HAVE_ML, ML_ROOT
 from pg import test_engine
 
 
-# Question 4 names a phase on purpose: a later phase's quiz is entitled to ask
-# what an earlier one covered, in those words, and the renderer's phase
-# renumbering must never reach the model's own sentences.
-GOOD_QUIZ = json.dumps([
-    {"q": "What did Phase 1 cover?" if i == 4 else f"Question {i}?", "options": [
-        {"text": "right", "correct": True, "why": "because"},
-        {"text": "wrong a", "correct": False, "why": "misconception a"},
-        {"text": "wrong b", "correct": False, "why": "misconception b"},
-        {"text": "wrong c", "correct": False, "why": "misconception c"},
-    ]} for i in range(10)
-])
+# The canned artifacts the fakes answer with live in the package now
+# (`curricle/scripted.py`): the scripted worker and these suites answer
+# with one script rather than two that drift. The aliases keep the names
+# this file has always used.
+GOOD_QUIZ = scripted.QUIZ
 
 # A course's own checkpoint page, the shape `read_exemplar` finds: its own
 # copy, its own title, and the phase-1 id its own phase-1 quiz reports under.
@@ -56,100 +50,13 @@ curricle.checkpoint("quiz-p1", {score});
 </script>
 """
 
-GOOD_EXERCISE = json.dumps({
-    "slug": "unit-03-bpe",
-    "task_md": "# BPE\nBuild it.",
-    "stub_name": "bpe.py",
-    "stub": textwrap.dedent('''\
-        def merge(tokens, pair):
-            """Merge every adjacent occurrence of pair."""
-            raise NotImplementedError
-        '''),
-    "test_name": "test_bpe.py",
-    "test": textwrap.dedent('''\
-        import unittest
-        from bpe import merge
-
-        class TestMerge(unittest.TestCase):
-            def test_merges_adjacent_pair(self):
-                # classic trap: overlapping pairs merge left-to-right
-                self.assertEqual(merge(["a", "b", "b"], ("a", "b")), ["ab", "b"])
-
-        if __name__ == "__main__":
-            unittest.main()
-        '''),
-})
+GOOD_EXERCISE = scripted.EXERCISE
 
 
-# The outline fixtures: a two-unit course small enough to read and real
-# enough to compile, standing in for what curriculum-designer emits.
-GOOD_CURRICULUM = """\
-# Tiny Demo: Curriculum
-
-A two-unit course, for one learner, at four hours a week.
-
-## Phase 1 — Foundations (Weeks 1–2)
-
-<!-- resource keys: primer -->
-
-**Goal:** Read a manifest and say what it claims.
-
-### Unit 1 — What a manifest is
-- **Build:** Write a three-line sidecar by hand and compile it.
-- **Read:** [The Manifest Primer](res:primer), the opening chapter.
-
-### Unit 2 — What the compiler refuses
-- **Build:** Break the sidecar on purpose and read the finding it raises.
-- **Concepts:** refusal over guessing; why every finding names a place.
-
-### — Phase 1 Checkpoint —
-You can write a sidecar that compiles and explain one thing it refuses.
-
----
-
-*Curriculum v1.0 — 2026-08-30: initial version.*
-"""
-
-GOOD_SIDECAR = """\
-sidecar_version: 1
-
-course:
-  id: tiny-demo
-  title: Tiny demo
-  mode: subject
-  hours_per_week: [4, 4]
-  docs:
-    curriculum_doc: learning/curriculum.md
-    resources_doc: learning/learning-resources.md
-  capstone: u2
-  description: A two-unit course about manifests.
-
-resource_tiers:
-- num: 1
-  name: Core path
-  role: Worked through in curriculum order.
-
-resources:
-- key: primer
-  tier: 1
-  title: The Manifest Primer
-  cite: "A. Author · 2026"
-  formats: [TEXT]
-  cost: free
-  free: true
-  links:
-  - ["Read online", "https://example.invalid/primer"]
-  why_this_one: The one text that argues for refusal rather than asserting it.
-
-units:
-- id: u1
-  num: 1
-  gloss: A manifest is a claim about a course, checkable by a compiler.
-- id: u2
-  num: 2
-  gloss: The compiler refuses rather than guesses.
-  depends_on: [u1]
-"""
+# The outline fixtures: the package's two-unit demo course, small enough
+# to read and real enough to compile.
+GOOD_CURRICULUM = scripted.CURRICULUM
+GOOD_SIDECAR = scripted.SIDECAR
 
 # Same sidecar, plus a unit no curriculum header claims: a compile error with
 # a `where` the designer can act on, and nothing the curator did wrong.
@@ -175,26 +82,7 @@ materials:
 CRASHING_SIDECAR = GOOD_SIDECAR.replace("hours_per_week: [4, 4]",
                                         "hours_per_week: 4")
 
-GOOD_SHELF = """\
-# Tiny Demo: Learning resources
-
-**Tier 1** is the core path, worked through in curriculum order.
-
----
-
-## Tier 1 — Core path
-
-### The Manifest Primer
-*A. Author · 2026 · free*
-→ <https://example.invalid/primer>
-
-The one text that argues for refusal rather than asserting it, which is the
-argument this whole course rests on.
-
----
-
-*Resources v1.0 — 2026-08-30.*
-"""
+GOOD_SHELF = scripted.SHELF
 
 # A shelf that disagrees with the sidecar in both directions at once.
 WRONG_SHELF = GOOD_SHELF.replace(
@@ -204,8 +92,7 @@ WRONG_SHELF = GOOD_SHELF.replace(
     "→ <https://example.invalid/other>")
 
 
-def designer_json(curriculum=GOOD_CURRICULUM, sidecar=GOOD_SIDECAR):
-    return json.dumps({"curriculum_md": curriculum, "course_yaml": sidecar})
+designer_json = scripted.designer_json
 
 
 SCOPE = {"subject": "Course manifests", "title": "Tiny demo",
@@ -1306,19 +1193,10 @@ class BuildPhaseTest(unittest.TestCase):
                 report.draft_dir, "exercises/unit-03-bpe/task.md")))
 
 
-GOOD_LESSON = "# Lesson\n" + "context " * 400 + "\n> PAUSE.\nmore"
-GOOD_WIDGET = ("<!DOCTYPE html><html><body><script>let x=1;</script>"
-               "</body></html>")
-GOOD_BANK = ("## Module 3 — Tokenization\n\n**3.1 (R)** What is BPE?\n"
-             "**Answer:** Byte-pair encoding.\n**Note:** Merges by frequency.")
-
-BUILD_RESPONSES = {
-    "lesson-writer": GOOD_LESSON,
-    "widget-builder": GOOD_WIDGET,
-    "exercise-author": GOOD_EXERCISE,
-    "quiz-author": GOOD_QUIZ,
-    "bank-author": GOOD_BANK,
-}
+GOOD_LESSON = scripted.LESSON
+GOOD_WIDGET = scripted.WIDGET
+GOOD_BANK = scripted.BANK
+BUILD_RESPONSES = scripted.BUILD_RESPONSES
 
 
 class FakeBuildSend:
@@ -1329,11 +1207,7 @@ class FakeBuildSend:
     and each role is handed exactly one exemplar section of its own.
     """
 
-    TAGS = (("<exemplar_lesson>", "lesson-writer"),
-            ("<exemplar_widget>", "widget-builder"),
-            ("<exemplar_exercise>", "exercise-author"),
-            ("<exemplar_questions>", "quiz-author"),
-            ("<existing_bank>", "bank-author"))
+    TAGS = scripted.BUILD_TAGS
 
     def __init__(self):
         self.calls: list[tuple[str, str]] = []

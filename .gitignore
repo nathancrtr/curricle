@@ -27,3 +27,9 @@ examples/*/learning/index.html
 examples/*/learning/curriculum.html
 examples/*/learning/learning-resources.html
 examples/*/learning/theme.css
+
+# `python -m curricle faces --out build/wizard` renders every onboarding
+# screen for review — a hundred-odd files that are regenerated in a second
+# from synthetic state. A reviewer's scratch, not an artifact: the committed
+# inspection copies in build/ are the course pages, which are few and stable.
+build/wizard/

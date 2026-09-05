@@ -50,6 +50,9 @@ COPY migrations/ ./migrations/
 COPY roles/ ./roles/
 COPY models.yaml ./
 COPY examples/ ./examples/
+# `docs/` because the app serves `docs/mcp-config.md` itself at /docs/
+# (the landing card links it); a checkout without it 404s that link.
+COPY docs/ ./docs/
 
 # Where the factory looks for models.yaml and roles/ — see the header.
 ENV CURRICLE_HOME=/app

@@ -332,6 +332,32 @@ class WordmarkTest(unittest.TestCase):
 GUARDED_MODULES = ("webapp.py", "wizard.py")
 
 
+class PlatformDocsTest(unittest.TestCase):
+    """`/docs/<name>`: the checkout's own documents, in the theme, from an
+    allowlist (issue #60). The landing card links one of them on a flow
+    whose promise is browser only, so the link has to resolve."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = test_engine()
+        cls.client = client(cls.engine, [], "platform-docs")
+
+    def test_the_tutor_page_is_served_in_the_theme_with_a_way_home(self):
+        page = self.client.get("/docs/mcp-config.md")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn("Connecting the tutor", page.text)
+        self.assertIn(theme.TOKENS_CSS, page.text)
+        self.assertIn('<a href="/">Your courses</a>', page.text)
+        self.assertIn("<code>docs/mcp-config.md</code>", page.text)
+        self.assertNotIn("Course hub", page.text)       # no course behind it
+
+    def test_anything_off_the_allowlist_is_a_404_whatever_is_on_disk(self):
+        for name in ("self-hosting.md", "platform-design.md", "..%2Fmodels.yaml",
+                     "nope.md"):
+            with self.subTest(name=name):
+                self.assertEqual(self.client.get(f"/docs/{name}").status_code, 404)
+
+
 class InvariantL1Test(unittest.TestCase):
     def test_the_request_path_cannot_reach_the_model(self):
         # L1: no LLM on a request path, ever. The front door made this module

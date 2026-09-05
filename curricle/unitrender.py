@@ -662,10 +662,19 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
 """
 
 
-def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
+def render_reader(mf: Manifest | None, md_text: str, *, doc_title: str,
                   material: Material | None = None,
                   depth: int | None = None,
-                  doc_dir: str | None = None) -> str:
+                  doc_dir: str | None = None,
+                  platform_doc: str | None = None) -> str:
+    """A markdown document in the theme.
+
+    `platform_doc` names a repository document that belongs to curricle
+    rather than to a course (`docs/mcp-config.md`), served at `/docs/`: it
+    has no manifest, so `mf` is None and every reference link degrades to
+    its label, its crumb leads home to the front door rather than to a
+    course hub, and its footer names the file rather than a course repo.
+    """
     e = html.escape
     if depth is None:
         depth = doc_depth(material) if material else 1
@@ -676,7 +685,7 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
     # relative figures resolve through the content route.
     rr = RefResolver(mf, to_root=up, doc_dir=doc_dir)
     unit = (next((x for x in mf.units if x.id == material.unit), None)
-            if material and material.unit else None)
+            if mf is not None and material and material.unit else None)
     unit_href = f"unit/{unit.id}.html" if unit else "curriculum.html"
     banner = ""
     if material and material.kind == "chapter":
@@ -711,29 +720,39 @@ def render_reader(mf: Manifest, md_text: str, *, doc_title: str,
                   f'<a class="next" href="{up}{e(unit_href)}">'
                   f'<b class="dir">Back to the unit</b>'
                   f"Unit {unit.num} — {e(unit.title)}</a></nav>")
+    if platform_doc:
+        suffix = "curricle"
+        crumbs = ('<a href="/">Your courses</a> <span class="sep">/</span> '
+                  f"{e(platform_doc)}")
+        foot = (f"This is <code>{e(platform_doc)}</code> from the curricle "
+                "checkout, rendered — the file is the canonical text.")
+    else:
+        suffix = mf.course.title if mf is not None else "curricle"
+        crumbs = (f'<a href="{up}index.html">Course hub</a> '
+                  f'<span class="sep">/</span> <a href="{up}curriculum.html">'
+                  f"Curriculum</a> {crumb_unit}")
+        foot = ("The canonical text lives in the course repo — this page "
+                "renders it, it does not replace it.")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{e(doc_title)} — {e(mf.course.title)}</title>
+<title>{e(doc_title)} — {e(suffix)}</title>
 <style>
 {STYLE}</style>
 </head>
 <body>
 <div class="wrap">
   <header class="masthead">
-    <p class="eyebrow"><a href="{up}index.html">Course hub</a>
-    <span class="sep">/</span> <a href="{up}curriculum.html">Curriculum</a>
-    {crumb_unit}</p>
+    <p class="eyebrow">{crumbs}</p>
   </header>
   {banner}
   <div class="doc">
 {block_html(md_text, rr)}
   </div>
   {onward}
-  <footer>The canonical text lives in the course repo — this page renders it,
-    it does not replace it.</footer>
+  <footer>{foot}</footer>
 </div>
 </body>
 </html>

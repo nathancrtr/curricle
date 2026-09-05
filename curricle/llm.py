@@ -39,7 +39,8 @@ def home() -> str:
     configuration somewhere deliberate. Resolved per call rather than pinned
     at import, so setting it late still works.
     """
-    return os.environ.get("CURRICLE_HOME") or REPO_ROOT
+    from .coursehome import checkout_home
+    return checkout_home()
 
 
 def models_path() -> str:

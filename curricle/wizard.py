@@ -480,7 +480,9 @@ PROMOTE_RETRY_ASIDE = "Publishing calls no model and spends nothing — try it a
 # block with this course and this tenant filled in. The repo has never
 # committed the snippet anywhere (design §9), so the doc is where a learner
 # who closed the tab finds it again — and the card prints a filled-in copy
-# so that nobody has to work out their own paths from a template.
+# so that nobody has to work out their own paths from a template. The app
+# serves the page itself at `/docs/mcp-config.md` (issue #60): on a flow
+# whose promise is browser only, a path in <code> was a terminal errand.
 MCP_DOC = "docs/mcp-config.md"
 MCP_LEDE = ("The same course, read by your own assistant. This runs on your "
             "machine against this database, and the conversation happens "
@@ -2487,9 +2489,9 @@ def landing_screen(flow: onboarding.CourseFlow, courses_dir: str | None,
     <p>{MCP_LEDE}</p>
     <p>{MCP_DEST}</p>
     <pre class="snippet">{e(mcp_config(course_path, tenant_slug))}</pre>
-    <p class="hint">The same block, with the paths left blank, is committed
-    at <code>{MCP_DOC}</code> — that page explains what the tutor can see
-    and what it can write.</p>
+    <p class="hint">The same block, with the paths left blank, is on
+    <a href="/{MCP_DOC}">the tutor page</a>, which explains what the tutor
+    can see and what it can write.</p>
   </div>
   <div class="nav">
     <a class="pill" href="/onboarding/?course=">Start another course</a>

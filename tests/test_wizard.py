@@ -1821,6 +1821,9 @@ class LandingCardTest(WizardFixture):
         self.assertIn("&quot;mcp&quot;", block)
         # And the committed page is named, for the day the tab is closed.
         self.assertIn(wizard.MCP_DOC, page)
+        # A link the browser can follow, not a path to type (issue #60).
+        self.assertIn(f'<a href="/{wizard.MCP_DOC}">', page)
+        self.assertNotIn(f"<code>{wizard.MCP_DOC}</code>", page)
 
     def test_the_block_says_where_it_goes_before_it_says_what_it_is(self):
         # A filled-in config with no destination is an answer to a question

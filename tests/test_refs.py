@@ -212,3 +212,14 @@ class TestCompileRefs(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoManifestTest(unittest.TestCase):
+    def test_a_resolver_with_no_manifest_degrades_every_reference(self):
+        # A platform document has no course behind it: every reference
+        # scheme comes back None, which the renderers print as the label.
+        r = RefResolver(None, to_root="../")
+        for href in ("res:wg", "unit:u2", "mat:l-u01", "repo:README.md"):
+            with self.subTest(href=href):
+                self.assertIsNone(r.resolve(href))
+        self.assertIsNone(r.resolve("https://example.org/"))

@@ -70,6 +70,7 @@ import html as html_mod
 import math
 import os
 import re
+import sys
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -1641,6 +1642,14 @@ def draft_manifest(courses_dir: str | None, course_id: str) -> Manifest | None:
     act on. The exception set is the one the outline stage guards its own
     load with — the sidecar loader raises through whatever it cannot turn
     into a finding.
+
+    None to the learner is not none to the operator. A raise collapsed here
+    is silent by design on the screen and would be silent everywhere without
+    this line: a permission skew on the courses directory looks exactly like
+    a draft that was never written, and a stranger stuck in that loop has
+    nothing to report but "it keeps asking me to redraft". One line to
+    stderr, the class and the message, no traceback — enough to tell the
+    two apart in a log.
     """
     if not courses_dir:
         return None
@@ -1651,7 +1660,9 @@ def draft_manifest(courses_dir: str | None, course_id: str) -> Manifest | None:
         return None
     try:
         manifest, _ = compile_course(root, load_sidecar(sidecar_path))
-    except (ValueError, TypeError, OSError, yaml.YAMLError):
+    except (ValueError, TypeError, OSError, yaml.YAMLError) as exc:
+        print(f"onboarding: draft for {course_id!r} would not compile: "
+              f"{type(exc).__name__}: {exc}", file=sys.stderr)
         return None
     return manifest
 
@@ -2046,12 +2057,23 @@ def _shelf_block(manifest: Manifest) -> str:
         # Beside the decision, never over it: a title that navigated this
         # tab away mid-approval lost the gate. External links carry the
         # hub's ↗, the one glyph that says a link leaves the page.
-        ext = res.url.startswith(("http://", "https://"))
-        target = ' target="_blank" rel="noopener"' if ext else ""
-        arrow = '<span class="arr">↗</span>' if ext else ""
-        items.append(f'<li><b><a href="{e(res.url)}"{target}>{e(res.title)}'
-                     f'{arrow}</a></b>'
-                     f"{essay}</li>")
+        #
+        # Only http(s) becomes a link, and everything else renders as plain
+        # text. A `urn:` is an identifier, not a destination — the ISBN of a
+        # book with no online copy — and the served shelf already renders
+        # those linkless (resrender's `all_links` filter); a relative path
+        # would resolve against this origin, which is the wizard and not the
+        # course. Either way a title that is a dead link here would be a
+        # promise the finished course does not keep. What cannot arrive at
+        # all is a dangerous scheme: `compiler.RESOURCE_URL_SCHEMES` refuses
+        # those upstream, and a draft carrying one never compiles far enough
+        # to be gated.
+        if res.url.startswith(("http://", "https://")):
+            title = (f'<a href="{e(res.url)}" target="_blank" rel="noopener">'
+                     f'{e(res.title)}<span class="arr">↗</span></a>')
+        else:
+            title = e(res.title)
+        items.append(f"<li><b>{title}</b>{essay}</li>")
     return f"""
     <div class="panel field">
       <h3>The resource shelf</h3>
@@ -3022,9 +3044,14 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
         A note from a rejected outline rides along in the `outline_requested`
         payload, because a retry after a rejection is still that note being
         answered and the ledger should say so. The queued run itself carries
-        nothing: the note lives in the fold, which is where the stage reads
-        it from, and copying it into two places would be two places to
-        disagree.
+        nothing, and that is a different statement from the one `reject`
+        makes. The stage reads `run.payload['note'] or flow.note`: a run
+        queued by a rejection is answering the note it was queued with and
+        says so on its own row, while a retry is answering nothing new — it
+        is the same stage attempted again, and the brief it should get is
+        whatever the fold's last note was. An empty payload here is how this
+        button asks for exactly that, rather than pinning a note that may
+        have been superseded by the time a worker picks the run up.
 
         Two folds reach this button, and the second one is the gate with a
         draft it cannot read. That state has no outline to review and no

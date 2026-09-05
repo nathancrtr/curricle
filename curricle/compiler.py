@@ -20,6 +20,29 @@ from .schema import (
 from .sidecar import Sidecar, SidecarUnit
 
 URL_RE = re.compile(r"https?://\S+")
+# The only schemes a resource may link with. `http`/`https` are the shelf's
+# whole job; `urn:` is the ISBN-only book, which the renderers deliberately
+# show linkless (resrender's `all_links` filter) because a urn is an
+# identifier and not a destination. Everything else is refused here rather
+# than filtered per renderer: a resource URL is model-written prose that ends
+# up as an `href` on the trust gate and, after promotion, on the origin that
+# carries the tenant's event APIs, so `javascript:` and `data:` have to die
+# once, upstream of every surface that renders them.
+#
+# A *schemeless* value stays legal, because it is not a scheme problem and
+# the corpus has a real one: textual-flow shelves this repo's own
+# `../exploration/` directory, a relative path that resolves against
+# whatever is serving the page — a dead link at worst, never a script. The
+# one schemeless shape that is refused is the protocol-relative `//host`,
+# which is an off-origin destination with the scheme filed off.
+RESOURCE_URL_SCHEMES = ("http", "https", "urn")
+# A scheme per RFC 3986, read the way a browser reads one. Browsers strip
+# every ASCII whitespace and control character out of a URL before parsing
+# it, so `java\nscript:alert(1)` is `javascript:` by the time it is clicked
+# and has to be `javascript:` by the time it is checked — hence the scrub
+# below rather than a match against the raw text.
+_SCHEME_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.\-]*):")
+_URL_STRIP_RE = re.compile(r"[\x00-\x20\x7f]")
 _MAT_LINK_RE = re.compile(r"\]\(mat:([^)]+)\)")
 INTERACTIVE_PATH_RE = re.compile(r"(interactive/[A-Za-z0-9_./\-]+[A-Za-z0-9_\-/])")
 
@@ -277,6 +300,28 @@ def _validate(mf: Manifest, content_root: str, issues: Issues, *,
     for k in set(keys):
         if keys.count(k) > 1:
             issues.error(k, "duplicate resource key")
+
+    # Resource link targets, every one of them: `url` is the primary and
+    # `links` are what the shelf actually renders, so checking only the
+    # first would leave the other rows clickable.
+    for r in mf.resources:
+        targets: dict[str, str] = {}          # url -> the label to name it by
+        for label, url in (("url", r.url), *r.all_links):
+            targets.setdefault(url, label)
+        allowed = ", ".join(f"{s}:" for s in RESOURCE_URL_SCHEMES)
+        for url, label in targets.items():
+            bare = _URL_STRIP_RE.sub("", url)
+            match = _SCHEME_RE.match(bare)
+            if match is not None:
+                if match.group(1).lower() not in RESOURCE_URL_SCHEMES:
+                    issues.error(f"resource {r.key}",
+                                 f"link {label!r} uses the "
+                                 f"{match.group(1).lower()}: scheme; resource "
+                                 f"URLs may only use {allowed}")
+            elif bare.startswith("//"):
+                issues.error(f"resource {r.key}",
+                             f"link {label!r} is protocol-relative; give it an "
+                             f"explicit scheme ({allowed})")
 
     unit_ids = {u.id for u in mf.units}
     phase_ids = {p.id for p in mf.phases}

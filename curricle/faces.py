@@ -63,7 +63,15 @@ CLAIMS = {
 PLAN = {"phase_id": "p1", "lesson_unit": "u1", "widget_unit": "u2",
         "widget_concept": "precedence as a table of binding powers",
         "exercise_unit": "u2", "quiz": True, "bank": True}
-OUTLINE = {"plan": PLAN, "estimate_usd": "1.37", "headroom_usd": "20.00"}
+# The estimate ends in a zero on purpose. These numbers are strings the whole
+# way from the ledger to the page precisely so that nothing reformats them,
+# and a trailing zero is the only fixture that can prove it: a float anywhere
+# on the path renders "1.40" as "1.3" and every assertion on the number
+# fails. The old "1.37" survived that round trip unchanged and so tested
+# nothing. The cents are also checked against the rendered pages — the
+# stylesheets quote contrast ratios in their comments, and "1.30" would have
+# matched one of those, silently defeating the gate test's `assertNotIn`.
+OUTLINE = {"plan": PLAN, "estimate_usd": "1.40", "headroom_usd": "20.00"}
 SCOPE = {"title": "Interpreters, end to end", "subject": "interpreters",
          "mode": "project", "hours_per_week": 4}
 
@@ -141,7 +149,7 @@ def faces() -> list[Face]:
     # reason the wording table knows.
     # The build faces carry an approved plan and two landed artifacts, so
     # the path in the panel has stones lit, one ringed and some to come.
-    build = {"approval": {"plan": PLAN, "estimate_usd": "1.37"},
+    build = {"approval": {"plan": PLAN, "estimate_usd": "1.40"},
              "landed": ("lesson", "widget")}
     for stage, draw in (("outline", lambda f: wizard.outline_screen(f)),
                         ("build", lambda f: wizard.build_screen(

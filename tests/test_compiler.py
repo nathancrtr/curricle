@@ -11,7 +11,7 @@ from curricle.compiler import compile_course
 from curricle.sidecar import (
     Sidecar, SidecarCourse, SidecarMaterial, SidecarMilestone, SidecarUnit,
 )
-from curricle.schema import Grader, Step, Track, Stage
+from curricle.schema import Grader, Resource, Step, Track, Stage
 
 CURRICULUM = textwrap.dedent("""\
     ## Phase 0 — Orientation (Week 0)
@@ -182,6 +182,92 @@ class TestCompile(unittest.TestCase):
     def test_grader_types_are_enforced(self):
         with self.assertRaises(Exception):
             Grader(type="vibes")
+
+
+class TestResourceUrlSchemes(unittest.TestCase):
+    """The chokepoint that keeps a model-written `href` from being a script.
+
+    A resource URL is prose a model wrote from a learner's scope, and it is
+    rendered as an anchor on the outline gate — the trust screen, on the
+    origin that after promotion also carries the tenant's event APIs. The
+    rule lives here rather than in the three renderers because a compile is
+    what every one of those surfaces is downstream of: the gate compiles the
+    draft fresh, the worker refuses before `outline_ready`, and `factory
+    promote` aborts on a dirty compile.
+    """
+
+    def setUp(self):
+        self.root = make_course_dir()
+
+    def compile_with(self, url=None, links=()):
+        res = Resource(key="r1", title="R", url=url or (links[0][1] if links else ""),
+                       links=tuple(links))
+        return compile_course(self.root, base_sidecar(resources=(res,)))
+
+    def errors(self, issues):
+        return [i.message for i in issues if i.level == "error"]
+
+    def test_http_https_and_urn_are_the_shelf_vocabulary(self):
+        for url in ("https://example.org/book", "http://example.org/book",
+                    "urn:isbn:9783438060105"):
+            with self.subTest(url=url):
+                mf, issues = self.compile_with(url)
+                self.assertIsNotNone(mf, self.errors(issues))
+
+    def test_a_dangerous_scheme_is_refused(self):
+        for url in ("javascript:alert(1)", "data:text/html,<script>x</script>",
+                    "vbscript:msgbox", "JavaScript:alert(1)"):
+            with self.subTest(url=url):
+                mf, issues = self.compile_with(url)
+                self.assertIsNone(mf)
+                self.assertTrue(any("scheme" in m for m in self.errors(issues)),
+                                self.errors(issues))
+
+    def test_a_scheme_a_browser_would_reassemble_is_refused(self):
+        r"""Browsers strip whitespace and control characters before parsing.
+
+        `java\nscript:` is `javascript:` by the time it is clicked, so it has
+        to be `javascript:` by the time it is checked — a rule matching the
+        raw text would wave this through as a relative path.
+        """
+        for url in ("java\nscript:alert(1)", "java\tscript:alert(1)",
+                    "  javascript:alert(1)", "java\rscript:alert(1)"):
+            with self.subTest(url=repr(url)):
+                mf, issues = self.compile_with(url)
+                self.assertIsNone(mf, "a browser would run this")
+
+    def test_a_relative_path_stays_legal(self):
+        """textual-flow shelves this repo's own `../exploration/`.
+
+        It is not a scheme problem: a relative path resolves against whoever
+        is serving the page — a dead link at worst, never a script — and the
+        corpus has a real one, so refusing it would be refusing a course
+        that has always compiled.
+        """
+        mf, issues = self.compile_with(links=[["exploration/", "../exploration/"]])
+        self.assertIsNotNone(mf, self.errors(issues))
+
+    def test_a_protocol_relative_url_is_refused(self):
+        """The one schemeless shape that is still a destination."""
+        mf, issues = self.compile_with("//evil.example/x")
+        self.assertIsNone(mf)
+        self.assertTrue(any("protocol-relative" in m for m in self.errors(issues)))
+
+    def test_every_link_is_checked_not_only_the_primary(self):
+        """`links` is what the shelf renders; checking `url` alone would
+        leave every row after the first clickable."""
+        mf, issues = self.compile_with(links=[
+            ["Publisher", "https://example.org/book"],
+            ["Mirror", "javascript:alert(1)"],
+        ])
+        self.assertIsNone(mf)
+        self.assertEqual(len(self.errors(issues)), 1, self.errors(issues))
+        self.assertIn("'Mirror'", self.errors(issues)[0])
+
+    def test_one_bad_url_reported_once_not_once_per_alias(self):
+        """`url` defaults to `links[0]`, so a naive walk names it twice."""
+        mf, issues = self.compile_with("javascript:alert(1)")
+        self.assertEqual(len(self.errors(issues)), 1, self.errors(issues))
 
 
 # The same course as `base_sidecar()`, on disk: the CLI loads its sidecar from

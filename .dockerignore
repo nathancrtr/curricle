@@ -29,7 +29,16 @@ __pycache__/
 
 # Prose that ships in the repo rather than the image. README.md and LICENSE
 # are exceptions — pyproject names them and the build needs them.
-docs/
+#
+# `docs/` is NOT excluded, and the omission is the point: the app serves
+# `docs/mcp-config.md` at /docs/ and the landing card links it, so the
+# directory is runtime content in a checkout-mode image rather than prose
+# about it (see the COPY in the Dockerfile). Excluding it here while the
+# Dockerfile copied it is what broke the v0.1.4 build — `COPY` of an ignored
+# path is not a silent no-op, it fails the build with "/docs: not found",
+# which is the good outcome and the reason this is a comment and not a bug
+# report. If a future change stops serving documents, delete the COPY and
+# put `docs/` back.
 CONTRIBUTING.md
 CODE_OF_CONDUCT.md
 CLAUDE.md

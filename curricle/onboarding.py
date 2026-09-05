@@ -187,6 +187,13 @@ WORDING: dict[tuple[str, str], str] = {
         "worker, will clear it; this one is also worth reporting.",
 }
 
+# What a phase-1 build can land, in the order the factory writes them and
+# the order the build screen draws them. A `build_progress` row names one;
+# the fold accumulates them into the flow's `landed` tuple. The names are
+# the plan's own keys with `_unit` shorn off, so the screen can line a
+# landed row up against an approved plan item without a second table.
+BUILD_ARTIFACTS = ("lesson", "widget", "exercise", "quiz", "bank")
+
 # The profile fields every factory prompt leans on (design §4, Stops 1–4).
 # The rest may be empty — an empty field is an omitted line in the prompt,
 # not filler — but a course generated against none of these is the product's
@@ -251,6 +258,10 @@ def validate_event(kind: str, course: str, payload: dict) -> None:
     elif kind == "promoted":
         if not isinstance(payload.get("course_id"), str):
             raise InvalidOnboardingEvent(f"{kind}: payload needs 'course_id' (string)")
+    elif kind == "build_progress":
+        if payload.get("artifact") not in BUILD_ARTIFACTS:
+            raise InvalidOnboardingEvent(
+                f"{kind}: payload needs 'artifact' in {BUILD_ARTIFACTS}")
 
 
 def append_event(conn: sa.Connection, scope: db.TenantScope, kind: str,
@@ -277,6 +288,7 @@ class CourseFlow:
     outline: dict | None = None         # latest outline_ready payload {plan, estimate_usd}
     approval: dict | None = None        # latest outline_approved payload
     note: str | None = None             # latest outline_rejected note
+    landed: tuple[str, ...] = ()        # BUILD_ARTIFACTS the build has written, in order
     updated_at: datetime | None = None  # the flow's last row's created_at — display only
 
 
@@ -359,8 +371,18 @@ def fold(events) -> OnboardingState:
         elif kind == "outline_approved":
             _at(flow, "build", "waiting")
             flow.approval = payload
+            # A fresh approval is a fresh plan: what an earlier build of a
+            # rejected outline landed is not what this one will.
+            flow.landed = ()
         elif kind == "build_requested":
+            # Not reset here: a retry after a failure resumes, and the
+            # artifacts an earlier run landed are still on disk and still
+            # lit. The approval above is what starts the count over.
             _at(flow, "build", "pending")
+        elif kind == "build_progress":
+            artifact = payload.get("artifact")
+            if artifact and artifact not in flow.landed:
+                flow.landed = flow.landed + (artifact,)
         elif kind == "build_failed":
             _at(flow, "build", "failed", payload.get("reason"))
         elif kind == "build_ready":

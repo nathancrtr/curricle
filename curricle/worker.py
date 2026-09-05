@@ -288,9 +288,19 @@ def _build(engine: sa.Engine, scope: db.TenantScope,
     # the draft tree; only promotion touches a course.
     content_root = os.path.join(draft_root, "learning")
     spec = _remaining(factory.BuildSpec(**plan), content_root)
+
+    def landed(artifact: str) -> None:
+        # One short transaction per artifact, between the checkpoint that
+        # made it durable and the next role call: the fact the screen
+        # draws a stone from, recorded the moment it becomes a fact. A
+        # count, never a forecast (design §3; issue #59).
+        with engine.begin() as conn:
+            onboarding.append_event(conn, scope, "build_progress", run.course,
+                                    {"artifact": artifact})
+
     try:
         report = factory.build_phase(RUNNER_FACTORY(engine, scope), manifest,
-                                     prof, content_root, spec)
+                                     prof, content_root, spec, progress=landed)
     except llm.NoApiKey as exc:
         # The same two classifications as the outline stage's: a credential
         # that is missing, and one that is refused, are both things the

@@ -195,6 +195,17 @@ class FacesTest(unittest.TestCase):
             self.assertNotIn("http-equiv", page)           # no refresh fallback
             self.assertIn("3 min", page)                    # elapsed, not a forecast
 
+    def test_the_build_faces_draw_what_has_landed(self):
+        # Two rings on the pending face — the masthead's on the build stop,
+        # the panel's on the artifact being written — and one on the failed
+        # face, where nothing is being written.
+        pending = self.page("build-pending")
+        self.assertIn("2 of 5 landed — writing the exercise", pending)
+        self.assertEqual(pending.count("wp-stone here"), 2)
+        failed = self.page("build-failed-worker-error")
+        self.assertIn("2 of 5 landed and kept", failed)
+        self.assertEqual(failed.count("wp-stone here"), 1)
+
     def test_the_filled_forms_and_the_review_carry_the_claims(self):
         self.assertIn(faces.CLAIMS["background"], self.page("form-1-filled"))
         self.assertNotIn(faces.CLAIMS["background"], self.page("form-1-empty"))

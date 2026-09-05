@@ -139,15 +139,22 @@ def faces() -> list[Face]:
 
     # Stops 7, 9, 10 — each machine turn pending, then failed for every
     # reason the wording table knows.
+    # The build faces carry an approved plan and two landed artifacts, so
+    # the path in the panel has stones lit, one ringed and some to come.
+    build = {"approval": {"plan": PLAN, "estimate_usd": "1.37"},
+             "landed": ("lesson", "widget")}
     for stage, draw in (("outline", lambda f: wizard.outline_screen(f)),
                         ("build", lambda f: wizard.build_screen(
                             f, _spend(built=f.reason is not None))),
                         ("promote", lambda f: wizard.promote_screen(f))):
+        extra = build if stage == "build" else {}
         add(f"{stage}-pending", stage, None,
-            draw(_flow(stage, "pending")), "a machine's turn, three minutes in")
+            draw(_flow(stage, "pending", **extra)),
+            "a machine's turn, three minutes in"
+            + (", two of five landed" if extra else ""))
         for reason in onboarding.REASONS:
             add(f"{stage}-failed-{reason.replace('_', '-')}", stage, None,
-                draw(_flow(stage, "failed", reason)),
+                draw(_flow(stage, "failed", reason, **extra)),
                 f"failed: {reason}")
 
     # Stop 8 — the gate over the example course, and over a draft that

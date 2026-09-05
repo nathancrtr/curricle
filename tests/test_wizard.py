@@ -1224,6 +1224,60 @@ class OutlineApproveTest(GateFixture):
         self.assertEqual(again.status_code, 409)
         self.assertEqual([(r.stage, r.status) for r in self.queued()],
                          [("build", "queued")])
+        # The path the panel draws: one stone per bought artifact, the ring
+        # on the first, and the count in words — a count, not a forecast.
+        self.assertIn("the lesson: current", page)
+        self.assertIn("the question bank: to come", page)
+        self.assertIn("Writing the lesson — the first of 5", page)
+        self.assertIn('data-landed="0"', page)
+        self.assertNotIn("no progress bar", page)
+
+    def test_z_a_landed_artifact_lights_a_stone_and_moves_the_poll(self):
+        # Named to run last in this class: it appends to the shared ledger.
+        with self.engine.begin() as conn:
+            onboarding.append_event(conn, self.scope, "build_progress",
+                                    self.COURSE, {"artifact": "lesson"})
+        page = self.screen()
+        self.assertIn("the lesson: done", page)
+        self.assertIn("the widget: current", page)
+        self.assertIn("1 of 5 landed — writing the widget", page)
+        self.assertIn('data-landed="1"', page)
+        # The poll reloads on a count change exactly as on a stop change,
+        # and the status route says the count for it to compare.
+        status = self.client.get(wizard.STATUS_PATH).json()
+        self.assertEqual((status["stop"], status["status"], status["landed"]),
+                         ("build", "pending", 1))
+        self.assertIn("String(s.landed) !== landed", page)
+
+
+class BuildWaypathTest(unittest.TestCase):
+    """The build panel's path, as a function of the plan and the ledger."""
+
+    PLAN = GateFixture.PLAN      # five bought
+
+    def test_lit_ringed_and_to_come_with_the_count_in_words(self):
+        path = wizard.build_waypath(self.PLAN, ("lesson", "widget"))
+        self.assertEqual(path.count("wp-stone lit"), 2)
+        self.assertEqual(path.count("wp-stone here"), 1)
+        self.assertIn("the exercise: current", path)
+        self.assertIn("2 of 5 landed — writing the exercise", path)
+
+    def test_everything_landed_is_five_lit_and_no_ring(self):
+        path = wizard.build_waypath(self.PLAN, tuple(onboarding.BUILD_ARTIFACTS))
+        self.assertEqual(path.count("wp-stone lit"), 5)
+        self.assertNotIn("wp-stone here", path)
+        self.assertIn("All 5 landed — checking the phase", path)
+
+    def test_a_stopped_build_draws_no_ring_and_says_what_was_kept(self):
+        path = wizard.build_waypath(self.PLAN, ("lesson",), failed=True)
+        self.assertNotIn("wp-stone here", path)
+        self.assertIn("1 of 5 landed and kept", path)
+        self.assertIn("Nothing had landed yet",
+                      wizard.build_waypath(self.PLAN, (), failed=True))
+
+    def test_a_plan_that_buys_nothing_draws_nothing(self):
+        self.assertEqual(wizard.build_waypath({}, ()), "")
+        self.assertEqual(wizard.build_waypath({"phase_id": "p1"}, ("lesson",)), "")
 
 
 class PlanAgreementTest(GateFixture):
@@ -2932,7 +2986,7 @@ class ProjectionHookOffTest(unittest.TestCase):
 
 
 class StatusRouteTest(WizardFixture):
-    """The waiting screens' poll: three fields off the same fold.
+    """The waiting screens' poll: four fields off the same fold.
 
     The route exists so that eleven minutes of building is eleven minutes of
     a page holding still rather than a hundred and thirty full reloads. What
@@ -2940,10 +2994,10 @@ class StatusRouteTest(WizardFixture):
     happened, and nothing else — no course content, no payloads, no plan.
     """
 
-    def test_the_status_is_the_fold_in_three_fields(self):
+    def test_the_status_is_the_fold_in_four_fields(self):
         self.assertEqual(self.client.get("/onboarding/status").json(),
                          {"stop": "profile", "status": "waiting",
-                          "elapsed": "just started"})
+                          "elapsed": "just started", "landed": 0})
         self.append("profile_published")
         self.append("scope_saved", "greek-120", {"title": "Greek"})
         self.append("outline_requested", "greek-120")
@@ -2952,7 +3006,7 @@ class StatusRouteTest(WizardFixture):
         self.assertEqual(status.headers["content-type"], "application/json")
         self.assertEqual(status.json(),
                          {"stop": "outline", "status": "pending",
-                          "elapsed": "less than a minute elapsed"})
+                          "elapsed": "less than a minute elapsed", "landed": 0})
 
     def test_then_the_answer_moves_when_the_fold_does(self):
         # Named to run after the outline above: the fold moves, and so does

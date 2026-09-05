@@ -53,11 +53,14 @@ PROFILE_EVENT_KINDS = ("assert", "propose", "accept", "reject", "retract")
 # any other, and a stage that can fail is a stage that can be asked for again.
 # Without the request row, a retried promotion has nothing to move the flow
 # off "failed", and the wizard would show a live run as a dead one (O1).
+# `build_progress` (0006) is one row per artifact as the build lands it:
+# a count the worker holds, so a fact for the ledger and a stone for the
+# screen — never a forecast.
 ONBOARDING_EVENT_KINDS = (
     "profile_published", "scope_saved",
     "outline_requested", "outline_ready", "outline_failed",
     "outline_approved", "outline_rejected",
-    "build_requested", "build_ready", "build_failed",
+    "build_requested", "build_progress", "build_ready", "build_failed",
     "promote_requested", "promote_failed", "promoted",
 )
 

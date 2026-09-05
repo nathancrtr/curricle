@@ -558,12 +558,13 @@ POLL_JS = """
   var elapsed = document.getElementById("wait-elapsed");
   var stop = line.getAttribute("data-stop");
   var status = line.getAttribute("data-status");
+  var landed = line.getAttribute("data-landed");
   function ask() {
     fetch("/onboarding/status", { headers: { "Accept": "application/json" } })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (s) {
         if (!s) return;
-        if (s.stop !== stop || s.status !== status) { location.reload(); return; }
+        if (s.stop !== stop || s.status !== status || String(s.landed) !== landed) { location.reload(); return; }
         if (elapsed) elapsed.textContent = s.elapsed;
       })
       .catch(function () {});
@@ -621,6 +622,10 @@ WIZARD_CSS = theme.style("""\
         overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
   .stepline { font-size:13.5px; font-weight:600; color:var(--muted);
               margin:12px 0 0; }
+  /* The build panel's own path: the same stones at the same size, sitting
+     between the inventory sentence and the sentence about the wait. */
+  .gatebox ol.waypath { margin:4px 0 0; }
+  .gatebox .stepline { margin:10px 0 12px; }
   .gatebox { background:var(--panel); border:1px solid var(--line);
              border-radius:var(--r-card); box-shadow:var(--shadow); padding:20px 24px;
              margin:26px 0; }
@@ -931,22 +936,25 @@ def _waitline(stop: str, status: str,
     since = (f'<span class="elapsed" id="wait-elapsed">'
              f"{elapsed_words(flow.updated_at)}</span>"
              if flow is not None else "")
+    landed = len(flow.landed) if flow is not None else 0
     return (f'<p class="stateline" id="wait" data-stop="{stop}" '
-            f'data-status="{status}">{_chip(status)}{since}</p>')
+            f'data-status="{status}" data-landed="{landed}">'
+            f"{_chip(status)}{since}</p>")
 
 
-def _stone(stage: str, state: str) -> str:
+def _stone(label: str, state: str) -> str:
     """One stone: the drawing for everyone who can see it, the word for the rest.
 
     The stone itself carries no text, so it is `aria-hidden` and the item
     around it holds the position in a phrase nobody sees — "Outline:
-    current". A ring a screen reader cannot read is a position only some
-    readers are given.
+    current", "the widget: done". A ring a screen reader cannot read is a
+    position only some readers are given. Two paths draw these: the setup's
+    six stops, and the build panel's artifacts (`build_waypath`).
     """
     tint = {"done": " lit", "current": " here", "to come": ""}[state]
     current = ' aria-current="step"' if state == "current" else ""
     return (f'<li{current}><span class="wp-stone{tint}" aria-hidden="true">'
-            f'</span><span class="vh">{STEP_LABELS[stage]}: {state}</span></li>')
+            f'</span><span class="vh">{html_mod.escape(label)}: {state}</span></li>')
 
 
 def _waypath(stop: str, sub: str | None = None) -> str:
@@ -982,13 +990,14 @@ def _waypath(stop: str, sub: str | None = None) -> str:
     """
     total = len(onboarding.STAGE_SEQUENCE)
     if stop == "done":
-        stones = "".join(_stone(stage, "done")
+        stones = "".join(_stone(STEP_LABELS[stage], "done")
                          for stage in onboarding.STAGE_SEQUENCE)
         return (f'<ol class="waypath" role="list">{stones}</ol>'
                 f'<p class="stepline">All {total} steps done</p>')
     at = onboarding.STAGE_SEQUENCE.index(stop)
     stones = "".join(
-        _stone(stage, "done" if i < at else "current" if i == at else "to come")
+        _stone(STEP_LABELS[stage],
+               "done" if i < at else "current" if i == at else "to come")
         for i, stage in enumerate(onboarding.STAGE_SEQUENCE))
     words = f"Step {at + 1} of {total}"
     if stop == "profile":
@@ -1782,6 +1791,7 @@ class PlanItem:
     name: str       # "the widget" — what the build screen calls it
     detail: str     # the widget's concept, or why this one is not bought
     bought: bool
+    key: str = ""   # the onboarding.BUILD_ARTIFACTS name a landed row carries
 
 
 def plan_items(plan: dict, manifest: Manifest | None) -> tuple[PlanItem, ...]:
@@ -1808,9 +1818,10 @@ def plan_items(plan: dict, manifest: Manifest | None) -> tuple[PlanItem, ...]:
     items = []
     for key, what, name in PLAN_PARTS:
         unit_id = plan.get(key)
+        artifact = key.removesuffix("_unit")
         if not unit_id:
             items.append(PlanItem(what[0].upper() + what[1:], name,
-                                  UNPLANNED_REASON, False))
+                                  UNPLANNED_REASON, False, artifact))
             continue
         unit = units.get(unit_id)
         where = f"Unit {unit.num}" if unit is not None else str(unit_id)
@@ -1824,17 +1835,57 @@ def plan_items(plan: dict, manifest: Manifest | None) -> tuple[PlanItem, ...]:
             concept = (plan.get("widget_concept") or "").strip()
             gloss = (unit.gloss or "").strip() if unit is not None else ""
             detail = concept if concept and concept != gloss else ""
-        items.append(PlanItem(f"{where} · {what}", name, detail, True))
+        items.append(PlanItem(f"{where} · {what}", name, detail, True, artifact))
 
     quiz = bool(plan.get("quiz"))
     items.append(PlanItem(f"{phase_words} checkpoint quiz",
                           "the checkpoint quiz",
-                          "" if quiz else UNPLANNED_REASON, quiz))
+                          "" if quiz else UNPLANNED_REASON, quiz, "quiz"))
     bank = bool(plan.get("bank"))
     items.append(PlanItem(
         "Question bank" + (" · a new section" if bank else ""),
-        "the question bank", "" if bank else BANK_REASON, bank))
+        "the question bank", "" if bank else BANK_REASON, bank, "bank"))
     return tuple(items)
+
+
+def build_waypath(plan: dict, landed: tuple[str, ...], *,
+                  failed: bool = False) -> str:
+    """What the build has landed, drawn in the product's own gesture.
+
+    One stone per artifact the approved plan buys, in the order the worker
+    writes them: lit for one the ledger says has landed, the hollow ring on
+    the one being written, unlit for those to come. Under it, the count in
+    words. This is the one number a waiting screen may show, because it is
+    a count of finished things the worker recorded as each one landed — not
+    an estimate, not a percentage of time, nothing this system would have to
+    invent (design §3; issue #59).
+
+    A stopped build draws no ring: nothing is being written, and the lit
+    stones are exactly what "what was already finished was kept" means. A
+    plan with nothing bought — a legacy approval with no plan in it — draws
+    nothing at all rather than an empty path.
+    """
+    bought = [item for item in plan_items(plan, None) if item.bought]
+    if not bought:
+        return ""
+    done = [item for item in bought if item.key in landed]
+    ahead = [item for item in bought if item.key not in landed]
+    current = ahead[0] if ahead and not failed else None
+    stones = "".join(
+        _stone(item.name, "done" if item in done
+               else "current" if item is current else "to come")
+        for item in bought)
+    n, total = len(done), len(bought)
+    if failed:
+        words = (f"{n} of {total} landed and kept" if n
+                 else "Nothing had landed yet")
+    elif current is not None:
+        words = (f"{n} of {total} landed — writing {current.name}" if n
+                 else f"Writing {current.name} — the first of {total}")
+    else:
+        words = f"All {total} landed — checking the phase"
+    return (f'<ol class="waypath" role="list">{stones}</ol>'
+            f'<p class="stepline">{words}</p>')
 
 
 def _and_list(names: list[str]) -> str:
@@ -2180,12 +2231,15 @@ def build_screen(flow: onboarding.CourseFlow | None,
         aside = BUILD_RETRY_ASIDE + (
             BUILD_RETRY_SPENT.format(spent=dollars(spend.build))
             if spend is not None and spend.build else "")
+        kept = build_waypath((flow.approval or {}).get("plan") or {},
+                             flow.landed, failed=True)
         return Screen(f"""
   <h1>{STOP_TITLES["build"]}</h1>
   <div class="gatebox attention">
     <p class="stateline">{_chip("failed")}</p>
     <h2>The build stopped</h2>
     <p class="wording">{worded}</p>
+    {kept}
     <form method="post" action="/onboarding/build/retry">
       <p class="ask">
         <button class="pill primary" type="submit">Carry on</button>
@@ -2199,17 +2253,24 @@ def build_screen(flow: onboarding.CourseFlow | None,
     # while the gate had said, two clicks earlier, that a new course does
     # not get one. Two screens, one derivation, and they cannot disagree.
     approval = (flow.approval or {}) if flow is not None else {}
+    plan = approval.get("plan") or {}
+    landed = build_waypath(plan, flow.landed if flow is not None else ())
+    # What has landed is drawn; how long the rest will take is not. The
+    # old paragraph said there was no progress bar because the system
+    # would have to invent one — true of the time, never of the count,
+    # which the ledger has held since 0006 (issue #59).
     return Screen(f"""
   <h1>{STOP_TITLES["build"]}</h1>
   <div class="gatebox">
     {_waitline("build", status, flow)}
     <h2>Building your phase-1 materials</h2>
-    <p>{build_inventory(approval.get("plan") or {})}
+    <p>{build_inventory(plan)}
     Every one of them is refused rather than kept if it fails its checks, and
     what has already been finished survives a stage that stops partway.</p>
-    <p>There is no progress bar here and no estimate of how much longer it
-    will be, because this system would have to invent both. Leave the tab
-    open or close it — the ledger keeps your place either way.</p>
+    {landed}
+    <p>No estimate of how much longer it will be — this system would have to
+    invent one — but each stone fills as its piece lands. Leave the tab open
+    or close it; the ledger keeps your place either way.</p>
   </div>
 """, refresh=status == "pending")
 
@@ -2643,7 +2704,7 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
 
     @app.get(STATUS_PATH)
     def onboarding_status() -> JSONResponse:
-        """Where the fold is, in three fields, for the waiting screens.
+        """Where the fold is, in four fields, for the waiting screens.
 
         The whole of what a waiting page needs to know whether anything has
         changed: which stop, which of the two waits, and how long it has
@@ -2663,6 +2724,9 @@ def mount(app: FastAPI, *, engine, scope: db.TenantScope, tenant_slug: str,
             "status": flow.status if flow is not None else "waiting",
             "elapsed": elapsed_words(flow.updated_at
                                      if flow is not None else None),
+            # The count of landed artifacts: a stone lighting is a different
+            # screen to be on, the same as a stop changing.
+            "landed": len(flow.landed) if flow is not None else 0,
         })
 
     @app.get("/onboarding/")

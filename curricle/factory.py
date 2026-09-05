@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Callable
 import re
 import subprocess
 import sys
@@ -825,7 +826,16 @@ def estimate_build_cost(config: ModelsConfig, plan: dict) -> Decimal:
 # ---------------------------------------------------------------------------
 
 def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
-                content_root: str, spec: BuildSpec) -> BuildReport:
+                content_root: str, spec: BuildSpec,
+                progress: Callable[[str], None] | None = None) -> BuildReport:
+    """Build the phase `spec` names into the draft tree, one artifact at a time.
+
+    `progress`, when given, is called with the artifact's name — one of
+    `onboarding.BUILD_ARTIFACTS` — right after that artifact has been
+    checkpointed, so a caller can record what has landed without reading
+    the draft. The worker uses it to write the ledger row the build screen
+    draws a stone from; the CLI passes nothing.
+    """
     phase = next(p for p in manifest.phases if p.id == spec.phase_id)
     units = {u.id: u for u in manifest.units}
     profile_md = render_skill_md(profile)
@@ -863,6 +873,11 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
                        "artifacts": kept + fresh,
                        "costs": {**prior_costs, **report.costs}}, f, indent=2)
 
+    def landed(artifact: str) -> None:
+        checkpoint()
+        if progress is not None:
+            progress(artifact)
+
     def run(role: str, sections: list[tuple[str, str]], max_tokens: int = 32000):
         result = runner.run_role(role, _prompt(profile_md, sections), max_tokens)
         report.costs[role] = f"${result.cost_usd:.4f} ({result.model}, " \
@@ -892,7 +907,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": f"l-u{unit.num:02d}", "kind": "lesson",
                       "title": f"{unit.title} (Socratic)",
                       "path": f"interactive/{rel}", "unit": unit.id}))
-        checkpoint()
+        landed("lesson")
 
     if spec.widget_unit:
         unit = units[spec.widget_unit]
@@ -915,7 +930,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": f"w-{slug[:16].rstrip('-')}", "kind": "widget",
                       "title": concept, "path": f"interactive/{rel}",
                       "unit": unit.id}))
-        checkpoint()
+        landed("widget")
 
     if spec.exercise_unit:
         unit = units[spec.exercise_unit]
@@ -938,7 +953,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
                       "unit": unit.id,
                       "grader": {"type": "unit-test", "runner": "python-unittest",
                                  "command": f"python {data['test_name']}"}}))
-        checkpoint()
+        landed("exercise")
 
     if spec.quiz:
         # The shell is the course's own checkpoint page with its data swapped;
@@ -969,7 +984,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             material={"id": quiz_id, "kind": "quiz",
                       "title": f"Phase {phase.num} checkpoint",
                       "path": f"interactive/{rel}", "phase_num": phase.num}))
-        checkpoint()
+        landed("quiz")
 
     if spec.bank:
         bank_material = next((m for m in manifest.materials
@@ -990,7 +1005,7 @@ def build_phase(runner: Runner, manifest: Manifest, profile: ProfileState,
             role="bank-author", rel_path="", content=text,
             material={},
             note=f"append to {bank_material.path if bank_material else 'question bank'}"))
-        checkpoint()
+        landed("bank")
 
     return report
 

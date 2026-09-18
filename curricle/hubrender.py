@@ -385,7 +385,18 @@ def render_hub(mf: Manifest, *, api: str | None = None,
         # everyone's: the trainers are Greek-track furniture, so they sit
         # under the Greek track's stepper. Served only — standalone keeps
         # the card grid below instead.
-        tools = [m for m in mf.materials if m.track == t.id]
+        own = [m for m in mf.materials if m.track == t.id]
+        chapters = [m for m in own if m.kind == "chapter"]
+        tools = [m for m in own if m.kind != "chapter"]
+        # A track's chapters are its text, read in registry order — the
+        # same "start here" a unit page gives its chapter — so they come
+        # before the trainers and are numbered, not listed as tools.
+        if api and chapters:
+            links = " · ".join(
+                f'<a href="{e(material_href(m))}">{i}. {e(m.title)}</a>'
+                for i, m in enumerate(chapters, 1))
+            parts.append(f'<p class="track-tools track-chapters">Its '
+                         f"chapters, in order: {links}</p>")
         if api and tools:
             links = " · ".join(
                 f'<a href="{e(material_href(m))}">{e(m.title)}</a>'

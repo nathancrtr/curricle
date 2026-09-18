@@ -45,7 +45,7 @@ class TestTextualFlow(unittest.TestCase):
     def test_shape(self):
         self.assertEqual(len(self.manifest.phases), 7)
         self.assertEqual(len(self.manifest.units), 23)
-        self.assertEqual(len(self.manifest.materials), 23)   # + the Phase 0 and Unit 1–4 chapters
+        self.assertEqual(len(self.manifest.materials), 24)   # + the Phase 0 and Unit 1–4 chapters, + Greek 1
         self.assertEqual(len(self.manifest.resources), 44)    # + Head 2010
 
     def test_every_phase_after_p0_has_goal_and_units(self):

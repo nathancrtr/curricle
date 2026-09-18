@@ -342,12 +342,22 @@ class TestMaterialsIncorporation(unittest.TestCase):
                                 title="Side Drill",
                                 path="interactive/quizzes/drill.html",
                                 track="side"),
+                SidecarMaterial(id="c-s02", kind="chapter",
+                                title="Side Two",
+                                path="interactive/chapters/side-02.md",
+                                track="side"),
+                SidecarMaterial(id="c-s01", kind="chapter",
+                                title="Side One",
+                                path="interactive/chapters/side-01.md",
+                                track="side"),
                 SidecarMaterial(id="b-bank", kind="question-bank",
                                 title="Question Bank",
                                 path="interactive/quizzes/bank.md"),
             ),
             extra_files=("interactive/quizzes/drill.html",
-                         "interactive/quizzes/bank.md"))
+                         "interactive/quizzes/bank.md",
+                         "interactive/chapters/side-02.md",
+                         "interactive/chapters/side-01.md"))
         cls.served = render_hub(cls.mf, api="api/events")
         cls.standalone = render_hub(cls.mf)
 
@@ -366,6 +376,21 @@ class TestMaterialsIncorporation(unittest.TestCase):
         # the stylesheet carries the rule in both modes; the element only
         # exists served
         self.assertNotIn('<p class="track-tools"', self.standalone)
+
+    def test_a_tracks_chapters_are_its_text_read_in_order(self):
+        # Chapters are the track's own text, so they lead its section,
+        # numbered in registry order and opened in the reader — not filed
+        # among the trainers as "tools".
+        chapters = self.served.index('class="track-tools track-chapters"')
+        tools = self.served.index('<p class="track-tools">Its tools')
+        self.assertLess(chapters, tools)
+        self.assertIn('href="read/interactive/chapters/side-02.md">'
+                      '1. Side Two</a>', self.served)
+        self.assertIn('href="read/interactive/chapters/side-01.md">'
+                      '2. Side One</a>', self.served)
+        self.assertNotIn('Its tools, in the browser: <a href="read/interactive/chapters',
+                         self.served)
+        self.assertNotIn("track-chapters", self.standalone)
 
     def test_unowned_materials_join_the_documents_panel_when_served(self):
         # markdown goes through the reader; the gloss is the kind when the

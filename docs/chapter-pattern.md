@@ -134,6 +134,16 @@ materials:
   blurb: The unit's text — read this first; the readings go deeper.
 ```
 
+A chapter can belong to a **track** instead of a unit (`track: greek` in
+place of `unit:`), when a secondary track has its own text: textual-flow's
+Greek track is one chapter per cluster of Decker chapters (`c-g01`,
+`c-g02`, …). A track has no unit page, so the served hub lists a track's
+chapters under its stepper, numbered in registry order and ahead of its
+tools; register them in the order they are to be read. A track chapter's
+"data" should be the track's own — for Greek, the tagged text of the
+letters the course reads, so that every count is re-runnable and the track
+converges on the program's corpus rather than on the textbook's examples.
+
 Do **not** also link it from the unit's **Read** row in `curriculum.md`.
 The unit page leads with the chapter — it is the "Start here" panel and the
 page's one primary action — and the curriculum page's derived Interactive

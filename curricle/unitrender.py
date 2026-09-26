@@ -365,11 +365,30 @@ def _context_line(mf: Manifest, u: Unit, rr: RefResolver) -> str:
     return f'<p class="context">{" ".join(bits)}</p>' if bits else ""
 
 
-def _start_panel(u: Unit, chapter: Material | None, read, rr: RefResolver) -> str:
+def _start_panel(u: Unit, chapters: list[Material], read, rr: RefResolver) -> str:
     """What to do first. The chapter when there is one — it is the unit's
-    text, and the page's one primary action opens it. Otherwise the Read row
-    *is* the start, with the first reading it names as the action."""
+    text, and the page's one primary action opens it. A unit whose text runs
+    to several chapters lists them in registry order, which is reading
+    order, and the action opens the first. Otherwise the Read row *is* the
+    start, with the first reading it names as the action."""
     e = html.escape
+    if len(chapters) > 1:
+        items = "".join(
+            f'<li><a href="{e(rr.material_href(c))}">{e(c.title)}</a>'
+            + (f" — {e(c.blurb)}" if c.blurb else "")
+            + "</li>"
+            for c in chapters)
+        first = chapters[0]
+        return (f'<section class="start panel"><p class="kicker">Start here</p>'
+                f"<h2>The unit's text, in {len(chapters)} chapters</h2>"
+                f"<p>Read them in order: together they teach the unit in full, "
+                f"with their sources as footnotes. The readings below go deeper; "
+                f"none is required to follow them.</p>"
+                f"<ol>{items}</ol>"
+                f'<div class="acts"><a class="pill primary" '
+                f'href="{e(rr.material_href(first))}">Read {e(first.title)}</a>'
+                f"</div></section>")
+    chapter = chapters[0] if chapters else None
     if chapter:
         return (f'<section class="start panel"><p class="kicker">Start here</p>'
                 f"<h2>{e(chapter.title)}</h2>"
@@ -422,9 +441,10 @@ def render_unit(mf: Manifest, unit_id: str, *, api: str,
                 if r.label not in _ROLE and not r.track and r.label != "Interactive"]
 
     # -- start here -----------------------------------------------------------
-    chapter = by_kind.get("chapter", [None])[0]
+    chapters = by_kind.get("chapter", [])
+    chapter = chapters[0] if chapters else None
     read = rows.get("Read")
-    start = _start_panel(u, chapter, read, rr)
+    start = _start_panel(u, chapters, read, rr)
 
     note = ""
     if u.note:
@@ -691,8 +711,23 @@ def render_reader(mf: Manifest | None, md_text: str, *, doc_title: str,
     if material and material.kind == "chapter":
         # A chapter is the unit's own text: it carries its sources as
         # footnotes and closes by saying how it was checked, so the banner
-        # says what the page is and where its reliability comes from.
-        banner = ('<div class="banner"><b>This is the unit\'s chapter.</b> '
+        # says what the page is and where its reliability comes from. When
+        # the unit's text runs to several chapters, it says which one this
+        # is and where the next one is, since they are read in order.
+        siblings = ([m for m in mf.materials_for_unit(unit.id) if m.kind == "chapter"]
+                    if unit else [])
+        if len(siblings) > 1:
+            k = next(i for i, m in enumerate(siblings) if m.id == material.id)
+            nxt = ""
+            if k + 1 < len(siblings):
+                n = siblings[k + 1]
+                nxt = (f' Next: <a href="{e(rr.material_href(n))}">'
+                       f"{e(n.title)}</a>.")
+            what = (f"<b>This is chapter {k + 1} of {len(siblings)} "
+                    f"of the unit's text.</b> Read them in order.{nxt} ")
+        else:
+            what = "<b>This is the unit's chapter.</b> "
+        banner = (f'<div class="banner">{what}'
                   "It teaches the unit's content in full; the readings on the "
                   "unit page go deeper, they are not required to follow it. "
                   "Footnotes name the source of every substantive claim, and "

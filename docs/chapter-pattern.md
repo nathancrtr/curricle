@@ -29,9 +29,25 @@ was checked.
    not be verified is either marked as such or left out. Never launder an
    unverified claim by citing a source you did not read.
 4. **Calibrated to the learner.** The course's learner profile sets the
-   register. For textual-flow that means: lead with code and data, formalize
-   second; do not scaffold linguistics; do scaffold statistics and the
-   conventions of scholarly method.
+   register and says what may be assumed, so the author reads it before
+   writing a word. It never falls back on the sibling chapters or on a
+   guess about the learner's background. For textual-flow that means: lead
+   with code and data, formalize second; do not scaffold linguistics; do
+   scaffold statistics and the conventions of scholarly method. A course
+   whose learner meets a field from zero means defining that field's
+   vocabulary from zero, however routine it is to the author.
+5. **Every term defined where it first appears.** A term of art that the
+   profile does not mark as known, and that no earlier chapter defined, is
+   defined in the body at its first use. The definition says what the term
+   is for as well as what it is: a formula alone is not a definition. The
+   first mention of a named benchmark, model, dataset, tool, or paper gets a
+   one-line identity. A definition given only in a footnote or inside a
+   check-yourself answer doesn't count, because a learner who gets the
+   question right never opens it. "Earlier" means earlier in the course's
+   reading order,
+   the unit order, not the order the chapters were written in. A chapter
+   written after the ones that follow it inherits their assumption that it
+   has been read, and it must define everything they assume.
 
 ## Structure
 
@@ -54,6 +70,15 @@ Use these sections in this order. Headings are `##`; sub-sections `###`.
 ## How this chapter was checked        (the verification ledger)
 ## Sources                             (the footnote definitions live here)
 ```
+
+The standfirst and the objectives are the first things the learner reads, so
+they are held to principle 5 like any other line: write them in plain words,
+or pair a term with its plain gloss the first time. An objective can promise
+"say what a surprisal measures" only if it doesn't lean on the reader already
+knowing. Section 1 puts the artifact before the *formal* definition, not before
+the words needed to read it. When the artifact's own labels are terms of art
+(a column headed `surprisal`, a unit in bits), say in plain words what they
+measure beside the artifact.
 
 Between sections, place **check-yourself** blocks — a `<details>` whose
 `<summary>` starts with *Check yourself:* and whose body holds the answer.
@@ -109,7 +134,56 @@ unverified rows, and never hide one.
   first draft of the Build).
 - Greek is written unaccented where the data is unaccented (the ECM's
   collation is), and glossed on first use.
-- Length: 3,000–5,000 words. Longer means the unit wants splitting.
+- Length: 3,000–5,000 words. Longer means the unit wants splitting. When
+  the ceiling and a definition conflict, the definition wins: cut elsewhere
+  or split the unit. An editor trimming for length never trims a
+  definition, because to a writer or editor who already knows the term a
+  definition looks like redundancy.
+
+## How a chapter is made
+
+Four passes, each by a different agent, because the one who writes is not
+the one who judges, and each pass checks something the others cannot see.
+
+1. **Write.** The author gets this document, the learner profile, the
+   unit's curriculum entry, and the earlier chapters in reading order. The
+   author runs every piece of code the chapter prints, and records in the
+   ledger each number the chapter reports.
+2. **Prose.** A copy pass removes the habits of machine-written text without
+   changing what is said (rolecall's `prose-editor`).
+3. **Correctness.** An adversarial review re-runs the printed code as
+   printed, checks every quotation against its source, and reads the
+   chapter against the curriculum it claims to cover (rolecall's
+   `reviewer`).
+4. **The learner's read.** The chapter is read front to back as the course's
+   learner (rolecall's `audience-reader`). Every term used before it is
+   defined is a finding. Every term treated as known must cite the profile
+   claim or earlier chapter that makes it known. Where the profile is
+   silent, the reader asks the learner a question; the answer becomes a
+   profile claim before the chapter is fixed.
+
+The audience reader is generic, and this is its binding for a course:
+
+- **Audience description:** the rendered learner profile,
+  `~/.claude/skills/learner-profile/SKILL.md`, which is a projection of the
+  profile ledger (`curricle profile show` prints the same claims with their
+  tiers). `attested` and `demonstrated` claims count as knowledge; `thin`
+  claims do not. Everything under *What to scaffold* is unknown, whatever
+  *Who the learner is* suggests.
+- **Prior reading:** the course's chapters before this one in reading order,
+  meaning unit order and then registry order within a unit, whatever order
+  they were written in. The curriculum page is not prior reading; a
+  learner skims it.
+- **Audience gaps:** the questions go to the learner, and the answers are
+  asserted as profile claims (`curricle profile assert`, or `import-seed`
+  for a batch) and re-rendered before the author fixes the chapter, so the
+  next chapter's read doesn't ask again.
+
+The author applies the findings from 3 and 4. If the fixes from 4 were
+substantial, 4 runs again. Passes 2 and 3 were the whole pipeline before
+pass 4 existed, and a chapter that passed both still opened with a column
+of numbers labelled `surprisal` and no word on what one is. The review had
+no reader in it.
 
 ## Figures
 
@@ -133,6 +207,15 @@ materials:
   unit: u1
   blurb: The unit's text — read this first; the readings go deeper.
 ```
+
+A unit's text can run to **more than one chapter**, as when a course
+needs a primer before a unit's own chapter because the learner meets the
+field from zero. Register each with the same `unit:`, in reading order. The
+unit page's start panel lists them in that order and opens the first, and
+each chapter's banner says which of them it is and links the next. Every
+chapter still stands on its own under the pattern. Reach for this rather
+than a longer chapter when the extra text is a different subject (the
+mechanism the unit's argument runs on), not more of the same one.
 
 A chapter can belong to a **track** instead of a unit (`track: greek` in
 place of `unit:`), when a secondary track has its own text: textual-flow's

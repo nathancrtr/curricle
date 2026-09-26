@@ -42,7 +42,7 @@ CURRICULUM = textwrap.dedent("""\
     """)
 
 
-def make_manifest():
+def make_manifest(*, u0_chapters=0):
     root = tempfile.mkdtemp()
     learning = os.path.join(root, "learning")
     os.makedirs(os.path.join(learning, "interactive", "quizzes"))
@@ -57,6 +57,15 @@ def make_manifest():
     os.makedirs(os.path.join(learning, "interactive", "chapters"))
     with open(os.path.join(learning, "interactive/chapters/u1.md"), "w") as f:
         f.write("# Chapter\n\nRead me.[^1]\n\n[^1]: A source.\n")
+    # A unit whose text runs to several chapters, registered in reading order.
+    u0_mats = []
+    for i in range(u0_chapters):
+        with open(os.path.join(learning, f"interactive/chapters/u0-{i}.md"), "w") as f:
+            f.write(f"# Part {i}\n\nRead me.\n")
+        u0_mats.append(SidecarMaterial(
+            id=f"c-u0-{i}", kind="chapter", title=f"Part {i}",
+            path=f"interactive/chapters/u0-{i}.md", unit="u0",
+            blurb=f"Blurb {i}."))
     sidecar = Sidecar(
         course=SidecarCourse(
             id="test-course", title="A test course",
@@ -76,6 +85,7 @@ def make_manifest():
                             path="interactive/lessons/u1.md", unit="u1"),
             SidecarMaterial(id="c-u1", kind="chapter", title="The chapter",
                             path="interactive/chapters/u1.md", unit="u1"),
+            *u0_mats,
         ),
     )
     mf, issues = compile_course(root, sidecar)
@@ -123,6 +133,42 @@ class TestChapterOnUnitPage(unittest.TestCase):
     def test_chapter_contributes_its_own_tag(self):
         self.assertIn("chapter", self.mf.tags_for_unit("u1"))
         self.assertIn("lesson", self.mf.tags_for_unit("u1"))
+
+
+class TestUnitWithSeveralChapters(unittest.TestCase):
+    """A unit's text can run to several chapters (a primer before the unit's
+    own chapter). They are read in order, so the page lists them in
+    registry order, opens the first, and each chapter points to the next."""
+
+    def setUp(self):
+        self.mf = make_manifest(u0_chapters=2)
+        self.page = render_unit(self.mf, "u0", api="../api/events")
+
+    def test_the_start_panel_lists_every_chapter_in_registry_order(self):
+        self.assertIn("The unit's text, in 2 chapters", self.page)
+        a = self.page.index('href="../read/interactive/chapters/u0-0.md">Part 0</a>')
+        b = self.page.index('href="../read/interactive/chapters/u0-1.md">Part 1</a>')
+        self.assertLess(a, b)
+        self.assertIn("Blurb 1.", self.page)
+
+    def test_the_one_primary_action_opens_the_first(self):
+        self.assertEqual(self.page.count("pill primary"), 1)
+        self.assertIn('class="pill primary" href="../read/interactive/chapters/u0-0.md">'
+                      "Read Part 0", self.page)
+
+    def test_each_chapter_says_where_it_sits_and_links_the_next(self):
+        first, second = (m for m in self.mf.materials if m.unit == "u0")
+        p0 = render_reader(self.mf, "# P0\n\nBody.", doc_title="Part 0", material=first)
+        p1 = render_reader(self.mf, "# P1\n\nBody.", doc_title="Part 1", material=second)
+        self.assertIn("This is chapter 1 of 2 of the unit's text.", p0)
+        self.assertIn('Next: <a href="../../../read/interactive/chapters/u0-1.md">Part 1</a>', p0)
+        self.assertIn("This is chapter 2 of 2 of the unit's text.", p1)
+        self.assertNotIn("Next:", p1)
+
+    def test_a_single_chapter_unit_is_unchanged(self):
+        page = render_unit(self.mf, "u1", api="../api/events")
+        self.assertIn("Read the chapter", page)
+        self.assertNotIn("chapters</h2>", page)
 
 
 class TestReader(unittest.TestCase):

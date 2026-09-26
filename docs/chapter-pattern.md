@@ -156,12 +156,28 @@ the one who judges, and each pass checks something the others cannot see.
    chapter against the curriculum it claims to cover (rolecall's
    `reviewer`).
 4. **The learner's read.** The chapter is read front to back as the course's
-   learner, using the profile and the reading order (rolecall's
-   `learner-reader`). Every term used before it is defined is a finding.
-   Every term treated as known must cite the profile claim or earlier
-   chapter that makes it known. Where the profile is silent, the reader asks
-   the learner a question; the answer becomes a profile claim before the
-   chapter is fixed.
+   learner (rolecall's `audience-reader`). Every term used before it is
+   defined is a finding. Every term treated as known must cite the profile
+   claim or earlier chapter that makes it known. Where the profile is
+   silent, the reader asks the learner a question; the answer becomes a
+   profile claim before the chapter is fixed.
+
+The audience reader is generic, and this is its binding for a course:
+
+- **Audience description:** the rendered learner profile,
+  `~/.claude/skills/learner-profile/SKILL.md`, which is a projection of the
+  profile ledger (`curricle profile show` prints the same claims with their
+  tiers). `attested` and `demonstrated` claims count as knowledge; `thin`
+  claims do not. Everything under *What to scaffold* is unknown, whatever
+  *Who the learner is* suggests.
+- **Prior reading:** the course's chapters before this one in reading order,
+  meaning unit order and then registry order within a unit, whatever order
+  they were written in. The curriculum page is not prior reading; a
+  learner skims it.
+- **Audience gaps:** the questions go to the learner, and the answers are
+  asserted as profile claims (`curricle profile assert`, or `import-seed`
+  for a batch) and re-rendered before the author fixes the chapter, so the
+  next chapter's read doesn't ask again.
 
 The author applies the findings from 3 and 4. If the fixes from 4 were
 substantial, 4 runs again. Passes 2 and 3 were the whole pipeline before

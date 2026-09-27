@@ -220,3 +220,56 @@ python -m curricle compile <course_root> --out build/<id>.manifest.yaml   # side
 No auth, no multi-tenant serving (single tenant per app instance, resolved
 at startup), no background job queue (factory runs are CLI-invoked; the
 queue arrives with multi-tenancy). Later phases per platform-design.md §9.
+
+## Agent roles
+
+Subagent role definitions come from the shared rolecall set loaded out of
+`~/.claude/agents/`; this section is where curricle adapts them, and it wins
+wherever it conflicts with a role's portable body. The rest of this file is
+already in every subagent's context, so an entry below carries only what is
+additionally true for that role.
+
+### art-director
+
+- Every pixel this product shows is emitted by a Python renderer — no CSS file
+  to hand-edit, no build step, no framework. Course hub `curricle/hubrender.py`;
+  curriculum `curricle/currender.py`; unit page `curricle/unitrender.py`;
+  learning resources `curricle/resrender.py`; learner profile
+  `curricle/profilerender.py`; front door, reader and onboarding wizard
+  `curricle/webapp.py` and `curricle/wizard.py`.
+- `curricle/theme.py` is the token source and the whole design system (§ The
+  design system). A renderer composes `theme.style(own_css)` and keeps no
+  `:root` of its own; a new stylesheet spending tokens joins `SHEETS` in
+  `tests/test_theme.py`, and changing a token means recomputing the
+  `DIRECTION.md` contrast table in the same change.
+- Read `DIRECTION.md` before proposing anything: the signature gesture, the
+  judgment calls, the contrast provenance, and what was already rejected and why
+  are recorded there.
+- The loop is cheap — rebuild, then open the file. `build/*.html` are
+  self-contained pages carrying real course content, no server and no database,
+  and `CONTRIBUTING.md` has the exact compile-and-render commands. Regenerate
+  `build/` in the same commit as any renderer change.
+- Design against honest content. `examples/tinylang` is the baseline everyone
+  has; where the sibling course repos (`../textual-flow`, `../rhyme-schemer`)
+  are checked out beside this one, design against those too — long unit titles,
+  dense tag chips, uneven phase lengths. Never design against a shortened
+  fixture.
+- Design within the settled constraints rather than around them: derived data is
+  computed and never stored, no LLM on a request path (L1), and the profile page
+  is a projection over `profile.FIELDS`. A design that needs a new persisted
+  field or a new claim field to look right is a finding to surface, not a change
+  to make.
+- Stdlib and PyYAML only — no CSS framework, no font pipeline, no JS bundler.
+  Self-hosted or system fonts; inline SVG.
+
+### copywriter
+
+- The voice target is approachable and commercial, not academic: the reader is a
+  general consumer or a self-teaching peer, not a colleague reading a spec. This
+  repo's own prose (`CLAUDE.md`, migration docstrings) is deliberately dense
+  internal voice — do not align to it.
+- Copy lives inside the Python renderers named above, not in a strings file.
+  Cite `file:line` for every string you change.
+- Evidence tiers (`attested`, `demonstrated`, `thin`) are claims, not tone. Copy
+  that reads as a higher tier than the evidence supports is a correctness bug,
+  not a style choice.

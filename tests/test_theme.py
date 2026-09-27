@@ -248,7 +248,7 @@ class TestPalettes(unittest.TestCase):
         # only for whoever is running that theme — the failure a renderer
         # test would never see.
         self.assertEqual(sorted(LIGHT), sorted(DARK))
-        self.assertEqual(len(LIGHT), 26)   # grow deliberately; renderers know these
+        self.assertEqual(len(LIGHT), 27)   # grow deliberately; renderers know these
 
     def test_the_radius_scale_is_three_steps_and_no_more(self):
         # Radii are a scale, not a per-component opinion: card, control,
@@ -420,6 +420,31 @@ def _decls(selector: str, css: str) -> dict[str, str]:
 
 def _px(value: str) -> float:
     return float(value.removesuffix("px"))
+
+
+class TestReadingMeasure(unittest.TestCase):
+    """The unit page and the reader spend `--measure-read`, and only that.
+
+    A measure is a length, so it fits one text size. These two pages are set
+    larger than the rest, and a paragraph left on `--measure` would end 88px
+    short of its neighbours: the ragged right edge the token exists to
+    prevent, arriving one rule at a time.
+    """
+
+    def setUp(self):
+        from curricle import unitrender
+        self.own = unitrender.STYLE[len(theme.style("")):]
+
+    def test_the_column_is_the_measure_plus_its_padding(self):
+        wrap = _decls(".wrap", self.own)
+        side = _px(wrap["padding"].split()[1])
+        self.assertEqual(_px(wrap["max-width"]) - 2 * side,
+                         _px(LIGHT["--measure-read"]))
+
+    def test_no_rule_on_these_pages_spends_the_caption_measure(self):
+        spent = [sel for sel, body in _rules(self.own)
+                 if "var(--measure)" in body]
+        self.assertEqual(spent, [])
 
 
 class TestEyebrowRhythm(unittest.TestCase):

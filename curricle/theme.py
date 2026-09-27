@@ -52,6 +52,12 @@ House rules encoded here:
   twice on one page) rendered as 514/548/552px, so consecutive paragraphs
   ended at three different places and nothing shared a right edge. `ch`
   cannot align across two font sizes; a length can.
+- `--measure-read` is the same idea for the pages read at length (the unit
+  page and the chapter reader). A length serves one text size: 552px holds
+  about 75 characters at 14.5px, which is right for a caption and small for
+  a chapter. Those pages set their text at 17–18px and spend 640px, the
+  same ratio, so the line holds the same words. A page spends one measure
+  or the other, never both, which keeps the single right edge.
 - Radii are zero and elevation is `none`. A block book has ruled fields, not
   floating cards; hierarchy is carried by rule weight and fill. The three
   radius tokens stay, spelled everywhere they were, so the decision is
@@ -82,7 +88,7 @@ LIGHT_VARS = """\
   --good:#7A894D; --good-text:#606C3D; --good-soft:#E5EAD7;
   --warn-text:#8A5F15; --warn-soft:#F6E6CB;
   --chip:#E1DAD6; --stone:#6D8FB0;
-  --measure:552px;
+  --measure:552px; --measure-read:640px;
   --r-card:0px; --r-ctl:0px; --r-chip:0px;
   --shadow:none;
   --shadow-lift:none;
@@ -96,7 +102,7 @@ DARK_VARS = """\
   --good:#6A7740; --good-text:#9AAE61; --good-soft:#303522;
   --warn-text:#CD9637; --warn-soft:#3B2E16;
   --chip:#423C38; --stone:#4D6984;
-  --measure:552px;
+  --measure:552px; --measure-read:640px;
   --r-card:0px; --r-ctl:0px; --r-chip:0px;
   --shadow:none;
   --shadow-lift:none;

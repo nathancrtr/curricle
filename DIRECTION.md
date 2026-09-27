@@ -108,7 +108,9 @@ one edit.
 ### Type
 
 - Body: a grotesque stack — `"Helvetica Neue", Helvetica, "Segoe UI", Roboto,
-  Arial, system-ui` — at 16px/1.6. No font pipeline (constraint honored).
+  Arial, system-ui` — at 16px/1.6, and 17–18px on the two pages read at
+  length (see "The pages read at length", below). No font pipeline
+  (constraint honored).
   A grotesque rather than a humanist face because the seed's own lettering is
   drawn sans capitals doing structural work.
 - Display (`h1–h3`): **the same stack**. `FONT_DISPLAY` has now shed two
@@ -329,8 +331,19 @@ renderer inherits that as a requirement, not as a pre-blessed exception.
   wizard, the profile page and the front door were 720, 840 and 760 wide
   with two h1 sizes, which a reader feels as the page shifting between
   clicks without being able to say why (live review, F17). All three are
-  760 with a 34px h1 now. The unit page keeps its 600, deliberately: it is
-  a text page set to the measure, and its reasoning is in `unitrender`.
+  760 with a 34px h1 now. The unit page keeps its own column, deliberately:
+  it is a text page set to the measure, and its reasoning is in `unitrender`.
+- **The pages read at length are set larger, on their own measure.** The
+  unit page and the chapter reader were set like every other page: captions
+  at 14.5px (chapters 15.5px) in the 552px measure. That size suits a gloss
+  beside a structure and is small for a chapter of five thousand words, and
+  the 600px column looked narrow in a desktop window. Both pages now scale
+  together by 640/552: text at 17px (unit fields) and 18px (chapters), code
+  blocks at 15px, in `--measure-read` (640px). Scaling size and column by
+  one ratio keeps the characters per line where they were (about 70), so
+  the change is in the size of the type only. The other pages keep
+  `--measure`; their prose is captions, and widening their lines without
+  enlarging their text would run them past 85 characters.
 - **Chips live under the unit title, never beside it** (hub). Chips beside the
   title crowded it out of its own line; the title owns the full column width
   and chips are a second line of metadata. In the curriculum's single wide column they stay

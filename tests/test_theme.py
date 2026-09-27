@@ -395,6 +395,14 @@ class TestBaseCss(unittest.TestCase):
         self.assertEqual(_decls("a.pill", theme.BASE_CSS),
                          {"text-decoration": "none"})
 
+    def test_block_code_keeps_its_newlines(self):
+        # Inline code is nowrap so a command never breaks mid-token; the same
+        # rule on <pre><code> collapsed every fenced block to one line. The
+        # block has to hand whitespace back to <pre>, whose default keeps it.
+        self.assertEqual(_decls("code", theme.BASE_CSS)["white-space"], "nowrap")
+        self.assertEqual(_decls("pre code", theme.BASE_CSS)["white-space"],
+                         "inherit")
+
     def test_style_composes_tokens_then_base_then_extra(self):
         out = theme.style("  .own { color:var(--ink); }")
         self.assertLess(out.index("--accent-strong"), out.index(".panel"))

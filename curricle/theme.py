@@ -162,6 +162,10 @@ BASE_CSS = f"""\
   code {{ font-family:{FONT_MONO}; font-size:.88em; background:var(--chip);
          padding:1px 5px; border-radius:var(--r-chip);
          white-space:nowrap; }}
+  /* ...but only inline code. A fenced block is <pre><code>, and nowrap on
+     the inner element collapses its newlines: a ten-line program rendered
+     as one line running off the edge. The block keeps <pre>'s whitespace. */
+  pre code {{ white-space:inherit; }}
   h1, h2, h3, .display {{ font-family:{FONT_DISPLAY}; }}
 
   /* ---- the shared shell ---- */

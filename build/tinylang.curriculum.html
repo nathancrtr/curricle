@@ -65,6 +65,10 @@
   code { font-family:ui-monospace, Menlo, Consolas, monospace; font-size:.88em; background:var(--chip);
          padding:1px 5px; border-radius:var(--r-chip);
          white-space:nowrap; }
+  /* ...but only inline code. A fenced block is <pre><code>, and nowrap on
+     the inner element collapses its newlines: a ten-line program rendered
+     as one line running off the edge. The block keeps <pre>'s whitespace. */
+  pre code { white-space:inherit; }
   h1, h2, h3, .display { font-family:"Helvetica Neue", Helvetica, "Segoe UI", Roboto, Arial, system-ui, sans-serif; }
 
   /* ---- the shared shell ---- */

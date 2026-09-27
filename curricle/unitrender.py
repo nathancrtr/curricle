@@ -41,26 +41,31 @@ from .refs import RefResolver
 from .schema import Manifest, Material, Unit
 
 STYLE = theme.style("""\
-  /* 600 - 48px of padding = 552px, which is `--measure` exactly. The unit
-     page is a text page: when the column is wider than the measure, the
-     heading and the nav end 160px to the right of every paragraph and the
-     page grows a phantom margin nothing occupies. One edge instead. */
-  .wrap { max-width:600px; margin:0 auto; padding:0 24px 90px; }
+  /* The unit page and the reader are the two pages read at length, so they
+     are set on the reading scale: `--measure-read` and text at 17–18px,
+     where every other page sets captions at 14.5px on `--measure`. The two
+     scale together (640/552 = 18/15.5), so a line holds the same words it
+     did and the type is a size a person reads for an hour.
+     688 - 48px of padding = 640px, which is `--measure-read` exactly: when
+     the column is wider than the measure, the heading and the nav end to
+     the right of every paragraph and the page grows a phantom margin
+     nothing occupies. One edge instead. */
+  .wrap { max-width:688px; font-size:18px; margin:0 auto; padding:0 24px 90px; }
   .masthead { padding:36px 0 10px; }
-  h1 { font-weight:700; font-size:clamp(26px,5vw,36px); line-height:1.15;
+  h1 { font-weight:700; font-size:clamp(30px,5vw,42px); line-height:1.15;
        letter-spacing:-.01em; margin:14px 0 0; }
-  .gloss { margin:12px 0 0; color:var(--muted); font-size:16px;
-           max-width:var(--measure); }
-  .phasegoal { margin:10px 0 0; color:var(--muted); font-size:14px;
-               max-width:var(--measure); }
+  .gloss { margin:12px 0 0; color:var(--muted); font-size:18px;
+           max-width:var(--measure-read); }
+  .phasegoal { margin:10px 0 0; color:var(--muted); font-size:16px;
+               max-width:var(--measure-read); }
   .phasegoal b { color:var(--ink); font-weight:600; }
-  .context { margin:14px 0 0; color:var(--muted); font-size:13.5px;
-             line-height:1.7; max-width:var(--measure); }
+  .context { margin:14px 0 0; color:var(--muted); font-size:15.5px;
+             line-height:1.7; max-width:var(--measure-read); }
   .context .chip { vertical-align:1px; }
   .chip.gate { background:var(--warn-soft); color:var(--warn-text); }
-  .row { margin:0 0 14px; font-size:14.5px; line-height:1.6;
-         max-width:var(--measure); }
-  .row b.lbl { display:block; font-size:14px; font-weight:700;
+  .row { margin:0 0 14px; font-size:17px; line-height:1.6;
+         max-width:var(--measure-read); }
+  .row b.lbl { display:block; font-size:16px; font-weight:700;
                color:var(--ink); margin:0 0 3px; }
   .key { border-left:2px solid var(--accent); padding:2px 0 2px 14px;
          background:none; }
@@ -71,90 +76,90 @@ STYLE = theme.style("""\
              background:none; }
   .deliver b.lbl { color:var(--good-text); }
   .unote { margin:24px 0 0; padding:13px 17px; background:var(--chip);
-           border-radius:var(--r-card); font-size:14px; line-height:1.6;
-           max-width:var(--measure); }
-  .unote b.lbl { display:block; font-size:14px; font-weight:700;
+           border-radius:var(--r-card); font-size:16px; line-height:1.6;
+           max-width:var(--measure-read); }
+  .unote b.lbl { display:block; font-size:16px; font-weight:700;
                  color:var(--ink); margin:0 0 3px; }
   /* Sections are ruled fields: a hairline above, the label in the ink. */
   .sec { margin:34px 0 0; padding-top:16px; border-top:1px solid var(--line); }
-  .sec h2 { font-size:18px; font-weight:700; margin:0 0 8px;
+  .sec h2 { font-size:21px; font-weight:700; margin:0 0 8px;
             letter-spacing:-.005em; }
-  .sec .sub { color:var(--muted); font-size:13.5px; margin:-4px 0 12px;
-              max-width:var(--measure); }
+  .sec .sub { color:var(--muted); font-size:15.5px; margin:-4px 0 12px;
+              max-width:var(--measure-read); }
   .sec .row { margin:0; }
   .sec .row + .row, .sec .row + details, .sec details + .row { margin-top:14px; }
-  .sec .row b.lbl { font-size:15px; }
-  .sec .trackline { color:var(--muted); font-size:13.5px; font-weight:600; }
+  .sec .row b.lbl { font-size:17.5px; }
+  .sec .trackline { color:var(--muted); font-size:15.5px; font-weight:600; }
   /* The start panel is the one field with a fill and holds the page's one
      primary action: the chapter is the unit's text, so the accent — which
      means "your next action" everywhere — lands here and nowhere else. */
   .start { margin:26px 0 0; padding:18px 20px 16px; }
-  .start .kicker { font-size:13px; font-weight:700; color:var(--accent-text);
+  .start .kicker { font-size:15px; font-weight:700; color:var(--accent-text);
                    margin:0 0 6px; }
-  .start h2 { font-size:20px; margin:0 0 6px; line-height:1.3; }
-  .start p { margin:0 0 12px; font-size:14.5px; color:var(--muted);
-             line-height:1.55; max-width:var(--measure); }
+  .start h2 { font-size:23px; margin:0 0 6px; line-height:1.3; }
+  .start p { margin:0 0 12px; font-size:17px; color:var(--muted);
+             line-height:1.55; max-width:var(--measure-read); }
   .start p.readings { color:var(--ink); }
   .start .acts { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
-  .start .acts a.more { font-size:13.5px; color:var(--accent-text); }
-  ul.know { margin:0; padding-left:20px; font-size:14.5px; line-height:1.55;
-            max-width:var(--measure); }
+  .start .acts a.more { font-size:15.5px; color:var(--accent-text); }
+  ul.know { margin:0; padding-left:20px; font-size:17px; line-height:1.55;
+            max-width:var(--measure-read); }
   ul.know li { margin:0 0 5px; }
   /* The assistant section: what to type, then what will happen. */
   .say-row { display:grid; grid-template-columns:auto 1fr; gap:6px 14px;
-             align-items:baseline; margin:0 0 10px; font-size:14.5px;
-             max-width:var(--measure); }
+             align-items:baseline; margin:0 0 10px; font-size:17px;
+             max-width:var(--measure-read); }
   .say-row .say { white-space:nowrap; }
   .say-row .what { color:var(--muted); line-height:1.5; }
   .exercise { margin:12px 0 0; padding:13px 17px; }
   .exercise .chip { margin:0 0 6px; }
-  .exercise h3 { margin:0 0 4px; font-size:15.5px; }
+  .exercise h3 { margin:0 0 4px; font-size:18px; }
   .exercise h3 a { text-decoration:none; }
   .exercise h3 a:hover { text-decoration:underline; text-underline-offset:3px; }
-  .exercise p { margin:0 0 8px; font-size:13.5px; color:var(--muted); }
-  .exercise .cmd { display:block; font:12.5px """ + theme.FONT_MONO + """; background:var(--chip);
+  .exercise p { margin:0 0 8px; font-size:15.5px; color:var(--muted); }
+  .exercise .cmd { display:block; font:14.5px """ + theme.FONT_MONO + """; background:var(--chip);
                    padding:6px 10px; margin:0 0 10px; overflow-x:auto;
                    white-space:pre; }
   .steps { margin:18px 0 0; padding:16px 20px; }
-  .steps h3 { font-size:15px; font-weight:700; color:var(--ink); margin:0 0 10px; }
-  .step-row { display:flex; align-items:baseline; gap:9px; font-size:14.5px;
+  .steps h3 { font-size:17.5px; font-weight:700; color:var(--ink); margin:0 0 10px; }
+  .step-row { display:flex; align-items:baseline; gap:9px; font-size:17px;
               margin:0 0 6px; }
   .step-row input { width:17px; height:17px; accent-color:var(--accent-strong); }
   .step-row.done label { color:var(--muted); text-decoration:line-through;
                          text-decoration-color:var(--faint); }
   .done-acts { display:flex; align-items:center; gap:14px; margin:18px 0 0; }
-  .done-acts .hint { font-size:13.5px; color:var(--muted); }
+  .done-acts .hint { font-size:15.5px; color:var(--muted); }
   /* auto-fit, not auto-fill: a unit with one material had it sitting in a
      230px track with two empty tracks beside it. Empty tracks collapse. */
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
           gap:14px; }
   .card { padding:15px 18px 13px; display:flex; flex-direction:column; }
   .card .chip { margin:0 0 9px; align-self:flex-start; }
-  .card h3 { margin:0 0 6px; font-size:16px; line-height:1.35; }
+  .card h3 { margin:0 0 6px; font-size:18px; line-height:1.35; }
   .card h3 a { text-decoration:none; }
   .card h3 a:hover { text-decoration:underline; text-underline-offset:3px; }
-  .card p { margin:0 0 10px; font-size:13.5px; color:var(--muted); line-height:1.5; }
-  .cardact { margin-top:auto; font-size:13px; font-weight:600;
+  .card p { margin:0 0 10px; font-size:15.5px; color:var(--muted); line-height:1.5; }
+  .cardact { margin-top:auto; font-size:15px; font-weight:600;
              color:var(--accent-text); text-decoration:none; }
   .cardact:hover { text-decoration:underline; text-underline-offset:3px; }
   details.check { margin:14px 0 0; padding:13px 17px; background:var(--panel);
                   border:1.5px solid var(--line); border-radius:var(--r-card);
-                  font-size:14.5px; }
+                  font-size:17px; }
   details.check summary { cursor:pointer; font-weight:600; }
   details.check div { margin-top:10px; color:var(--muted); }
   .cp { margin:22px 0 0; padding:2px 0 2px 16px; background:none;
-        border-left:2px solid var(--good); font-size:14.5px; }
-  .cp b.cpl { display:block; font-size:14px; font-weight:700;
+        border-left:2px solid var(--good); font-size:17px; }
+  .cp b.cpl { display:block; font-size:16px; font-weight:700;
               color:var(--good-text); margin:0 0 6px; }
   .cp .track-goal { margin-top:8px; color:var(--muted); }
   /* A side-quest milestone that follows this unit: the product's one drawn
      glyph, the same flag the curriculum and hub give the same row. */
   .side { margin:22px 0 0; padding:2px 0 2px 16px; background:none;
-          border-left:2px solid var(--good); font-size:14.5px; }
-  .side b.sl { display:block; font-size:14px; font-weight:700;
+          border-left:2px solid var(--good); font-size:17px; }
+  .side b.sl { display:block; font-size:16px; font-weight:700;
                color:var(--good-text); margin:0 0 4px; }
   .side b.sl svg { vertical-align:-1px; margin-right:5px; }
-  .side p { margin:0; color:var(--muted); max-width:var(--measure); }
+  .side p { margin:0; color:var(--muted); max-width:var(--measure-read); }
   /* Pagination, drawn as two destinations rather than two arrows. The
      glyph pair said the direction and the ellipsis ate the title that said
      the destination — on a 46%-wide nowrap pill, "Unit 3 — Local stemmata
@@ -171,26 +176,28 @@ STYLE = theme.style("""\
             padding:10px 14px; color:var(--ink); }
   .unav a:hover { border-color:var(--accent); }
   .unav a.next { text-align:right; }
-  .unav b.dir { display:block; font-size:12.5px; font-weight:700;
+  .unav b.dir { display:block; font-size:14.5px; font-weight:700;
                 color:var(--muted); margin:0 0 2px; }
   .unav a.next b.dir { color:var(--accent-text); }
 
   /* ---- the reader ---- */
-  .doc { margin:26px 0 0; font-size:15.5px; line-height:1.65; }
-  .doc h1 { font-size:clamp(24px,4.5vw,32px); margin:26px 0 8px; }
-  .doc h2 { font-size:20px; margin:30px 0 8px; }
-  .doc h3 { font-size:16.5px; margin:24px 0 6px; }
-  .doc p, .doc li { max-width:var(--measure); }
+  .doc { margin:26px 0 0; font-size:18px; line-height:1.65; }
+  /* A phone column is 342px; 18px leaves 34 characters to a line. */
+  @media (max-width:620px) { .doc { font-size:17px; } }
+  .doc h1 { font-size:clamp(28px,4.5vw,37px); margin:26px 0 8px; }
+  .doc h2 { font-size:23px; margin:30px 0 8px; }
+  .doc h3 { font-size:19px; margin:24px 0 6px; }
+  .doc p, .doc li { max-width:var(--measure-read); }
   .doc li { margin:0 0 6px; }
   .doc blockquote { margin:14px 0; padding:10px 16px; border-left:3px solid
                     var(--accent); background:var(--accent-soft);
                     border-radius:0 var(--r-card) var(--r-card) 0; }
   .doc blockquote p { margin:0; }
   .doc pre { background:var(--chip); padding:12px 15px; border-radius:var(--r-card);
-             overflow-x:auto; font-size:13px; line-height:1.5; }
+             overflow-x:auto; font-size:15px; line-height:1.5; }
   .doc pre code { background:none; padding:0; }
   .doc .tablewrap { overflow-x:auto; }
-  .doc table { border-collapse:collapse; font-size:14px; }
+  .doc table { border-collapse:collapse; font-size:16px; }
   .doc th, .doc td { border:1px solid var(--line); padding:5px 11px; text-align:left; }
   .doc th { background:var(--chip); }
   .doc h2, .doc h3 { scroll-margin-top:16px; }
@@ -201,12 +208,12 @@ STYLE = theme.style("""\
   .doc figure img { display:block; max-width:100%; height:auto; padding:8px;
                     background:#FFFFFF; border:1px solid var(--line);
                     border-radius:var(--r-card); }
-  .doc figcaption { margin:6px 0 0; font-size:13.5px; color:var(--muted);
+  .doc figcaption { margin:6px 0 0; font-size:15.5px; color:var(--muted);
                     max-width:68ch; }
   .doc sup.fn { font-size:.72em; line-height:0; }
   .doc sup.fn a { text-decoration:none; font-weight:600; }
   .doc .footnotes { margin:38px 0 0; padding:14px 0 0; border-top:1px solid var(--line);
-                    font-size:13.5px; color:var(--muted); }
+                    font-size:15.5px; color:var(--muted); }
   .doc .footnotes ol { padding-left:22px; }
   .doc .footnotes li { max-width:72ch; margin:0 0 6px; }
   .doc .footnotes li:target { color:var(--ink); }
@@ -220,16 +227,16 @@ STYLE = theme.style("""\
                   border-radius:0 var(--r-card) var(--r-card) 0; }
   .doc .callout p { margin:0 0 8px; }
   .doc .callout p:last-child { margin-bottom:0; }
-  .doc .callout-title { font-weight:700; font-size:13px; letter-spacing:.04em;
+  .doc .callout-title { font-weight:700; font-size:15px; letter-spacing:.04em;
                         text-transform:uppercase; }
   .doc .callout.tip { border-color:var(--good); background:var(--good-soft); }
   .doc .callout.warning, .doc .callout.caution {
     border-color:var(--warn-text); background:var(--warn-soft); }
   .banner { margin:22px 0 0; padding:13px 17px; border:1.5px solid var(--line);
-            border-radius:var(--r-card); font-size:14px; color:var(--muted);
+            border-radius:var(--r-card); font-size:16px; color:var(--muted);
             background:var(--panel); }
   .banner b { color:var(--ink); }
-  .say { font:13px """ + theme.FONT_MONO + """; background:var(--chip);
+  .say { font:15px """ + theme.FONT_MONO + """; background:var(--chip);
          padding:2px 8px; border-radius:var(--r-ctl); }
 """)
 
